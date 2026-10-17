@@ -1,5 +1,9 @@
 import XCTest
+#if canImport(JournalCore)
 @testable import JournalCore
+#else
+@testable import Lamplight
+#endif
 
 final class DayCalendarTests: XCTestCase {
     func testKnownDayNumbers() {
@@ -155,5 +159,19 @@ final class OnThisDayTests: XCTestCase {
         ]
         let groups = OnThisDay.groups(entries: list, today: DayStamp(year: 2028, month: 2, day: 29), calendar: calendar)
         XCTAssertEqual(groups.map(\.year), [2024])
+    }
+}
+
+final class StreakMessageTests: XCTestCase {
+    func testMessages() {
+        func message(_ current: Int) -> String {
+            var s = StreakSummary.empty
+            s.current = current
+            return s.savedMessage
+        }
+        XCTAssertEqual(message(1), "Saved. Day one.")
+        XCTAssertEqual(message(5), "Saved. 5 days in a row.")
+        XCTAssertEqual(message(7), "Saved. A full week.")
+        XCTAssertEqual(message(365), "Saved. A whole year.")
     }
 }

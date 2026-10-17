@@ -1,5 +1,9 @@
 import Foundation
+#if canImport(JournalCore)
 @testable import JournalCore
+#else
+@testable import Lamplight
+#endif
 
 enum T {
     /// "2026-10-17T21:14:03Z" -> Date

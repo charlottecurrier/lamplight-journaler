@@ -300,6 +300,54 @@ final class Library {
         try files.remove(layout.trashEntryDir(entryID))
     }
 
+    // MARK: Copying between libraries
+
+    struct CopyReport: Equatable {
+        var copied = 0
+        var skipped = 0
+        var failed = 0
+    }
+
+    /// Copies journals, templates, entries and photos into another library. Nothing in the destination is
+    /// overwritten and nothing in this library is touched, so moving to a new folder can't lose anything.
+    func copyContents(to destination: Library) -> CopyReport {
+        var report = CopyReport()
+        let pairs = [
+            (layout.journalsDir, destination.layout.journalsDir),
+            (layout.templatesDir, destination.layout.templatesDir),
+            (layout.entriesDir, destination.layout.entriesDir),
+        ]
+        for (source, target) in pairs {
+            copyTree(from: source, to: target, into: destination.files, report: &report)
+        }
+        if !destination.files.exists(destination.layout.settingsFile),
+           let data = try? files.read(layout.settingsFile) {
+            if (try? destination.files.write(data, to: destination.layout.settingsFile)) != nil {
+                report.copied += 1
+            } else {
+                report.failed += 1
+            }
+        }
+        return report
+    }
+
+    private func copyTree(from source: URL, to target: URL, into destination: FileAccess, report: inout CopyReport) {
+        guard let items = try? files.list(source) else { return }
+        for item in items {
+            let targetURL = target.appendingPathComponent(item.name, isDirectory: item.isDirectory)
+            if item.isDirectory {
+                try? destination.createDirectory(targetURL)
+                copyTree(from: item.url, to: targetURL, into: destination, report: &report)
+            } else if destination.exists(targetURL) {
+                report.skipped += 1
+            } else if let data = try? files.read(item.url), (try? destination.write(data, to: targetURL)) != nil {
+                report.copied += 1
+            } else {
+                report.failed += 1
+            }
+        }
+    }
+
     /// Permanently removes entries that have been in Recently Deleted longer than `days`.
     @discardableResult
     func purgeTrash(olderThanDays days: Int = 30, now: Date = Date()) -> Int {
@@ -311,3 +359,6 @@ final class Library {
         return removed
     }
 }
+
+// Library keeps no mutable state; all work goes through the FileAccess it was given.
+extension Library: @unchecked Sendable {}

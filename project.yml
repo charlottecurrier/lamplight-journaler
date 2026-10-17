@@ -1,0 +1,87 @@
+# Xcode project definition. Generate the project with:  xcodegen
+# (brew install xcodegen). A generated Lamplight.xcodeproj is committed too, so you only need to
+# re-run xcodegen after adding or removing files.
+name: Lamplight
+
+options:
+  bundleIdPrefix: com.forageandjump
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Automatic
+    TARGETED_DEVICE_FAMILY: "1,2" # iPhone and iPad
+    DEVELOPMENT_TEAM: "" # Pick your team in Xcode > Signing & Capabilities
+
+targets:
+  Lamplight:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+      - path: Sources/JournalCore
+    settings:
+      base:
+        # Must be unique to you. Change it if Xcode says the identifier is taken.
+        PRODUCT_BUNDLE_IDENTIFIER: com.forageandjump.lamplight
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ENABLE_PREVIEWS: YES
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Lamplight
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        NSFaceIDUsageDescription: Lamplight uses Face ID to keep your journal private.
+        # Lets you see the "on this device only" journal in the Files app.
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+        ITSAppUsesNonExemptEncryption: false
+
+  LamplightTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests/JournalCoreTests
+    dependencies:
+      - target: Lamplight
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.forageandjump.lamplight.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  Lamplight:
+    build:
+      targets:
+        Lamplight: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - LamplightTests
+    profile:
+      config: Release
+    archive:
+      config: Release

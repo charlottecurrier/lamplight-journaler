@@ -1,5 +1,9 @@
 import XCTest
+#if canImport(JournalCore)
 @testable import JournalCore
+#else
+@testable import Lamplight
+#endif
 
 /// Wraps the real file system and pretends another device left conflicting versions behind.
 private struct ConflictingFileAccess: FileAccess {
@@ -228,6 +232,40 @@ final class LibraryTests: XCTestCase {
         XCTAssertEqual(try library.readPhoto(entryID: copies[0].id, fileName: "p.jpg"), Data([7]))
         XCTAssertEqual(try library.loadEntry(id: entry.id).body, "version on this iPad")
         XCTAssertEqual(access.cleared.urls, [library.layout.entryFile(entry.id)])
+    }
+
+    // MARK: Copying
+
+    func testCopyContentsBringsEverythingAndNeverOverwrites() throws {
+        var entry = T.entry("2026-10-17T21:14:03Z", body: "from the old folder")
+        entry.photos = [PhotoRef(fileName: "p.jpg", width: 1, height: 1)]
+        try library.save(entry)
+        try library.writePhoto(Data([4, 2]), fileName: "p.jpg", entryID: entry.id)
+        let template = EntryTemplate(name: "Evening", questions: ["Q1"], createdAt: T.date("2026-10-01T00:00:00Z"))
+        try library.save(template)
+        try library.save(LibrarySettings(home: EntryLocation(name: "Home", isHome: true)))
+
+        let other = Library(root: dir.appendingPathComponent("New", isDirectory: true))
+        try other.prepare()
+        let sameID = T.entry("2026-10-01T10:00:00Z", body: "already in the new folder")
+        try other.save(sameID)
+        var clash = sameID
+        clash.body = "old folder's different version"
+        try library.save(clash)
+
+        let report = library.copyContents(to: other)
+        XCTAssertEqual(report.failed, 0)
+        XCTAssertGreaterThan(report.copied, 0)
+        XCTAssertGreaterThan(report.skipped, 0)
+
+        XCTAssertEqual(try other.loadEntry(id: entry.id).body, "from the old folder")
+        XCTAssertEqual(try other.readPhoto(entryID: entry.id, fileName: "p.jpg"), Data([4, 2]))
+        XCTAssertEqual(try other.loadEntry(id: sameID.id).body, "already in the new folder")
+        XCTAssertEqual(other.loadTemplates(), [template])
+        XCTAssertEqual(other.loadSettings().home?.name, "Home")
+        XCTAssertEqual(other.loadJournals().count, 1)
+        // The source is untouched.
+        XCTAssertEqual(try library.loadEntry(id: entry.id).body, "from the old folder")
     }
 
     func testNoConflictsMeansNoWork() {

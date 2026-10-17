@@ -1,5 +1,9 @@
 import XCTest
+#if canImport(JournalCore)
 @testable import JournalCore
+#else
+@testable import Lamplight
+#endif
 
 final class EntryFileTests: XCTestCase {
     let defaults = EntryFileDefaults(

@@ -1,5 +1,9 @@
 import XCTest
+#if canImport(JournalCore)
 @testable import JournalCore
+#else
+@testable import Lamplight
+#endif
 
 final class EntryTextTests: XCTestCase {
     func testPlainEntryUsesFirstLineAsTitle() {
@@ -90,5 +94,38 @@ final class TemplateComposerTests: XCTestCase {
         )
         XCTAssertEqual(decoded.body, body)
         XCTAssertEqual(decoded.templateID, template.id)
+    }
+}
+
+final class MarkdownBlocksTests: XCTestCase {
+    func testHeadingsAndParagraphs() {
+        let blocks = MarkdownBlocks.parse("## What went well?\n\nThe light.\nSecond line.\n\n## What was hard?\n\nNot much.\n")
+        XCTAssertEqual(blocks, [
+            .heading(level: 2, text: "What went well?"),
+            .paragraph("The light.\nSecond line."),
+            .heading(level: 2, text: "What was hard?"),
+            .paragraph("Not much."),
+        ])
+    }
+
+    func testHashtagIsNotAHeading() {
+        XCTAssertEqual(MarkdownBlocks.parse("#grateful for today"), [.paragraph("#grateful for today")])
+        XCTAssertEqual(MarkdownBlocks.parse("#"), [.paragraph("#")])
+        XCTAssertEqual(MarkdownBlocks.parse("####### seven"), [.paragraph("####### seven")])
+    }
+
+    func testHeadingRightAfterTextStartsANewBlock() {
+        XCTAssertEqual(MarkdownBlocks.parse("Intro\n# Title\nMore"), [
+            .paragraph("Intro"), .heading(level: 1, text: "Title"), .paragraph("More"),
+        ])
+    }
+
+    func testBlankInput() {
+        XCTAssertEqual(MarkdownBlocks.parse(""), [])
+        XCTAssertEqual(MarkdownBlocks.parse("\n \n\n"), [])
+    }
+
+    func testWindowsLineEndings() {
+        XCTAssertEqual(MarkdownBlocks.parse("## Q\r\n\r\nA\r\n"), [.heading(level: 2, text: "Q"), .paragraph("A")])
     }
 }

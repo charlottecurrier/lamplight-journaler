@@ -63,3 +63,18 @@ enum Streaks {
         )
     }
 }
+
+extension StreakSummary {
+    /// The line shown after the first entry of a day is saved. Calm, not cheerleading.
+    var savedMessage: String {
+        switch current {
+        case 0, 1: return "Saved. Day one."
+        case 7: return "Saved. A full week."
+        case 14: return "Saved. Two weeks."
+        case 30: return "Saved. Thirty days in a row."
+        case 100: return "Saved. One hundred days."
+        case 365: return "Saved. A whole year."
+        default: return "Saved. \(current) days in a row."
+        }
+    }
+}
