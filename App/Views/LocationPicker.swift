@@ -59,7 +59,7 @@ struct LocationPickerView: View {
                     }
                     ForEach(searcher.suggestions, id: \.self) { suggestion in
                         Button {
-                            Task {
+                            Task { @MainActor in
                                 isResolving = true
                                 let place = await searcher.resolve(suggestion)
                                 isResolving = false
@@ -159,7 +159,7 @@ struct HomeEditorView: View {
                     .autocorrectionDisabled()
                 ForEach(searcher.suggestions, id: \.self) { suggestion in
                     Button {
-                        Task {
+                        Task { @MainActor in
                             let found = await searcher.resolve(suggestion)
                             place = found
                             query = ""

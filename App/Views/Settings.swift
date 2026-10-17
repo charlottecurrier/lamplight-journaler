@@ -93,7 +93,7 @@ struct SettingsView: View {
                     LabeledContent("Journal location", value: model.storageName)
                     Button("Choose a Different Folder…") { showFolderPicker = true }
                     Button("Refresh Now") {
-                        Task { await model.refresh() }
+                        Task { @MainActor in await model.refresh() }
                     }
                 } header: {
                     Text("Storage")
@@ -316,7 +316,7 @@ struct RecentlyDeletedView: View {
                 .listRowBackground(Theme.surface)
                 .swipeActions(edge: .leading) {
                     Button {
-                        Task { await model.restore(item.id); await reload() }
+                        Task { @MainActor in await model.restore(item.id); await reload() }
                     } label: {
                         Label("Restore", systemImage: "arrow.uturn.backward")
                     }
@@ -324,19 +324,19 @@ struct RecentlyDeletedView: View {
                 }
                 .swipeActions(edge: .trailing) {
                     Button(role: .destructive) {
-                        Task { await model.deleteForever(item.id); await reload() }
+                        Task { @MainActor in await model.deleteForever(item.id); await reload() }
                     } label: {
                         Label("Delete Now", systemImage: "trash")
                     }
                 }
                 .contextMenu {
                     Button {
-                        Task { await model.restore(item.id); await reload() }
+                        Task { @MainActor in await model.restore(item.id); await reload() }
                     } label: {
                         Label("Restore", systemImage: "arrow.uturn.backward")
                     }
                     Button(role: .destructive) {
-                        Task { await model.deleteForever(item.id); await reload() }
+                        Task { @MainActor in await model.deleteForever(item.id); await reload() }
                     } label: {
                         Label("Delete Now", systemImage: "trash")
                     }

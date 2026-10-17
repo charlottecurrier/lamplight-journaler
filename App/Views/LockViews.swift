@@ -29,7 +29,7 @@ struct LockView: View {
                 }
 
                 Button("Unlock with \(LockManager.methodName)") {
-                    Task { await lock.unlock() }
+                    Task { @MainActor in await lock.unlock() }
                 }
                 .buttonStyle(.primaryPaper)
                 .padding(.top, 8)

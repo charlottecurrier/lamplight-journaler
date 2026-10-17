@@ -13,6 +13,8 @@ final class LockManager {
     private(set) var passcodeMissing = false
 
     @ObservationIgnored private var backgroundedAt: Date?
+    /// Set once the lock screen has asked for Face ID on its own. After a cancel, only the Unlock button asks again.
+    @ObservationIgnored private var hasAutoPrompted = false
 
     init(startLocked: Bool) {
         isLocked = startLocked
@@ -43,6 +45,7 @@ final class LockManager {
         switch phase {
         case .background:
             if backgroundedAt == nil { backgroundedAt = Date() }
+            hasAutoPrompted = false
         case .active:
             if let since = backgroundedAt {
                 backgroundedAt = nil
@@ -53,8 +56,16 @@ final class LockManager {
         }
     }
 
+    /// True once, each time the lock screen comes up, so Face ID is offered automatically but never nagged.
+    func takeAutoPrompt() -> Bool {
+        guard isLocked, !hasAutoPrompted else { return false }
+        hasAutoPrompted = true
+        return true
+    }
+
     func lock() {
         guard !isLocked else { return }
+        hasAutoPrompted = false
         isLocked = true
         failureMessage = nil
         // Close the keyboard so nothing stays open behind the lock screen.

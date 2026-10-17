@@ -213,7 +213,7 @@ struct EntryEditorView: View {
 
     private func scheduleSave() {
         saveTask?.cancel()
-        saveTask = Task {
+        saveTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: 800_000_000)
             guard !Task.isCancelled else { return }
             commit()
@@ -241,7 +241,7 @@ struct EntryEditorView: View {
         let items = pickerItems
         pickerItems = []
         guard !items.isEmpty else { return }
-        Task {
+        Task { @MainActor in
             isImporting = true
             var images: [Data] = []
             for item in items {

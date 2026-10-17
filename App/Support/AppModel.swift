@@ -313,6 +313,8 @@ final class AppModel {
         body: String = "",
         location: EntryLocation? = nil
     ) -> UUID {
+        // Forget any earlier new entry that was never typed in.
+        entries.removeAll { $0.isBlank && !persistedIDs.contains($0.id) }
         let entry = Entry(journalID: journalID, templateID: templateID, location: location, body: body)
         entries.insert(entry, at: 0)
         editingEntryID = entry.id
@@ -330,7 +332,8 @@ final class AppModel {
 
     /// Ends an editing session. An entry with nothing in it is dropped instead of saved.
     func finishEditing(_ id: UUID, announce: Bool, calendar: DayCalendar) {
-        if editingEntryID == id { editingEntryID = nil }
+        let wasEditing = editingEntryID == id
+        if wasEditing { editingEntryID = nil }
         guard let entry = entry(id) else { return }
         if entry.isBlank {
             entries.removeAll { $0.id == id }
@@ -339,6 +342,7 @@ final class AppModel {
             }
             return
         }
+        guard wasEditing else { return }
         persist(entry)
         if announce { announceSaved(entry, calendar: calendar) }
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()

@@ -31,7 +31,7 @@ struct RootView: View {
                 timeout: prefs.lockTimeout.seconds
             )
             if scenePhase == .active {
-                Task { await model.refresh() }
+                Task { @MainActor in await model.refresh() }
             }
         }
         .onChange(of: prefs.lockEnabled) {
@@ -40,7 +40,7 @@ struct RootView: View {
         // Ask for Face ID as soon as the lock screen is in front. Cancelling doesn't ask again;
         // the Unlock button does.
         .task(id: lock.isLocked && scenePhase == .active) {
-            guard lock.isLocked, scenePhase == .active else { return }
+            guard scenePhase == .active, lock.takeAutoPrompt() else { return }
             try? await Task.sleep(nanoseconds: 300_000_000)
             await lock.unlock()
         }
