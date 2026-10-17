@@ -215,7 +215,9 @@ private struct TemplateForm: View {
         .background(PaperBackground())
         .navigationTitle("Edit Template")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar { EditButton() }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) { EditButton() }
+        }
         .onChange(of: name) { save() }
         .onChange(of: items) { save() }
         .onChange(of: defaultJournalID) { save() }

@@ -9,7 +9,7 @@ struct MonthGrid: View {
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
 
-    private var calendar: Calendar { Calendar.current }
+    private var calendar: Calendar { Calendar.journal }
 
     private var weekdayHeaders: [String] {
         let symbols = calendar.veryShortWeekdaySymbols
@@ -109,7 +109,7 @@ struct CalendarScreen: View {
     @State private var selectedDay: DayStamp?
 
     private func shiftMonth(_ delta: Int) {
-        if let moved = Calendar.current.date(byAdding: .month, value: delta, to: month) {
+        if let moved = Calendar.journal.date(byAdding: .month, value: delta, to: month) {
             withAnimation(.easeInOut(duration: 0.2)) { month = moved }
         }
     }
@@ -119,8 +119,8 @@ struct CalendarScreen: View {
         parts.year = day.year
         parts.month = day.month
         parts.day = day.day
-        guard let date = Calendar.current.date(from: parts) else { return "" }
-        return date.formatted(.dateTime.weekday(.wide).month(.wide).day())
+        guard let date = Calendar.journal.date(from: parts) else { return "" }
+        return date.formatted(Date.FormatStyle(calendar: .journal).weekday(.wide).month(.wide).day())
     }
 
     var body: some View {

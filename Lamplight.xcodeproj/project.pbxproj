@@ -26,6 +26,7 @@
 		512240FF9E7A2545D9C0BC4C /* TextAndTemplateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFDC559D91BE1D8511F84EEE /* TextAndTemplateTests.swift */; };
 		54FF6543ED72547F635DE58F /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5491C8FA97B11EBBF1BD82B4 /* Theme.swift */; };
 		5BE3474E513CEC29C76EB2A1 /* LamplightApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 207FB51548BCEE5615F2F616 /* LamplightApp.swift */; };
+		5C63CE799C11D6575BB401BB /* IO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E2BB08B950AFCA5FCCE4DB1 /* IO.swift */; };
 		5F16DD6D06C986B5A04EA51F /* StreakAndOnThisDay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BE5182385723CEA9BB56D5B /* StreakAndOnThisDay.swift */; };
 		604AD211542A316381FAA0DF /* Palette.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBBF3D1EE7EDB2A03C483517 /* Palette.swift */; };
 		785FB16E5BAB7A00BD5EC7D3 /* CalendarScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 009079C9CED4DD64ECECA30B /* CalendarScreen.swift */; };
@@ -41,6 +42,7 @@
 		C2148EFDD029B67D7CDAC8C2 /* EntryEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0DCF3193C40A2D5ACB6810 /* EntryEditor.swift */; };
 		C8F4BBDECE33D51DBF38B171 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F114470549B0A7F0EB8B7257 /* RootView.swift */; };
 		CC3C876BFCD16AB7484BD75D /* TestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB3B2BE259D1C1BE36AB6B36 /* TestSupport.swift */; };
+		CE523ED9A8B8E53F6BD50E70 /* SampleFolderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6BCA8060694A1AD9EDCB356 /* SampleFolderTests.swift */; };
 		DC24C01A51129B32C2288F66 /* Streaks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 005A58A0E03C68B6A00E2F9B /* Streaks.swift */; };
 		E1DC34F787BD217E204BAE1A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F4658FCE2F66D8CD9E1CDAAF /* Assets.xcassets */; };
 		EC565338735D2F01589540A5 /* LibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CBE403099A9389B2B848284 /* LibraryTests.swift */; };
@@ -83,6 +85,7 @@
 		52712EE65A0CD96BF4BE5531 /* StorageLocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageLocation.swift; sourceTree = "<group>"; };
 		5491C8FA97B11EBBF1BD82B4 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		5B95823AD791B7E84498532B /* OnThisDay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnThisDay.swift; sourceTree = "<group>"; };
+		5E2BB08B950AFCA5FCCE4DB1 /* IO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IO.swift; sourceTree = "<group>"; };
 		61BF25975884AA034412A213 /* Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Settings.swift; sourceTree = "<group>"; };
 		67891C9630602F98A6B8BDBC /* ImageTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageTools.swift; sourceTree = "<group>"; };
 		6E5BE0348E80F2CF20230C51 /* EntryFileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntryFileTests.swift; sourceTree = "<group>"; };
@@ -97,6 +100,7 @@
 		B8E1841F5704D8743F4B29D4 /* EntryFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntryFile.swift; sourceTree = "<group>"; };
 		B9313CDB7E0DDC2AF4B8F378 /* EntryList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntryList.swift; sourceTree = "<group>"; };
 		BFA78D27462BEE3157679BCC /* AppPrefs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPrefs.swift; sourceTree = "<group>"; };
+		C6BCA8060694A1AD9EDCB356 /* SampleFolderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleFolderTests.swift; sourceTree = "<group>"; };
 		C8A6A576038E1819DCC9B29D /* DayCalendar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayCalendar.swift; sourceTree = "<group>"; };
 		CB3B2BE259D1C1BE36AB6B36 /* TestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestSupport.swift; sourceTree = "<group>"; };
 		CBBF3D1EE7EDB2A03C483517 /* Palette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Palette.swift; sourceTree = "<group>"; };
@@ -176,6 +180,7 @@
 				A52C54B6479E9626367BE999 /* DayAndStreakTests.swift */,
 				6E5BE0348E80F2CF20230C51 /* EntryFileTests.swift */,
 				7CBE403099A9389B2B848284 /* LibraryTests.swift */,
+				C6BCA8060694A1AD9EDCB356 /* SampleFolderTests.swift */,
 				CB3B2BE259D1C1BE36AB6B36 /* TestSupport.swift */,
 				EFDC559D91BE1D8511F84EEE /* TextAndTemplateTests.swift */,
 			);
@@ -212,6 +217,7 @@
 				9F55EF7462A0B312423293AA /* CoordinatedFileAccess.swift */,
 				8875EA9ACB53EB8EFD9183B3 /* Formatting.swift */,
 				67891C9630602F98A6B8BDBC /* ImageTools.swift */,
+				5E2BB08B950AFCA5FCCE4DB1 /* IO.swift */,
 				29825E762AFF8EDF0CFC1ECE /* LockManager.swift */,
 				282ECA86077F2686E2CF3953 /* PlaceSearcher.swift */,
 				52712EE65A0CD96BF4BE5531 /* StorageLocation.swift */,
@@ -338,6 +344,7 @@
 				C01B45505BA742D4510FCEF7 /* DayAndStreakTests.swift in Sources */,
 				A7AF6811FE5A1848EA84CEEF /* EntryFileTests.swift in Sources */,
 				EC565338735D2F01589540A5 /* LibraryTests.swift in Sources */,
+				CE523ED9A8B8E53F6BD50E70 /* SampleFolderTests.swift in Sources */,
 				CC3C876BFCD16AB7484BD75D /* TestSupport.swift in Sources */,
 				512240FF9E7A2545D9C0BC4C /* TextAndTemplateTests.swift in Sources */,
 			);
@@ -361,6 +368,7 @@
 				F7C20E6F249944AFE1799665 /* EntryText.swift in Sources */,
 				50CE04C60CB646144BE4A33E /* FileAccess.swift in Sources */,
 				7E525EA57A3DEDD50A975E11 /* Formatting.swift in Sources */,
+				5C63CE799C11D6575BB401BB /* IO.swift in Sources */,
 				469EEA06985F7B5839EF049C /* ImageTools.swift in Sources */,
 				5BE3474E513CEC29C76EB2A1 /* LamplightApp.swift in Sources */,
 				46845C08672E031A174862EC /* Library.swift in Sources */,

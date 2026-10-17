@@ -13,6 +13,11 @@ struct StreakCard: View {
         return "Begin again tonight."
     }
 
+    private var spoken: String {
+        let days = summary.current == 1 ? "day" : "days"
+        return "\(summary.current) \(days) in a row. \(message) Longest streak \(summary.longest). \(summary.totalDays) days written."
+    }
+
     var body: some View {
         HStack(alignment: .center, spacing: 20) {
             VStack(alignment: .leading, spacing: 2) {
@@ -44,10 +49,7 @@ struct StreakCard: View {
         .padding(18)
         .paperCard()
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(
-            "\(summary.current) \(summary.current == 1 ? "day" : "days") in a row. \(message) "
-                + "Longest streak \(summary.longest). \(summary.totalDays) days written."
-        )
+        .accessibilityLabel(spoken)
     }
 }
 
@@ -164,6 +166,7 @@ struct OnThisDayStrip: View {
                 SectionLabel("On this day")
                 Spacer()
                 Button("See all", action: onSeeAll)
+                    .buttonStyle(.borderless)
                     .font(Theme.serif(.footnote, weight: .medium))
                     .foregroundStyle(Theme.accent)
             }

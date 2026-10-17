@@ -9,11 +9,13 @@ struct PhotoThumb: View {
     var maxPixel: CGFloat = 480
 
     @State private var image: UIImage?
+    /// Which photo `image` belongs to. The view can be reused for a different photo, so the two must match.
+    @State private var imageFor: UUID?
 
     var body: some View {
         Theme.raised
             .overlay {
-                if let image {
+                if let image, imageFor == photo.id {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
@@ -25,9 +27,12 @@ struct PhotoThumb: View {
             }
             .clipped()
             .task(id: "\(photo.id.uuidString)-\(model.refreshCounter)") {
-                guard image == nil else { return }
+                if image != nil, imageFor == photo.id { return }
                 let loaded = await model.image(entryID: entryID, photo: photo, maxPixel: maxPixel)
-                withAnimation(.easeOut(duration: 0.25)) { image = loaded }
+                withAnimation(.easeOut(duration: 0.25)) {
+                    image = loaded
+                    imageFor = loaded == nil ? nil : photo.id
+                }
             }
             .accessibilityHidden(true)
     }

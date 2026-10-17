@@ -9,6 +9,17 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
+# A Swift file that isn't in the Xcode project breaks the Xcode build but not `swift test`. Catch that here.
+missing=0
+for file in "$ROOT"/App/*.swift "$ROOT"/App/*/*.swift "$ROOT"/Sources/JournalCore/*.swift "$ROOT"/Tests/JournalCoreTests/*.swift; do
+  name="$(basename "$file")"
+  if ! grep -q "$name in Sources" "$ROOT/Lamplight.xcodeproj/project.pbxproj"; then
+    echo "Not in Lamplight.xcodeproj: $name. Run xcodegen."
+    missing=1
+  fi
+done
+[ "$missing" -eq 0 ] || exit 1
+
 cp "$ROOT"/Sources/JournalCore/*.swift "$WORK"/
 for name in AppModel StorageLocation CoordinatedFileAccess LockManager Formatting IO; do
   # SwiftUI and UIKit imports become Foundation. The rest is stood in for by tools/typecheck_stubs.swift.

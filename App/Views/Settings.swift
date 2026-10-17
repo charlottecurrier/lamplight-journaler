@@ -194,7 +194,9 @@ struct JournalsSettingsView: View {
         .background(PaperBackground())
         .navigationTitle("Journals")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar { EditButton() }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) { EditButton() }
+        }
         .sheet(item: $editing) { journal in
             JournalEditor(journal: journal)
         }

@@ -1,5 +1,16 @@
 import Foundation
 
+extension Calendar {
+    /// The calendar the journal counts days with. Entries are stamped with Gregorian years no matter which
+    /// calendar the device shows, so month grids must use the same one. Only the first weekday follows the device.
+    static var journal: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.firstWeekday = Calendar.current.firstWeekday
+        calendar.locale = Calendar.current.locale
+        return calendar
+    }
+}
+
 /// Date text for an entry, always in the time zone the entry was written in.
 enum Fmt {
     private static func style(_ entry: Entry) -> Date.FormatStyle {
@@ -38,7 +49,7 @@ enum Fmt {
 
     /// "October 2026" for a calendar page.
     static func monthYear(_ date: Date) -> String {
-        date.formatted(.dateTime.month(.wide).year())
+        date.formatted(Date.FormatStyle(calendar: .journal).month(.wide).year())
     }
 
     /// Days left before something in Recently Deleted is removed for good.

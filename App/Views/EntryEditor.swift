@@ -64,9 +64,13 @@ struct EntryEditorView: View {
             try? await Task.sleep(nanoseconds: 350_000_000)
             focused = true
         }
+        .onChange(of: showDate) { if !showDate { focused = true } }
+        .onChange(of: showPlace) { if !showPlace { focused = true } }
         .onDisappear {
             saveTask?.cancel()
             commit()
+            // A full-screen photo covers this screen without leaving it.
+            guard viewer == nil else { return }
             model.finishEditing(draft.id, announce: false, calendar: prefs.dayCalendar)
         }
     }

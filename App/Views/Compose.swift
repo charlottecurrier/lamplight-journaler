@@ -9,6 +9,9 @@ struct ComposeSheet: View {
 
     @State private var journalID: UUID
     @State private var flowTemplate: EntryTemplate?
+    private let initialTemplate: EntryTemplate?
+    @State private var confirmDiscard = false
+    @State private var didAutoStart = false
     /// Answers survive going back to the list, so a slip of the thumb doesn't lose them.
     @State private var answers: [UUID: [String]] = [:]
 
@@ -18,8 +21,8 @@ struct ComposeSheet: View {
         onCreate: @escaping (_ journalID: UUID, _ templateID: UUID?, _ body: String) -> Void
     ) {
         self.onCreate = onCreate
+        self.initialTemplate = initialTemplate
         _journalID = State(initialValue: initialJournalID)
-        _flowTemplate = State(initialValue: initialTemplate)
     }
 
     private var hasUnsavedAnswers: Bool {
@@ -86,7 +89,22 @@ struct ComposeSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") {
+                        if hasUnsavedAnswers { confirmDiscard = true } else { dismiss() }
+                    }
+                }
+            }
+            .confirmationDialog("Discard your answers?", isPresented: $confirmDiscard, titleVisibility: .visible) {
+                Button("Discard Answers", role: .destructive) { dismiss() }
+                Button("Keep Writing", role: .cancel) {}
+            } message: {
+                Text("You've started answering a template. Nothing is saved yet.")
+            }
+            .task {
+                // "Write with this template" opens straight into its questions.
+                if let initialTemplate, !didAutoStart {
+                    didAutoStart = true
+                    flowTemplate = initialTemplate
                 }
             }
             .navigationDestination(item: $flowTemplate) { template in
@@ -103,7 +121,7 @@ struct ComposeSheet: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents(flowTemplate == nil ? [.medium, .large] : [.large])
         .interactiveDismissDisabled(hasUnsavedAnswers)
     }
 

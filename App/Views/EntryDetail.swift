@@ -75,9 +75,12 @@ struct EntryDetailView: View {
                     .id(entryID)
             } else {
                 reader(entry)
+                    .id(entryID)
             }
         } else {
+            // The entry is gone (an empty new entry, or deleted elsewhere). Leave this screen.
             DetailPlaceholder(onCompose: onCompose)
+                .onAppear { onClose() }
         }
     }
 
