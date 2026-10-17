@@ -15,6 +15,7 @@ An iPad-first (also iPhone) SwiftUI journal. Entries are Markdown files in a fol
 swift test                                   # Core tests (needs a Swift toolchain)
 LAMPLIGHT_SAMPLE_DIR=<dir> swift test --filter SampleFolderTests   # checks tools/make_sample_journal.py output
 xcodegen                                     # regenerate Lamplight.xcodeproj (set USER=anyname on Linux)
+tools/typecheck_support.sh                   # type-checks App/Support (model, storage) against iOS stand-ins on Linux
 python3 tools/check_palette.py               # contrast checks, writes docs/palette-preview.png
 python3 tools/make_assets.py                 # redraws textures, icon and color sets
 python3 tools/make_sample_journal.py <dir>   # sample data for trying the app
@@ -24,7 +25,7 @@ On Linux, a Swift toolchain can be downloaded from `download.swift.org` (Ubuntu 
 
 ## What can and can't be verified without a Mac
 
-- Verified in CI-less environments: everything in `Sources/JournalCore` (64 tests), `App/Support/Formatting.swift` (it only needs Foundation), the Python tools, the project structure.
+- Verified in CI-less environments: everything in `Sources/JournalCore` (64 tests), the model and storage code in `App/Support` (type-checked against stand-ins by `tools/typecheck_support.sh`), the Python tools, the project structure. `ImageTools`, `PlaceSearcher`, `AppPrefs` and `Theme` are read-checked only.
 - **Not compilable on Linux:** all SwiftUI/UIKit code in `App/`. Review it by reading. Check every call against the declarations in Core and `AppModel` before assuming it compiles.
 
 ## Rules that matter

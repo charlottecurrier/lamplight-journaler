@@ -17,6 +17,7 @@ final class PlaceSearcher: NSObject, ObservableObject, MKLocalSearchCompleterDel
     func update(query: String) {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
+            completer.queryFragment = ""
             suggestions = []
         } else {
             completer.queryFragment = trimmed

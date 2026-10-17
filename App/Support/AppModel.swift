@@ -70,6 +70,9 @@ final class AppModel {
     @ObservationIgnored private var retryTask: Task<Void, Never>?
     @ObservationIgnored private var retryCount = 0
     @ObservationIgnored private var isRefreshing = false
+    @ObservationIgnored private var refreshRequested = false
+    /// Counts every write. A folder read that started before a write finished is out of date and is thrown away.
+    @ObservationIgnored private var writeGeneration = 0
 
     init() {
         thumbnails.totalCostLimit = 160 * 1024 * 1024
@@ -117,16 +120,14 @@ final class AppModel {
         totalCount = 0
         let files = self.files
         Task {
-            let root = await Task.detached(priority: .userInitiated) {
-                LibraryLocator.resolveRoot(picked: picked, files: files)
-            }.value
+            let root = await IO.run { LibraryLocator.resolveRoot(picked: picked, files: files) }
             let newLibrary = Library(root: root, files: files)
             if let previous, previous.layout.root.standardizedFileURL != root.standardizedFileURL {
                 // Moving to a new folder: bring everything along. The old folder is left as it is.
-                await Task.detached(priority: .userInitiated) {
+                await IO.run {
                     try? newLibrary.prepare()
                     _ = previous.copyContents(to: newLibrary)
-                }.value
+                }
             }
             library = newLibrary
             storageName = storage.displayName
@@ -137,7 +138,7 @@ final class AppModel {
 
     private func load(_ library: Library, initial: Bool) async {
         do {
-            try await Task.detached(priority: .userInitiated) { try library.prepare() }.value
+            try await IO.runThrowing { try library.prepare() }
         } catch {
             phase = .problem("Lamplight couldn't open the journal folder. \(error.localizedDescription)")
             return
@@ -150,7 +151,7 @@ final class AppModel {
         }
         apply(snapshot)
         if initial {
-            Task.detached(priority: .background) { library.purgeTrash() }
+            Task { await IO.run { _ = library.purgeTrash() } }
         }
     }
 
@@ -181,11 +182,11 @@ final class AppModel {
 
     /// Entries still downloading from iCloud: look again in a few seconds.
     private func scheduleRetry() {
-        guard retryCount < 8 else { return }
+        guard retryCount < 20 else { return }
         retryCount += 1
         retryTask?.cancel()
         retryTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 6_000_000_000)
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
             guard !Task.isCancelled else { return }
             await self?.refresh()
         }
@@ -193,28 +194,47 @@ final class AppModel {
 
     /// Reads the journal folder again. Runs when the app comes forward and on pull-to-refresh.
     func refresh() async {
-        guard let library, phase == .ready, !isRefreshing else { return }
+        guard phase == .ready else { return }
+        if isRefreshing {
+            // Someone asked while a read was running. Read once more when it finishes.
+            refreshRequested = true
+            return
+        }
         isRefreshing = true
         defer { isRefreshing = false }
 
-        var waited = 0
-        while writesInFlight > 0 && waited < 30 {
-            try? await Task.sleep(nanoseconds: 100_000_000)
-            waited += 1
-        }
-        let snapshot = await Self.readEverything(library) { _, _ in }
-        apply(snapshot)
-        refreshCounter += 1
+        var attempts = 0
+        repeat {
+            refreshRequested = false
+            guard let library else { return }
+            attempts += 1
+
+            var waited = 0
+            while writesInFlight > 0 && waited < 30 {
+                try? await Task.sleep(nanoseconds: 100_000_000)
+                waited += 1
+            }
+            let generation = writeGeneration
+            let snapshot = await Self.readEverything(library) { _, _ in }
+
+            // Something was saved while the folder was being read, so this picture is already old.
+            // Read again rather than put back an entry that was just deleted or an old version of one that was edited.
+            if generation != writeGeneration || writesInFlight > 0 {
+                refreshRequested = true
+                continue
+            }
+            apply(snapshot)
+            refreshCounter += 1
+        } while refreshRequested && attempts < 3
     }
 
     nonisolated private static func readEverything(
         _ library: Library,
         progress: @escaping @Sendable (Int, Int) -> Void
     ) async -> LoadSnapshot {
-        let journals = library.loadJournals()
-        let templates = library.loadTemplates()
-        let settings = library.loadSettings()
-        let ids = (try? library.entryIDs()) ?? []
+        let (journals, templates, settings, ids) = await IO.run {
+            (library.loadJournals(), library.loadTemplates(), library.loadSettings(), (try? library.entryIDs()) ?? [])
+        }
 
         var entries: [Entry] = []
         var failed = 0
@@ -226,7 +246,7 @@ final class AppModel {
             while cursor < min(8, ids.count) {
                 let id = ids[cursor]
                 cursor += 1
-                group.addTask { Self.loadOne(library, id: id) }
+                group.addTask { await IO.run { Self.loadOne(library, id: id) } }
             }
             while let item = await group.next() {
                 done += 1
@@ -237,7 +257,7 @@ final class AppModel {
                 if cursor < ids.count {
                     let id = ids[cursor]
                     cursor += 1
-                    group.addTask { Self.loadOne(library, id: id) }
+                    group.addTask { await IO.run { Self.loadOne(library, id: id) } }
                 }
             }
         }
@@ -384,6 +404,7 @@ final class AppModel {
     /// Writes happen one at a time, in order, off the main thread.
     private func enqueueWrite(_ work: @escaping @Sendable () throws -> Void) {
         writesInFlight += 1
+        writeGeneration += 1
         writeQueue.async { [weak self] in
             var failed = false
             do { try work() } catch { failed = true }
@@ -402,7 +423,7 @@ final class AppModel {
         guard let library else { return [] }
         var added: [PhotoRef] = []
         for data in images {
-            let ref = await Task.detached(priority: .userInitiated) { () -> PhotoRef? in
+            let ref = await IO.run { () -> PhotoRef? in
                 guard let prepared = ImageTools.prepareForStorage(data) else { return nil }
                 let id = UUID()
                 let fileName = "\(id.uuidString).jpg"
@@ -412,7 +433,7 @@ final class AppModel {
                     return nil
                 }
                 return PhotoRef(id: id, fileName: fileName, width: prepared.width, height: prepared.height)
-            }.value
+            }
             if let ref { added.append(ref) }
         }
         if added.count < images.count { show("Some photos couldn't be added.") }
@@ -429,10 +450,10 @@ final class AppModel {
         let key = "\(entryID.uuidString)/\(photo.fileName)@\(Int(maxPixel))" as NSString
         if let cached = thumbnails.object(forKey: key) { return cached }
         guard let library else { return nil }
-        let image = await Task.detached(priority: .utility) { () -> UIImage? in
+        let image = await IO.run { () -> UIImage? in
             guard let data = try? library.readPhoto(entryID: entryID, fileName: photo.fileName) else { return nil }
             return ImageTools.downsample(data, maxPixel: maxPixel)
-        }.value
+        }
         if let image {
             let cost = Int(image.size.width * image.scale * image.size.height * image.scale * 4)
             thumbnails.setObject(image, forKey: key, cost: cost)
@@ -449,8 +470,9 @@ final class AppModel {
 
     func save(template: EntryTemplate) {
         guard let library else { return }
-        var saved = template
-        saved.modifiedAt = Date()
+        var edited = template
+        edited.modifiedAt = Date()
+        let saved = edited
         if let index = templates.firstIndex(where: { $0.id == saved.id }) {
             templates[index] = saved
         } else {
@@ -517,12 +539,12 @@ final class AppModel {
 
     func loadTrash() async -> [TrashedEntry] {
         guard let library else { return [] }
-        return await Task.detached { library.trashedEntries() }.value
+        return await IO.run { library.trashedEntries() }
     }
 
     func restore(_ id: UUID) async {
         guard let library else { return }
-        let restored = await Task.detached { (try? library.restore(entryID: id)) != nil }.value
+        let restored = await IO.run { (try? library.restore(entryID: id)) != nil }
         if restored {
             await refresh()
             show("Restored.")
@@ -533,7 +555,7 @@ final class AppModel {
 
     func deleteForever(_ id: UUID) async {
         guard let library else { return }
-        await Task.detached { try? library.deleteForever(entryID: id) }.value
+        await IO.run { _ = try? library.deleteForever(entryID: id) }
     }
 
     // MARK: Messages

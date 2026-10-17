@@ -12,19 +12,26 @@ struct CoordinatedFileAccess: FileAccess {
         url.deletingLastPathComponent().appendingPathComponent(".\(url.lastPathComponent).icloud")
     }
 
-    /// If iCloud only has a stub of this file, ask for it and wait a while.
-    private func waitForDownloadIfNeeded(_ url: URL) {
+    /// If iCloud only has a stub of this file, ask for it.
+    ///
+    /// Text files (entries, journals, templates) fail right away and are picked up by the next refresh,
+    /// so opening the journal never waits on a slow or missing connection. A photo is worth a short wait,
+    /// because someone is looking at it.
+    private func prepareForRead(_ url: URL) throws {
         let manager = FileManager.default
         guard manager.fileExists(atPath: placeholderURL(for: url).path) else { return }
         try? manager.startDownloadingUbiquitousItem(at: url)
-        for _ in 0..<40 {
+        guard url.pathExtension.lowercased() == "jpg" else {
+            throw CocoaError(.fileReadNoSuchFile)
+        }
+        for _ in 0..<16 {
             if manager.fileExists(atPath: url.path) { return }
             Thread.sleep(forTimeInterval: 0.5)
         }
     }
 
     func read(_ url: URL) throws -> Data {
-        waitForDownloadIfNeeded(url)
+        try prepareForRead(url)
         var outcome: Result<Data, Error> = .failure(CocoaError(.fileReadUnknown))
         var coordinationError: NSError?
         coordinator().coordinate(readingItemAt: url, options: [], error: &coordinationError) { readURL in
@@ -110,11 +117,20 @@ struct CoordinatedFileAccess: FileAccess {
         }
     }
 
+    /// Marks the conflicts that were read (and saved as copies) as resolved. A version that couldn't be read
+    /// yet is left alone, so it is tried again later instead of being thrown away.
     func clearConflicts(at url: URL) {
         guard let versions = NSFileVersion.unresolvedConflictVersionsOfItem(at: url) else { return }
+        var everyVersionRead = true
         for version in versions {
-            version.isResolved = true
+            if (try? Data(contentsOf: version.url)) != nil {
+                version.isResolved = true
+            } else {
+                everyVersionRead = false
+            }
         }
-        try? NSFileVersion.removeOtherVersionsOfItem(at: url)
+        if everyVersionRead {
+            try? NSFileVersion.removeOtherVersionsOfItem(at: url)
+        }
     }
 }

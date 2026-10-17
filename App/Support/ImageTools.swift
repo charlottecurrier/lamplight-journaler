@@ -15,7 +15,7 @@ enum ImageTools {
         guard let image = downsampledImage(data, maxPixel: CGFloat(maxPixel)) else { return nil }
         let output = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(
-            output, UTType.jpeg.identifier as CFString, 1, nil
+            output as CFMutableData, UTType.jpeg.identifier as CFString, 1, nil
         ) else { return nil }
         let properties = [kCGImageDestinationLossyCompressionQuality: quality] as CFDictionary
         CGImageDestinationAddImage(destination, image, properties)
