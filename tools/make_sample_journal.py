@@ -3,8 +3,11 @@
 
     python3 tools/make_sample_journal.py ~/Desktop
 
-makes ~/Desktop/Lamplight/. Copy that folder into your iCloud Drive journal folder (or into the folder you
-picked in the app), then pull down on the list. Everything in it is made up.
+makes ~/Desktop/Lamplight/. Put that folder inside its own iCloud Drive folder (say "Journal Demo") and choose
+"Journal Demo" in the app. Everything in it is made up.
+
+Do NOT drag it into a folder that already holds your real journal: Finder offers to replace the folder
+with the same name, and that deletes your entries.
 
 What you get:
   - a 12-day streak that ended yesterday, so tonight's entry keeps it going
