@@ -37,6 +37,12 @@ final class EntryTextTests: XCTestCase {
         XCTAssertLessThanOrEqual(s.preview.count, 41)
     }
 
+    func testChecklistBoxesAreNotPartOfTheTitle() {
+        let s = EntryText.summarize(body: "## Habits\n\n- [ ] Drink water\n- [x] Walk\n", answersFirst: true)
+        XCTAssertEqual(s.title, "Drink water")
+        XCTAssertEqual(s.preview, "Walk")
+    }
+
     func testEmptyBody() {
         XCTAssertEqual(EntryText.summarize(body: " \n\n ", answersFirst: false), EntrySummary(title: "", preview: ""))
     }
@@ -62,38 +68,71 @@ final class EntryTextTests: XCTestCase {
     }
 }
 
-final class TemplateComposerTests: XCTestCase {
-    let template = EntryTemplate(name: "Evening", questions: ["What went well?", "  ", "What was\nhard?"])
-
-    func testCleanQuestionsDropBlanksAndFlattenWhitespace() {
-        XCTAssertEqual(template.cleanQuestions, ["What went well?", "What was hard?"])
-    }
-
-    func testAnswersBecomeSections() {
-        let body = TemplateComposer.body(for: template, answers: ["The light.", "Not much."])
-        XCTAssertEqual(body, "## What went well?\n\nThe light.\n\n## What was hard?\n\nNot much.\n")
-    }
-
-    func testSkippedQuestionsAreLeftOut() {
-        let body = TemplateComposer.body(for: template, answers: ["  ", "Not much."])
-        XCTAssertEqual(body, "## What was hard?\n\nNot much.\n")
-    }
-
-    func testNoAnswersMeansNoText() {
-        XCTAssertEqual(TemplateComposer.body(for: template, answers: []), "")
-        XCTAssertEqual(TemplateComposer.body(for: template, answers: ["", ""]), "")
-    }
-
-    func testComposedBodySurvivesTheEntryFile() {
-        let body = TemplateComposer.body(for: template, answers: ["Line one\nLine two", "Two"])
-        var entry = T.entry("2026-10-17T21:00:00Z", body: body, template: template.id)
-        entry.location = nil
-        let decoded = EntryFile.decode(
-            EntryFile.encode(entry),
-            defaults: EntryFileDefaults(id: UUID(), journalID: Journal.defaultID, date: Date())
+final class TemplateModelTests: XCTestCase {
+    func testTemplateRoundTripsAsAPage() throws {
+        let template = EntryTemplate(
+            name: "Evening", body: "## What went well?\n\n- [ ] Drink water\n",
+            defaultJournalID: UUID(), sortOrder: 3, createdAt: T.date("2026-10-01T00:00:00Z")
         )
-        XCTAssertEqual(decoded.body, body)
-        XCTAssertEqual(decoded.templateID, template.id)
+        let data = try JSONCoding.encoder().encode(template)
+        let decoded = try JSONCoding.decoder().decode(EntryTemplate.self, from: data)
+        XCTAssertEqual(decoded, template)
+        XCTAssertFalse(String(decoding: data, as: UTF8.self).contains("questions"))
+    }
+
+    func testTemplatesFromTheFirstVersionBecomeHeadings() throws {
+        let legacy = """
+        {"id":"11111111-1111-4111-8111-111111111111","name":"Evening","questions":["What went well?","  ","What was\\nhard?"],
+         "sortOrder":2,"createdAt":"2026-10-01T00:00:00Z","modifiedAt":"2026-10-02T00:00:00Z"}
+        """
+        let decoded = try JSONCoding.decoder().decode(EntryTemplate.self, from: Data(legacy.utf8))
+        XCTAssertEqual(decoded.name, "Evening")
+        XCTAssertEqual(decoded.body, "## What went well?\n\n\n## What was hard?\n\n")
+        XCTAssertEqual(decoded.sortOrder, 2)
+    }
+
+    func testJournalsWithoutADefaultTemplateStillLoad() throws {
+        let json = #"{"id":"00000000-0000-4000-8000-000000000001","name":"Journal","colorKey":"ember","sortOrder":0,"createdAt":"2026-10-01T00:00:00Z"}"#
+        let journal = try JSONCoding.decoder().decode(Journal.self, from: Data(json.utf8))
+        XCTAssertNil(journal.defaultTemplateID)
+        var withTemplate = journal
+        withTemplate.defaultTemplateID = UUID()
+        let data = try JSONCoding.encoder().encode(withTemplate)
+        XCTAssertEqual(try JSONCoding.decoder().decode(Journal.self, from: data), withTemplate)
+    }
+
+    func testCaretStartsUnderTheFirstHeading() {
+        let text = "## What went well?\n\n\n## What was hard?\n\n"
+        XCTAssertEqual(TemplateText.initialCaret(inEditorText: text), "## What went well?\n".utf16.count)
+    }
+
+    func testCaretWithoutAHeadingGoesToTheEnd() {
+        XCTAssertEqual(TemplateText.initialCaret(inEditorText: "Just a line"), 11)
+        XCTAssertEqual(TemplateText.initialCaret(inEditorText: ""), 0)
+    }
+
+    func testCaretWhenTheHeadingHasTextRightUnderIt() {
+        XCTAssertEqual(TemplateText.initialCaret(inEditorText: "## Q\nanswer"), 4)
+    }
+
+    func testInsertingATemplateIntoAnEntryKeepsABlankLineBetween() {
+        let template = "## Gratitude\n\n"
+        let edit = TemplateText.insertionEdit(templateEditorText: template, into: "Already wrote this.", caret: 19)
+        XCTAssertEqual(edit.applied(to: "Already wrote this."), "Already wrote this.\n\n## Gratitude\n\n")
+        // The caret lands on the blank line under the new heading.
+        XCTAssertEqual(edit.selection.lowerBound, "Already wrote this.\n\n## Gratitude\n".utf16.count)
+    }
+
+    func testInsertingATemplateIntoAnEmptyEntry() {
+        let edit = TemplateText.insertionEdit(templateEditorText: "## Q\n\n", into: "", caret: 0)
+        XCTAssertEqual(edit.applied(to: ""), "## Q\n\n")
+        XCTAssertEqual(edit.selection.lowerBound, 5)
+    }
+
+    func testInsertingInTheMiddleSeparatesBothSides() {
+        let text = "Before\nAfter"
+        let edit = TemplateText.insertionEdit(templateEditorText: "## Q\n", into: text, caret: 7)
+        XCTAssertEqual(edit.applied(to: text), "Before\n\n## Q\nAfter")
     }
 }
 
