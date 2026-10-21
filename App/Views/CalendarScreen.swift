@@ -103,7 +103,7 @@ struct CalendarScreen: View {
     @EnvironmentObject private var prefs: AppPrefs
 
     @Binding var selection: UUID?
-    var onCompose: () -> Void
+    var onCompose: (NewEntryChoice) -> Void
 
     @State private var month = Date()
     @State private var selectedDay: DayStamp?

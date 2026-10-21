@@ -11,7 +11,9 @@ struct EntryEditorView: View {
     /// The last version handed to the model. Used to skip saves when nothing changed.
     @State private var committed: Entry
     @State private var saveTask: Task<Void, Never>?
-    @FocusState private var focused: Bool
+    @State private var controller = MarkdownEditorController()
+    @State private var focusMode = false
+    private let initialCaret: Int?
 
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var isImporting = false
@@ -19,25 +21,33 @@ struct EntryEditorView: View {
     @State private var showPlace = false
     @State private var viewer: PhotoViewerItem?
 
-    init(entry: Entry) {
+    init(entry: Entry, initialCaret: Int? = nil) {
         _draft = State(initialValue: entry)
         _committed = State(initialValue: entry)
+        self.initialCaret = initialCaret
     }
 
     // MARK: Layout
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            header
-            if !draft.photos.isEmpty || isImporting { photoStrip }
+            if !focusMode {
+                header
+                if !draft.photos.isEmpty || isImporting { photoStrip }
+            }
             editor
         }
         .frame(maxWidth: Theme.readingWidth)
         .padding(.horizontal, 24)
-        .padding(.top, 14)
+        .padding(.top, focusMode ? 0 : 14)
         .frame(maxWidth: .infinity)
         .background(PaperBackground())
+        .overlay(alignment: .topTrailing) {
+            if focusMode { leaveFocusButton }
+        }
+        .animation(.easeInOut(duration: 0.3), value: focusMode)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(focusMode ? .hidden : .visible, for: .navigationBar)
         .toolbar { toolbarItems }
         .sheet(isPresented: $showDate) {
             DateSheet(date: $draft.createdAt)
@@ -59,13 +69,8 @@ struct EntryEditorView: View {
                 commit()
             }
         }
-        .task {
-            // Give the screen a moment to settle, then bring up the keyboard.
-            try? await Task.sleep(nanoseconds: 350_000_000)
-            focused = true
-        }
-        .onChange(of: showDate) { if !showDate { focused = true } }
-        .onChange(of: showPlace) { if !showPlace { focused = true } }
+        .onChange(of: showDate) { if !showDate { controller.focus() } }
+        .onChange(of: showPlace) { if !showPlace { controller.focus() } }
         .onDisappear {
             saveTask?.cancel()
             commit()
@@ -173,24 +178,85 @@ struct EntryEditorView: View {
     }
 
     private var editor: some View {
-        TextEditor(text: $draft.body)
-            .font(Theme.serif(.title3))
-            .lineSpacing(7)
-            .foregroundStyle(Theme.ink)
-            .scrollContentBackground(.hidden)
-            .focused($focused)
-            .overlay(alignment: .topLeading) {
-                if draft.body.isEmpty {
-                    Text("Start writing…")
-                        .font(Theme.serif(.title3))
-                        .foregroundStyle(Theme.inkTertiary)
-                        .padding(.top, 8)
-                        .padding(.leading, 5)
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true)
+        MarkdownEditor(
+            text: $draft.body,
+            isFocusMode: focusMode,
+            wantsFocus: true,
+            initialCaret: initialCaret,
+            controller: controller
+        )
+        .overlay(alignment: .topLeading) {
+            if draft.body.isEmpty {
+                Text("Start writing…")
+                    .font(Theme.serif(.title3))
+                    .foregroundStyle(Theme.inkTertiary)
+                    .padding(.top, 8)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
+    }
+
+    private var leaveFocusButton: some View {
+        Button {
+            focusMode = false
+        } label: {
+            Image(systemName: "arrow.down.right.and.arrow.up.left")
+                .font(.footnote)
+                .foregroundStyle(Theme.inkTertiary)
+                .padding(14)
+        }
+        .keyboardShortcut(.escape, modifiers: [])
+        .accessibilityLabel("Leave focus mode")
+    }
+
+    /// Everything the format bar does, for people on a hardware keyboard, plus templates and focus mode.
+    private var formatMenu: some View {
+        Menu {
+            Menu {
+                Button("Heading 1") { controller.apply(.heading(1)) }
+                Button("Heading 2") { controller.apply(.heading(2)) }
+                Button("Heading 3") { controller.apply(.heading(3)) }
+                Button("Body Text") { controller.apply(.heading(0)) }
+            } label: {
+                Label("Heading", systemImage: "textformat.size")
+            }
+            Button { controller.apply(.bold) } label: { Label("Bold", systemImage: "bold") }
+            Button { controller.apply(.italic) } label: { Label("Italic", systemImage: "italic") }
+            Button { controller.apply(.strike) } label: { Label("Strikethrough", systemImage: "strikethrough") }
+            Button { controller.apply(.highlight) } label: { Label("Highlight", systemImage: "highlighter") }
+            Divider()
+            Button { controller.apply(.bullet) } label: { Label("Bulleted List", systemImage: "list.bullet") }
+            Button { controller.apply(.numbered) } label: { Label("Numbered List", systemImage: "list.number") }
+            Button { controller.apply(.checklist) } label: { Label("Checklist", systemImage: "checklist") }
+            Button { controller.apply(.quote) } label: { Label("Quote", systemImage: "text.quote") }
+            Button { controller.apply(.link) } label: { Label("Link", systemImage: "link") }
+            Button { controller.apply(.divider) } label: { Label("Divider", systemImage: "minus") }
+            Divider()
+            if !model.templates.isEmpty {
+                Menu {
+                    ForEach(model.templatesByUse()) { template in
+                        Button(template.name) { add(template) }
+                    }
+                } label: {
+                    Label("Add Template", systemImage: "doc.badge.plus")
                 }
             }
-            .accessibilityLabel("Entry text")
+            Button {
+                focusMode = true
+            } label: {
+                Label("Focus Mode", systemImage: "arrow.up.left.and.arrow.down.right")
+            }
+        } label: {
+            Label("Format", systemImage: "textformat")
+        }
+    }
+
+    /// Puts a template's text into the entry at the cursor.
+    private func add(_ template: EntryTemplate) {
+        controller.insertTemplate(template.body)
+        model.recordTemplateUse(template.id)
+        if draft.templateID == nil { draft.templateID = template.id }
     }
 
     @ToolbarContentBuilder
@@ -204,6 +270,7 @@ struct EntryEditorView: View {
             } label: {
                 Label("Place", systemImage: "mappin.and.ellipse")
             }
+            formatMenu
             Button {
                 finish()
             } label: {
@@ -235,7 +302,7 @@ struct EntryEditorView: View {
     private func finish() {
         saveTask?.cancel()
         commit()
-        focused = false
+        controller.dismissKeyboard()
         model.finishEditing(draft.id, announce: true, calendar: prefs.dayCalendar)
     }
 

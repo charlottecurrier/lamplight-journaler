@@ -13,7 +13,7 @@ Choices made for the first build. Change any of them.
 | Location picker, Home vs. enter a place | Home (set once in Settings, synced) or a searched or typed place. Uses Apple Maps search. No GPS. |
 | Amber lenses | Dark "lamp" theme by default. See below. |
 | Paper notebook, textures matter | Paper grain on every page and card, photos shown like prints, serif type. |
-| No AI, reminders or suggested prompts | None. Templates are only your own questions. |
+| No AI, reminders or suggested prompts | None. Templates are only your own pages. |
 | Streaks | Current, longest, last seven days, calendar dots. |
 | Skip for now: Day One import, mood, tags, weather | Left out. |
 
@@ -39,7 +39,9 @@ Amber lenses cut blue light. Blues go dark and warm colors blur together, but br
 - **Lock timing.** Locks right away when you leave the app. You can allow 1, 5 or 15 minutes in Settings. The app contents are hidden in the app switcher whenever the app isn't in front.
 - **Streak message** after the first entry of a day, such as "Saved. 12 days in a row." Quiet, no confetti.
 - **Search** is included. It was cheap and a journal needs it.
-- **Templates save answers as headings.** Each question becomes a `##` heading with your answer under it. After that it's just text you can edit.
+- **A template is a page of Markdown.** It is written in the same editor as an entry, and a new entry starts as a copy. Nothing links the entry back to the template, so editing a template never changes old entries. Templates from the first version (a list of questions) open as `##` headings.
+- **Live Markdown, with the symbols hidden.** The file keeps plain Markdown. On screen, symbols like `##` and `**` are hidden except on the line the cursor is on, so you can always edit by hand. Lists and checklists are shown as `•`, `☐` and `☑` and turned back into `-`, `1.` and `- [ ]` when saved.
+- **Most-used templates first.** Counts are kept on each device, not in the journal folder, so two devices never write the same file.
 - **Working name: Lamplight.** Easy to change: `project.yml` (`CFBundleDisplayName`) and the text in `App/Views`.
 - **Minimum iOS 17.**
 
@@ -47,9 +49,10 @@ Amber lenses cut blue light. Blues go dark and warm colors blur together, but br
 
 - Day One import (you chose to wait).
 - Mood, tags, weather.
-- Rich text. Entries are plain text with light Markdown styling when reading.
-- Photos placed inline in the text. Photos sit above the text.
-- Export. The files are the export.
+- Rich text beyond Markdown. No colors, fonts or alignment.
+- Photos placed inline in the text (planned, next). Photos sit above the text for now.
+- Audio, drawings and video (planned, after that).
+- Export. The files are the export. Sharing a single entry is planned.
 - iPad Stage Manager multiple windows. One window only, so two windows can't edit one entry.
 - Sign-in with Apple or accounts. There aren't any.
 

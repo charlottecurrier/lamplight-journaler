@@ -5,7 +5,7 @@ An iPad-first (also iPhone) SwiftUI journal. Entries are Markdown files in a fol
 ## Layout
 
 - `Sources/JournalCore/` has all logic that doesn't need a screen: file format, storage, streaks, On This Day, templates. Plain Swift, builds and tests on Linux.
-- `App/` is the SwiftUI app. `App/Support` is the model and platform code. `App/Views` is the screens. `App/Theme` is colors and paper styling.
+- `App/` is the SwiftUI app. `App/Support` is the model and platform code. `App/Editor` is the UITextView editor (styling, format bar). `App/Views` is the screens. `App/Theme` is colors and paper styling.
 - Core and App are compiled into **one module** (the app target), so Core code needs no `public` and App code needs no `import JournalCore`. `Package.swift` exists only so Core can be tested without Xcode.
 - `Lamplight.xcodeproj` is generated from `project.yml` by XcodeGen and committed. After adding or removing Swift files, regenerate it (see below).
 
@@ -25,7 +25,7 @@ On Linux, a Swift toolchain can be downloaded from `download.swift.org` (Ubuntu 
 
 ## What can and can't be verified without a Mac
 
-- Verified in CI-less environments: everything in `Sources/JournalCore` (64 tests), the model and storage code in `App/Support` (type-checked against stand-ins by `tools/typecheck_support.sh`), the Python tools, the project structure. `ImageTools`, `PlaceSearcher`, `AppPrefs` and `Theme` are read-checked only.
+- Verified in CI-less environments: everything in `Sources/JournalCore` (155 tests, including the Markdown engine and every editing rule), the model and storage code in `App/Support` (type-checked against stand-ins by `tools/typecheck_support.sh`), the Python tools, the project structure. `ImageTools`, `PlaceSearcher`, `AppPrefs` and `Theme` are read-checked only.
 - **Not compilable on Linux:** all SwiftUI/UIKit code in `App/`. Review it by reading. Check every call against the declarations in Core and `AppModel` before assuming it compiles.
 
 ## Rules that matter
@@ -36,4 +36,6 @@ On Linux, a Swift toolchain can be downloaded from `download.swift.org` (Ubuntu 
 - **Colors only from `Palette.swift`**, as `Pair(light:dark:)` lines in that exact shape (the Python tools parse them). The person reads through amber blue-blocking lenses. Differences must be in brightness, not hue. No blues or purples. Re-run `tools/check_palette.py` after any change.
 - **Swift 5 language mode, iOS 17 minimum.** Use `@MainActor in` on `Task` created in views.
 - **Plain, quiet UI copy.** Short sentences. No exclamation marks, no cheering, no prompts or suggestions for what to write. The person asked for no AI, reminders or suggested prompts.
+- **Editing rules live in Core, not in the editor.** `MarkdownEngine` (line and inline analysis), `MarkdownEditing` (Return, Space, Backspace, Tab, format commands), `SlashCommand` and `EditorText` are pure Swift on UTF-16 offsets and are unit tested. `App/Editor` only applies their `TextEdit`s to the `UITextView`. Add a test in Core before changing a rule.
+- **Editor text is not file text.** The editor shows `•`, `☐` and `☑` for list markers. `EditorText.fromMarkdown` and `toMarkdown` convert at the load and save boundary. Never write editor text to disk or read file text into the editor without converting.
 - The `EntryFile` header values are JSON. Splitting text on `"\n"` must be done on bytes (Swift treats `\r\n` as one character).

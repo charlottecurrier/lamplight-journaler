@@ -1,50 +1,8 @@
 import SwiftUI
 
-/// An entry's text with headings styled and simple inline Markdown (bold, italic, links) shown.
-struct MarkdownBodyView: View {
-    let text: String
-
-    private func inline(_ string: String) -> AttributedString {
-        var options = AttributedString.MarkdownParsingOptions()
-        options.interpretedSyntax = .inlineOnlyPreservingWhitespace
-        return (try? AttributedString(markdown: string, options: options)) ?? AttributedString(string)
-    }
-
-    private func headingFont(_ level: Int) -> Font {
-        switch level {
-        case 1: return Theme.serif(.title2, weight: .bold)
-        case 2: return Theme.serif(.title3, weight: .semibold)
-        default: return Theme.serif(.headline, weight: .semibold)
-        }
-    }
-
-    var body: some View {
-        let blocks = MarkdownBlocks.parse(text)
-        VStack(alignment: .leading, spacing: 16) {
-            ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
-                switch block {
-                case .heading(let level, let value):
-                    Text(inline(value))
-                        .font(headingFont(level))
-                        .foregroundStyle(Theme.accent)
-                        .padding(.top, 8)
-                        .accessibilityAddTraits(.isHeader)
-                case .paragraph(let value):
-                    Text(inline(value))
-                        .font(Theme.serif(.title3))
-                        .lineSpacing(7)
-                        .foregroundStyle(Theme.ink)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .textSelection(.enabled)
-    }
-}
-
 /// Shown in the detail column when no entry is chosen.
 struct DetailPlaceholder: View {
-    var onCompose: () -> Void
+    var onCompose: (NewEntryChoice) -> Void
 
     var body: some View {
         EmptyStateView(
@@ -52,7 +10,7 @@ struct DetailPlaceholder: View {
             title: "Choose an entry",
             message: "Or begin a new one for tonight.",
             actionTitle: "New Entry",
-            action: onCompose
+            action: { onCompose(.standard) }
         )
         .background(PaperBackground())
     }
@@ -62,7 +20,7 @@ struct DetailPlaceholder: View {
 struct EntryDetailView: View {
     @Environment(AppModel.self) private var model
     let entryID: UUID
-    var onCompose: () -> Void
+    var onCompose: (NewEntryChoice) -> Void
     var onClose: () -> Void
 
     @State private var viewer: PhotoViewerItem?
@@ -71,7 +29,7 @@ struct EntryDetailView: View {
     var body: some View {
         if let entry = model.entry(entryID) {
             if model.editingEntryID == entryID {
-                EntryEditorView(entry: entry)
+                EntryEditorView(entry: entry, initialCaret: startingCaret(for: entry))
                     .id(entryID)
             } else {
                 reader(entry)
@@ -84,8 +42,27 @@ struct EntryDetailView: View {
         }
     }
 
+    /// A brand-new entry made from a template starts with the caret under its first heading.
+    private func startingCaret(for entry: Entry) -> Int? {
+        guard model.freshEntryIDs.contains(entry.id), entry.templateID != nil else { return nil }
+        return TemplateText.initialCaret(inEditorText: EditorText.fromMarkdown(entry.body))
+    }
+
     private func shareText(_ entry: Entry) -> String {
         Fmt.fullDate(entry) + "\n\n" + entry.body
+    }
+
+    /// Ticking a checklist item while reading changes the entry.
+    private func bodyBinding(_ entry: Entry) -> Binding<String> {
+        Binding(
+            get: { model.entry(entry.id)?.body ?? entry.body },
+            set: { newBody in
+                guard var current = model.entry(entry.id), current.body != newBody else { return }
+                current.body = newBody
+                current.modifiedAt = Date()
+                model.update(current)
+            }
+        )
     }
 
     private func reader(_ entry: Entry) -> some View {
@@ -116,7 +93,7 @@ struct EntryDetailView: View {
                     }
                 }
 
-                MarkdownBodyView(text: entry.body)
+                MarkdownEditor(text: bodyBinding(entry), isEditable: false)
             }
             .frame(maxWidth: Theme.readingWidth, alignment: .leading)
             .padding(.horizontal, 24)

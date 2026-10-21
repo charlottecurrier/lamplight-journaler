@@ -35,20 +35,18 @@ enum MarkdownEditing {
     static func intercept(
         text: String, range: Range<Int>, replacement: String, context: SlashContext = .current
     ) -> TextEdit? {
+        let isReturn = replacement == "\n" && range.isEmpty
+        let isSpace = replacement == " " && range.isEmpty
+        let isBackspace = replacement.isEmpty && range.count == 1
+        let isTab = replacement == "\t" && range.isEmpty
+        // Most keystrokes are ordinary letters. Don't read the whole document for those.
+        guard isReturn || isSpace || isBackspace || isTab else { return nil }
+
         let doc = MarkdownDocument(text)
-        if replacement == "\n" && range.isEmpty {
-            return returnKey(doc, caret: range.lowerBound)
-        }
-        if replacement == " " && range.isEmpty {
-            return spaceKey(doc, caret: range.lowerBound, context: context)
-        }
-        if replacement.isEmpty && range.count == 1 {
-            return backspace(doc, caret: range.upperBound)
-        }
-        if replacement == "\t" && range.isEmpty {
-            return tab(doc, caret: range.lowerBound)
-        }
-        return nil
+        if isReturn { return returnKey(doc, caret: range.lowerBound) }
+        if isSpace { return spaceKey(doc, caret: range.lowerBound, context: context) }
+        if isBackspace { return backspace(doc, caret: range.upperBound) }
+        return tab(doc, caret: range.lowerBound)
     }
 
     private static func nextMarker(for line: MDLine) -> String {

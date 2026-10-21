@@ -52,6 +52,10 @@ final class AppModel {
     /// Entries that exist in the folder but haven't finished downloading from iCloud yet.
     var stillDownloading = 0
     var saveProblem = false
+    /// How often each template has been used on this device. Used to list the favorites first.
+    var templateUseCounts: [UUID: Int] = AppModel.loadUseCounts()
+    /// Entries just made, not yet written in. The editor uses this to put the caret under a template's first heading.
+    private(set) var freshEntryIDs: Set<UUID> = []
     /// Bumps after each refresh, so photos that failed to load can try again.
     var refreshCounter = 0
     var storageName = ""
@@ -338,6 +342,7 @@ final class AppModel {
         let entry = Entry(journalID: journalID, templateID: templateID, location: location, body: body)
         entries.insert(entry, at: 0)
         editingEntryID = entry.id
+        freshEntryIDs.insert(entry.id)
         if !entry.isBlank { persist(entry) }
         return entry.id
     }
@@ -353,7 +358,10 @@ final class AppModel {
     /// Ends an editing session. An entry with nothing in it is dropped instead of saved.
     func finishEditing(_ id: UUID, announce: Bool, calendar: DayCalendar) {
         let wasEditing = editingEntryID == id
-        if wasEditing { editingEntryID = nil }
+        if wasEditing {
+            editingEntryID = nil
+            freshEntryIDs.remove(id)
+        }
         guard let entry = entry(id) else { return }
         if entry.isBlank {
             entries.removeAll { $0.id == id }
@@ -465,7 +473,40 @@ final class AppModel {
 
     func newTemplate() -> EntryTemplate {
         let next = (templates.map(\.sortOrder).max() ?? -1) + 1
-        return EntryTemplate(name: "New template", questions: [""], sortOrder: next)
+        return EntryTemplate(name: "New template", body: "", sortOrder: next)
+    }
+
+    /// The template new entries in this journal start with, if the journal has one.
+    func defaultTemplate(for journalID: UUID) -> EntryTemplate? {
+        guard let templateID = journal(journalID)?.defaultTemplateID else { return nil }
+        return template(templateID)
+    }
+
+    /// Templates, the ones used most first.
+    func templatesByUse() -> [EntryTemplate] {
+        templates.sorted { a, b in
+            let usedA = templateUseCounts[a.id] ?? 0
+            let usedB = templateUseCounts[b.id] ?? 0
+            if usedA != usedB { return usedA > usedB }
+            return (a.sortOrder, a.createdAt) < (b.sortOrder, b.createdAt)
+        }
+    }
+
+    func recordTemplateUse(_ id: UUID) {
+        templateUseCounts[id, default: 0] += 1
+        let stored = Dictionary(uniqueKeysWithValues: templateUseCounts.map { ($0.key.uuidString, $0.value) })
+        UserDefaults.standard.set(stored, forKey: AppModel.useCountsKey)
+    }
+
+    private static let useCountsKey = "templates.useCounts"
+
+    private static func loadUseCounts() -> [UUID: Int] {
+        guard let stored = UserDefaults.standard.dictionary(forKey: useCountsKey) as? [String: Int] else { return [:] }
+        var counts: [UUID: Int] = [:]
+        for (key, value) in stored {
+            if let id = UUID(uuidString: key) { counts[id] = value }
+        }
+        return counts
     }
 
     func save(template: EntryTemplate) {

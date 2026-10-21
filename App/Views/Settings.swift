@@ -257,6 +257,21 @@ struct JournalEditor: View {
                     Text("A small hint beside the journal's name. The name is always shown too.")
                 }
                 .listRowBackground(Theme.surface)
+
+                if !model.templates.isEmpty {
+                    Section {
+                        Picker("New entries start with", selection: $journal.defaultTemplateID) {
+                            Text("A blank page").tag(UUID?.none)
+                            ForEach(model.templates) { template in
+                                Text(template.name).tag(Optional(template.id))
+                            }
+                        }
+                        .font(Theme.serif(.body))
+                    } footer: {
+                        Text("Tapping New Entry in this journal starts with this template. Press and hold New Entry to pick another.")
+                    }
+                    .listRowBackground(Theme.surface)
+                }
             }
             .scrollContentBackground(.hidden)
             .background(PaperBackground())
@@ -278,7 +293,7 @@ struct JournalEditor: View {
                 }
             }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
     }
 }
 
