@@ -11,6 +11,8 @@ struct Journal: Codable, Identifiable, Hashable {
     var colorKey: String
     var sortOrder: Int
     var createdAt: Date
+    /// New entries in this journal start with this template. Nil means a blank page.
+    var defaultTemplateID: UUID?
 
     static func makeDefault(now: Date = Date()) -> Journal {
         Journal(id: defaultID, name: "Journal", colorKey: JournalColors.keys[0], sortOrder: 0, createdAt: now)
@@ -130,10 +132,11 @@ struct Entry: Identifiable, Hashable {
 
 // MARK: - Templates
 
+/// A template is a page of Markdown: headings, prompts, checklists. A new entry starts with a copy of it.
 struct EntryTemplate: Codable, Identifiable, Hashable {
     var id: UUID
     var name: String
-    var questions: [String]
+    var body: String
     var defaultJournalID: UUID?
     var sortOrder: Int
     var createdAt: Date
@@ -142,7 +145,7 @@ struct EntryTemplate: Codable, Identifiable, Hashable {
     init(
         id: UUID = UUID(),
         name: String,
-        questions: [String],
+        body: String = "",
         defaultJournalID: UUID? = nil,
         sortOrder: Int = 0,
         createdAt: Date = Date(),
@@ -150,18 +153,52 @@ struct EntryTemplate: Codable, Identifiable, Hashable {
     ) {
         self.id = id
         self.name = name
-        self.questions = questions
+        self.body = body
         self.defaultJournalID = defaultJournalID
         self.sortOrder = sortOrder
         self.createdAt = createdAt
         self.modifiedAt = modifiedAt ?? createdAt
     }
 
-    /// Questions with blank ones removed and whitespace flattened to single spaces.
-    var cleanQuestions: [String] {
+    private enum CodingKeys: String, CodingKey {
+        case id, name, body, questions, defaultJournalID, sortOrder, createdAt, modifiedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        defaultJournalID = try c.decodeIfPresent(UUID.self, forKey: .defaultJournalID)
+        sortOrder = try c.decodeIfPresent(Int.self, forKey: .sortOrder) ?? 0
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        modifiedAt = try c.decodeIfPresent(Date.self, forKey: .modifiedAt) ?? createdAt
+        if let body = try c.decodeIfPresent(String.self, forKey: .body) {
+            self.body = body
+        } else {
+            // The first version of Lamplight saved a list of questions.
+            let questions = try c.decodeIfPresent([String].self, forKey: .questions) ?? []
+            self.body = EntryTemplate.body(fromQuestions: questions)
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(name, forKey: .name)
+        try c.encode(body, forKey: .body)
+        try c.encodeIfPresent(defaultJournalID, forKey: .defaultJournalID)
+        try c.encode(sortOrder, forKey: .sortOrder)
+        try c.encode(createdAt, forKey: .createdAt)
+        try c.encode(modifiedAt, forKey: .modifiedAt)
+    }
+
+    /// Each question becomes a heading with room under it to write.
+    static func body(fromQuestions questions: [String]) -> String {
         questions
             .map { $0.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ") }
             .filter { !$0.isEmpty }
+            .map { "## \($0)\n\n" }
+            .joined(separator: "\n")
     }
 }
 

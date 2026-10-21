@@ -53,6 +53,13 @@ extension UIColor {
 }
 
 extension Pair {
+    /// The same color for UIKit views, following light and dark.
+    var uiColor: UIColor {
+        UIColor { traits in
+            UIColor(hex: traits.userInterfaceStyle == .dark ? self.dark : self.light)
+        }
+    }
+
     /// A color that follows the current light or dark appearance.
     var color: Color {
         Color(uiColor: UIColor { traits in

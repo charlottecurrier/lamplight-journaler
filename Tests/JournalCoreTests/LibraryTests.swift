@@ -187,8 +187,8 @@ final class LibraryTests: XCTestCase {
         try library.save(second)
         XCTAssertEqual(library.loadJournals().map(\.name), ["Journal", "Dreams"])
 
-        let t1 = EntryTemplate(name: "Evening", questions: ["What went well?", "What was hard?"], sortOrder: 1, createdAt: T.date("2026-10-01T00:00:00Z"))
-        let t0 = EntryTemplate(name: "Gratitude", questions: ["Three things"], sortOrder: 0, createdAt: T.date("2026-10-02T00:00:00Z"))
+        let t1 = EntryTemplate(name: "Evening", body: "## What went well?\n\n## What was hard?\n\n", sortOrder: 1, createdAt: T.date("2026-10-01T00:00:00Z"))
+        let t0 = EntryTemplate(name: "Gratitude", body: "## Three things\n\n", sortOrder: 0, createdAt: T.date("2026-10-02T00:00:00Z"))
         try library.save(t1)
         try library.save(t0)
         XCTAssertEqual(library.loadTemplates(), [t0, t1])
@@ -241,7 +241,7 @@ final class LibraryTests: XCTestCase {
         entry.photos = [PhotoRef(fileName: "p.jpg", width: 1, height: 1)]
         try library.save(entry)
         try library.writePhoto(Data([4, 2]), fileName: "p.jpg", entryID: entry.id)
-        let template = EntryTemplate(name: "Evening", questions: ["Q1"], createdAt: T.date("2026-10-01T00:00:00Z"))
+        let template = EntryTemplate(name: "Evening", body: "## Q1\n\n", createdAt: T.date("2026-10-01T00:00:00Z"))
         try library.save(template)
         try library.save(LibrarySettings(home: EntryLocation(name: "Home", isHome: true)))
 

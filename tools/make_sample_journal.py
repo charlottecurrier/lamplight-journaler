@@ -161,10 +161,12 @@ def main(out_dir: Path):
         (EVENING_TEMPLATE, "Evening check-in", EVENING_QUESTIONS, 0),
         (GRATITUDE_TEMPLATE, "Three good things", ["First thing", "Second thing", "Third thing"], 1),
     ]:
+        # A template is a page of Markdown. Each question becomes a heading with a blank line under it.
+        template_body = "".join(f"## {question}\n\n" for question in questions)
         path = root / "Templates" / f"{template_id}.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps({
-            "id": template_id, "name": name, "questions": questions, "sortOrder": order,
+            "id": template_id, "name": name, "body": template_body, "sortOrder": order,
             "createdAt": created[:19] + "Z", "modifiedAt": created[:19] + "Z",
         }, indent=2, sort_keys=True), encoding="utf-8")
 

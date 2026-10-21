@@ -1,16 +1,56 @@
 import SwiftUI
 
+// MARK: - New entries
+
+/// What to start a new entry with.
+enum NewEntryChoice {
+    /// The journal's default template, or a blank page if it has none.
+    case standard
+    case blank
+    case template(EntryTemplate)
+}
+
+/// Tap to start an entry right away, with the journal's default template if it has one.
+/// Press and hold for a blank page or any template, the ones you use most first.
+struct NewEntryMenu: View {
+    @Environment(AppModel.self) private var model
+    var onChoose: (NewEntryChoice) -> Void
+
+    var body: some View {
+        Menu {
+            Button {
+                onChoose(.blank)
+            } label: {
+                Label("Blank Entry", systemImage: "square.and.pencil")
+            }
+            let templates = model.templatesByUse()
+            if !templates.isEmpty {
+                Divider()
+                ForEach(templates) { template in
+                    Button {
+                        onChoose(.template(template))
+                    } label: {
+                        Label(template.name, systemImage: "doc.text")
+                    }
+                }
+            }
+        } label: {
+            Label("New Entry", systemImage: "square.and.pencil")
+        } primaryAction: {
+            onChoose(.standard)
+        }
+        .accessibilityHint("Press and hold to choose a template")
+    }
+}
+
 // MARK: - Shared pieces
 
 extension View {
-    /// Adds the "New Entry" button (and its ⌘N shortcut) to a screen's toolbar.
-    func composeToolbar(_ action: @escaping () -> Void) -> some View {
+    /// Adds the "New Entry" button to a screen's toolbar.
+    func composeToolbar(_ onChoose: @escaping (NewEntryChoice) -> Void) -> some View {
         toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button(action: action) {
-                    Label("New Entry", systemImage: "square.and.pencil")
-                }
-                .keyboardShortcut("n", modifiers: .command)
+                NewEntryMenu(onChoose: onChoose)
             }
         }
     }
@@ -151,7 +191,7 @@ struct EntryListView: View {
 
     let scope: EntryScope
     @Binding var selection: UUID?
-    var onCompose: () -> Void
+    var onCompose: (NewEntryChoice) -> Void
     var onSeeOnThisDay: () -> Void
 
     @State private var query = ""
@@ -253,7 +293,7 @@ struct EntryListView: View {
                         title: "A blank page",
                         message: "Your entries will gather here. Write a few lines tonight.",
                         actionTitle: "Write an entry",
-                        action: onCompose
+                        action: { onCompose(.standard) }
                     )
                     .padding(.top, 220)
                 }
@@ -269,7 +309,7 @@ struct OnThisDayScreen: View {
     @EnvironmentObject private var prefs: AppPrefs
 
     @Binding var selection: UUID?
-    var onCompose: () -> Void
+    var onCompose: (NewEntryChoice) -> Void
 
     var body: some View {
         let groups = model.onThisDay(calendar: prefs.dayCalendar)

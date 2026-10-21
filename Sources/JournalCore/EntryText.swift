@@ -66,6 +66,10 @@ enum EntryText {
             s = s.dropFirst(marker.count)
             break
         }
+        for box in ["[ ] ", "[x] ", "[X] "] where s.hasPrefix(box) {
+            s = s.dropFirst(box.count)
+            break
+        }
         return s.trimmingCharacters(in: .whitespaces)
     }
 }

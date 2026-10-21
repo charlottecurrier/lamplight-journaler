@@ -14,18 +14,21 @@ struct TemplatesScreen: View {
 
     var body: some View {
         List(selection: $selection) {
-            ForEach(model.templates) { template in
-                let count = template.cleanQuestions.count
+            ForEach(model.templatesByUse()) { template in
+                let preview = EntryText.summarize(body: template.body, answersFirst: false, maxPreview: 90)
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(template.name)
                             .font(Theme.serif(.headline, weight: .semibold))
                             .foregroundStyle(Theme.ink)
-                        Text(count == 1 ? "1 question" : "\(count) questions")
-                            .font(Theme.serif(.footnote))
-                            .foregroundStyle(Theme.inkSecondary)
-                        if let first = template.cleanQuestions.first {
-                            Text(first)
+                        if !preview.title.isEmpty {
+                            Text(preview.title)
+                                .font(Theme.serif(.footnote))
+                                .foregroundStyle(Theme.inkSecondary)
+                                .lineLimit(1)
+                        }
+                        if !preview.preview.isEmpty {
+                            Text(preview.preview)
                                 .font(Theme.serif(.caption))
                                 .foregroundStyle(Theme.inkTertiary)
                                 .lineLimit(1)
@@ -70,9 +73,9 @@ struct TemplatesScreen: View {
         .overlay {
             if model.templates.isEmpty {
                 EmptyStateView(
-                    systemImage: "list.bullet.rectangle",
+                    systemImage: "doc.text",
                     title: "No templates yet",
-                    message: "A template is a set of questions you answer one at a time. Make one for your evening check-in.",
+                    message: "A template is a page you write once, with headings, prompts or checklists. New entries start with a copy of it.",
                     actionTitle: "Create a Template",
                     action: createTemplate
                 )
@@ -85,20 +88,15 @@ struct TemplatesScreen: View {
 struct TemplatePlaceholder: View {
     var body: some View {
         EmptyStateView(
-            systemImage: "list.bullet.rectangle",
+            systemImage: "doc.text",
             title: "Choose a template",
-            message: "Edit its questions here, or tap the pencil beside it to write with it."
+            message: "Edit it here like any entry, or tap the pencil beside it to write with it."
         )
         .background(PaperBackground())
     }
 }
 
-private struct QuestionItem: Identifiable, Equatable {
-    let id = UUID()
-    var text: String
-}
-
-/// Edit a template's name and questions. Changes are saved as you make them.
+/// A template, edited as a page. Changes are saved as you make them.
 struct TemplateEditorView: View {
     @Environment(AppModel.self) private var model
     let templateID: UUID
@@ -107,7 +105,7 @@ struct TemplateEditorView: View {
 
     var body: some View {
         if let template = model.template(templateID) {
-            TemplateForm(template: template, onStart: onStart, onDeleted: onDeleted)
+            TemplatePage(template: template, onStart: onStart, onDeleted: onDeleted)
                 .id(templateID)
         } else {
             TemplatePlaceholder()
@@ -115,112 +113,125 @@ struct TemplateEditorView: View {
     }
 }
 
-private struct TemplateForm: View {
+private struct TemplatePage: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.scenePhase) private var scenePhase
     let template: EntryTemplate
     var onStart: (EntryTemplate) -> Void
     var onDeleted: () -> Void
 
+    private struct Snapshot: Equatable {
+        var name: String
+        var text: String
+        var journal: UUID?
+    }
+
     @State private var name: String
-    @State private var items: [QuestionItem]
+    @State private var text: String
     @State private var defaultJournalID: UUID?
+    @State private var saved: Snapshot
     @State private var confirmDelete = false
+    @State private var controller = MarkdownEditorController()
 
     init(template: EntryTemplate, onStart: @escaping (EntryTemplate) -> Void, onDeleted: @escaping () -> Void) {
         self.template = template
         self.onStart = onStart
         self.onDeleted = onDeleted
         _name = State(initialValue: template.name)
-        _items = State(initialValue: template.questions.map { QuestionItem(text: $0) })
+        _text = State(initialValue: template.body)
         _defaultJournalID = State(initialValue: template.defaultJournalID)
+        _saved = State(initialValue: Snapshot(name: template.name, text: template.body, journal: template.defaultJournalID))
+    }
+
+    private var snapshot: Snapshot {
+        Snapshot(name: name, text: text, journal: defaultJournalID)
     }
 
     private var current: EntryTemplate {
         var updated = template
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         updated.name = trimmed.isEmpty ? "Untitled" : trimmed
-        updated.questions = items.map(\.text)
+        updated.body = text
         updated.defaultJournalID = defaultJournalID
         return updated
     }
 
     private func save() {
+        // A template deleted a moment ago must not come back from a late save.
+        guard model.template(template.id) != nil, snapshot != saved else { return }
+        saved = snapshot
         model.save(template: current)
     }
 
     var body: some View {
-        Form {
-            Section {
-                TextField("Template name", text: $name)
-                    .font(Theme.serif(.title3, weight: .semibold))
-            } header: {
-                Text("Name")
-            }
-            .listRowBackground(Theme.surface)
+        VStack(alignment: .leading, spacing: 10) {
+            TextField("Template name", text: $name)
+                .font(Theme.serif(.title2, weight: .bold))
+                .foregroundStyle(Theme.ink)
+            Text("New entries start with a copy of this page. Headings, bullets, checklists and quotes all work.")
+                .font(Theme.serif(.footnote))
+                .foregroundStyle(Theme.inkSecondary)
 
-            Section {
-                ForEach($items) { $item in
-                    TextField("Question", text: $item.text, axis: .vertical)
-                        .font(Theme.serif(.body))
-                        .lineLimit(1...4)
-                }
-                .onDelete { offsets in
-                    items.remove(atOffsets: offsets)
-                }
-                .onMove { source, destination in
-                    items.move(fromOffsets: source, toOffset: destination)
-                }
-                Button {
-                    items.append(QuestionItem(text: ""))
-                } label: {
-                    Label("Add Question", systemImage: "plus")
-                }
-            } header: {
-                Text("Questions")
-            } footer: {
-                Text("You'll answer these one at a time. Blank questions are skipped.")
-            }
-            .listRowBackground(Theme.surface)
-
-            if model.journals.count > 1 {
-                Section {
-                    Picker("Write in", selection: $defaultJournalID) {
-                        Text("Ask each time").tag(UUID?.none)
-                        ForEach(model.journals) { journal in
-                            Text(journal.name).tag(Optional(journal.id))
-                        }
+            MarkdownEditor(text: $text, controller: controller)
+                .overlay(alignment: .topLeading) {
+                    if text.isEmpty {
+                        Text("Write your template here…")
+                            .font(Theme.serif(.title3))
+                            .foregroundStyle(Theme.inkTertiary)
+                            .padding(.top, 8)
+                            .allowsHitTesting(false)
+                            .accessibilityHidden(true)
                     }
-                } header: {
-                    Text("Journal")
                 }
-                .listRowBackground(Theme.surface)
-            }
-
-            Section {
+        }
+        .frame(maxWidth: Theme.readingWidth)
+        .padding(.horizontal, 24)
+        .padding(.top, 14)
+        .frame(maxWidth: .infinity)
+        .background(PaperBackground())
+        .navigationTitle("Template")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                if model.journals.count > 1 {
+                    Menu {
+                        Picker("Write in", selection: $defaultJournalID) {
+                            Text("The current journal").tag(UUID?.none)
+                            ForEach(model.journals) { journal in
+                                Text(journal.name).tag(Optional(journal.id))
+                            }
+                        }
+                    } label: {
+                        Label("Journal", systemImage: "book.closed")
+                    }
+                }
                 Button {
+                    save()
                     onStart(current)
                 } label: {
                     Label("Write with This Template", systemImage: "square.and.pencil")
-                        .font(Theme.serif(.body, weight: .semibold))
                 }
-                Button(role: .destructive) {
-                    confirmDelete = true
+                Menu {
+                    Button(role: .destructive) {
+                        confirmDelete = true
+                    } label: {
+                        Label("Delete Template", systemImage: "trash")
+                    }
                 } label: {
-                    Label("Delete Template", systemImage: "trash")
+                    Label("More", systemImage: "ellipsis.circle")
                 }
             }
-            .listRowBackground(Theme.surface)
         }
-        .scrollContentBackground(.hidden)
-        .background(PaperBackground())
-        .navigationTitle("Edit Template")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) { EditButton() }
+        // Wait for a pause in typing before saving.
+        .task(id: snapshot) {
+            try? await Task.sleep(nanoseconds: 600_000_000)
+            guard !Task.isCancelled else { return }
+            save()
         }
-        .onChange(of: name) { save() }
-        .onChange(of: items) { save() }
-        .onChange(of: defaultJournalID) { save() }
+        .onDisappear { save() }
+        .onChange(of: scenePhase) {
+            if scenePhase != .active { save() }
+        }
         .confirmationDialog("Delete this template?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete Template", role: .destructive) {
                 model.deleteTemplate(template.id)

@@ -11,7 +11,8 @@ A calm journal for writing at the end of the day. Made for iPad first, works on 
 - Timeline of entries with photo thumbnails, grouped by month. Search.
 - **On This Day.** A strip at the top of the journal, and its own screen.
 - **Streak.** Days in a row, longest streak, and the last seven days. A "new day starts at" setting keeps a 12:30 AM entry in yesterday's streak.
-- **Templates.** Save a set of questions. You answer them one at a time, and the answers become the start of an entry. No built-in prompts. You write your own.
+- **Writing.** Markdown shows as you type. `#` and a space makes a heading. `**bold**`, `*italic*`, `~~strike~~`, `==highlight==`, bullets, numbered lists, tappable checklists, quotes, dividers, links and code all work. The symbols hide when your cursor leaves the line. A bar above the keyboard has the same things as buttons, and typing `/` lists commands. Focus mode hides everything but the text.
+- **Templates.** A template is a page you write once, in the same editor as an entry: headings, prompts, checklists. A new entry starts with a copy of it. Tap New Entry to use the journal's default template, or press and hold to pick another (the ones you use most are first). You can also add a template to an entry you already started. No built-in prompts. You write your own.
 - **Calendar.** A month view with a dot on days you wrote.
 - **Multiple journals.**
 - **Places.** Pick Home, or search for a place. No GPS, no location permission.
@@ -87,8 +88,9 @@ The light in the kitchen.
 | Path | What's there |
 | --- | --- |
 | `Sources/JournalCore/` | Logic with no screens: file format, storage, streaks, On This Day, templates. Built and tested on Linux. |
-| `Tests/JournalCoreTests/` | 64 tests. Run with `swift test`, or in Xcode with ⌘U. |
+| `Tests/JournalCoreTests/` | 155 tests. Run with `swift test`, or in Xcode with ⌘U. |
 | `App/` | The SwiftUI app. |
+| `App/Editor/` | The text editor: live Markdown styling, the bar above the keyboard, focus mode. |
 | `App/Theme/Palette.swift` | Every color, in one place. |
 | `tools/check_palette.py` | Checks contrast and draws `docs/palette-preview.png`, including a look through amber lenses. |
 | `tools/make_assets.py` | Draws the paper textures and app icon. |
@@ -98,7 +100,7 @@ If you add or remove Swift files, regenerate the project: `brew install xcodegen
 
 ## Honest status
 
-- The core logic (everything in `Sources/JournalCore`) is tested. 64 tests pass.
+- The core logic (everything in `Sources/JournalCore`) is tested. 155 tests pass.
 - **The screens have never been compiled or run.** They were written without Xcode. Expect a few compile errors on the first build. They should be small. Send me the messages and I'll fix them.
 - The amber-lens colors were checked with a simulation, not real lenses. If something is hard to read, tell me which screen. Colors are all in `Palette.swift`.
 

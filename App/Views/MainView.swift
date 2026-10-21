@@ -109,8 +109,6 @@ struct MainView: View {
     @State private var sidebar: SidebarItem? = .all
     @State private var selectedEntryID: UUID?
     @State private var selectedTemplateID: UUID?
-    @State private var showCompose = false
-    @State private var composeTemplate: EntryTemplate?
     @State private var showSettings = false
     @State private var columns = NavigationSplitViewVisibility.automatic
 
@@ -136,13 +134,6 @@ struct MainView: View {
             }
         }
         .animation(.spring(response: 0.45, dampingFraction: 0.9), value: model.toast)
-        .sheet(isPresented: $showCompose, onDismiss: { composeTemplate = nil }) {
-            ComposeSheet(
-                initialJournalID: model.defaultJournalID(for: scope),
-                initialTemplate: composeTemplate,
-                onCreate: createEntry
-            )
-        }
         .sheet(isPresented: $showSettings) {
             SettingsView()
         }
@@ -157,15 +148,15 @@ struct MainView: View {
             EntryListView(
                 scope: scope,
                 selection: $selectedEntryID,
-                onCompose: { showCompose = true },
+                onCompose: create,
                 onSeeOnThisDay: { sidebar = .onThisDay }
             )
         case .onThisDay:
-            OnThisDayScreen(selection: $selectedEntryID, onCompose: { showCompose = true })
+            OnThisDayScreen(selection: $selectedEntryID, onCompose: create)
         case .calendar:
-            CalendarScreen(selection: $selectedEntryID, onCompose: { showCompose = true })
+            CalendarScreen(selection: $selectedEntryID, onCompose: create)
         case .templates:
-            TemplatesScreen(selection: $selectedTemplateID, onStart: startWith)
+            TemplatesScreen(selection: $selectedTemplateID) { create(.template($0)) }
         }
     }
 
@@ -175,7 +166,7 @@ struct MainView: View {
             if let templateID = selectedTemplateID {
                 TemplateEditorView(
                     templateID: templateID,
-                    onStart: startWith,
+                    onStart: { create(.template($0)) },
                     onDeleted: { selectedTemplateID = nil }
                 )
             } else {
@@ -184,26 +175,38 @@ struct MainView: View {
         } else if let entryID = selectedEntryID {
             EntryDetailView(
                 entryID: entryID,
-                onCompose: { showCompose = true },
+                onCompose: create,
                 onClose: { selectedEntryID = nil }
             )
         } else {
-            DetailPlaceholder(onCompose: { showCompose = true })
+            DetailPlaceholder(onCompose: create)
         }
     }
 
     // MARK: Actions
 
-    private func startWith(_ template: EntryTemplate) {
-        composeTemplate = template
-        showCompose = true
-    }
-
-    private func createEntry(journalID: UUID, templateID: UUID?, body: String) {
+    /// Starts an entry and opens the editor for it. A template's page becomes the entry's text.
+    private func create(_ choice: NewEntryChoice) {
+        let journalID: UUID
+        var template: EntryTemplate?
+        switch choice {
+        case .standard:
+            journalID = model.defaultJournalID(for: scope)
+            template = model.defaultTemplate(for: journalID)
+        case .blank:
+            journalID = model.defaultJournalID(for: scope)
+        case .template(let chosen):
+            template = chosen
+            // A template can name the journal it belongs in.
+            if let named = chosen.defaultJournalID, model.journal(named) != nil {
+                journalID = named
+            } else {
+                journalID = model.defaultJournalID(for: scope)
+            }
+        }
         // The editor opens in the detail column, so leave the Templates screen first.
         if sidebar == .templates { sidebar = .all }
-        let id = model.beginNewEntry(journalID: journalID, templateID: templateID, body: body)
-        selectedEntryID = id
-        showCompose = false
+        if let template { model.recordTemplateUse(template.id) }
+        selectedEntryID = model.beginNewEntry(journalID: journalID, templateID: template?.id, body: template?.body ?? "")
     }
 }
