@@ -7,6 +7,7 @@ import UIKit
 final class MarkdownUITextView: UITextView {
     var onFormat: ((FormatCommand) -> Void)?
     var onAppearanceChange: (() -> Void)?
+    var onLayout: (() -> Void)?
 
     override init(frame: CGRect, textContainer: NSTextContainer?) {
         super.init(frame: frame, textContainer: textContainer)
@@ -17,6 +18,11 @@ final class MarkdownUITextView: UITextView {
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) is not used")
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        onLayout?()
     }
 
     private struct Shortcut {
@@ -140,9 +146,18 @@ struct MarkdownEditor: UIViewRepresentable {
         private var cachedText = ""
         private var cachedDocument: MarkdownDocument?
         private var didFocus = false
-        private var pendingInsertion: NSRange?
+        /// The Markdown this view stands for, as last exchanged with SwiftUI. Tells an outside change from our own.
+        private var syncedText = ""
+        private var styledSignature: StyleSignature?
         private var sizeObserver: NSObjectProtocol?
         private var lastFocusMode = false
+
+        /// What the last styling pass looked at. If none of it changed, the text needs no new styling.
+        private struct StyleSignature: Equatable {
+            var text: String
+            var activeLines: [Int]
+            var editing: Bool
+        }
 
         init(_ parent: MarkdownEditor) {
             self.parent = parent
@@ -174,7 +189,11 @@ struct MarkdownEditor: UIViewRepresentable {
             }
 
             view.onFormat = { [weak self] command in self?.apply(command) }
-            view.onAppearanceChange = { [weak self] in self?.restyle() }
+            view.onAppearanceChange = { [weak self] in self?.restyle(force: true) }
+            view.onLayout = { [weak self, weak view] in
+                guard let self, let view else { return }
+                if self.updateFocusInsets(view), self.parent.isFocusMode { self.centerCaret(view) }
+            }
 
             if parent.isEditable {
                 let bar = FormatBar()
@@ -192,11 +211,12 @@ struct MarkdownEditor: UIViewRepresentable {
             sizeObserver = NotificationCenter.default.addObserver(
                 forName: UIContentSizeCategory.didChangeNotification, object: nil, queue: .main
             ) { [weak self] _ in
-                MainActor.assumeIsolated { self?.restyle() }
+                MainActor.assumeIsolated { self?.restyle(force: true) }
             }
 
+            syncedText = parent.text
             view.text = EditorText.fromMarkdown(parent.text)
-            restyle()
+            restyle(force: true)
         }
 
         func tearDown() {
@@ -213,7 +233,8 @@ struct MarkdownEditor: UIViewRepresentable {
             }
 
             // The text was changed from outside, such as by a checklist tap in the reader or a new template.
-            if EditorText.toMarkdown(view.text) != parent.text {
+            if parent.text != syncedText {
+                syncedText = parent.text
                 let selection = view.selectedRange
                 view.text = EditorText.fromMarkdown(parent.text)
                 let length = (view.text as NSString).length
@@ -233,19 +254,31 @@ struct MarkdownEditor: UIViewRepresentable {
                 let caret = parent.initialCaret
                 DispatchQueue.main.async { [weak self, weak view] in
                     guard let self, let view else { return }
-                    let length = (view.text as NSString).length
-                    let location = min(max(caret ?? length, 0), length)
-                    view.becomeFirstResponder()
-                    view.selectedRange = NSRange(location: location, length: 0)
-                    self.restyle()
-                    if self.parent.isFocusMode { self.centerCaret(view) }
+                    self.beginEditing(view, caret: caret, attemptsLeft: 4)
+                }
+            }
+        }
+
+        /// Brings up the keyboard. If the view isn't on screen yet, tries again a moment later.
+        private func beginEditing(_ view: MarkdownUITextView, caret: Int?, attemptsLeft: Int) {
+            let length = (view.text as NSString).length
+            let location = min(max(caret ?? length, 0), length)
+            if view.becomeFirstResponder() {
+                view.selectedRange = NSRange(location: location, length: 0)
+                restyle()
+                if parent.isFocusMode { centerCaret(view) }
+            } else if attemptsLeft > 0 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self, weak view] in
+                    guard let self, let view else { return }
+                    self.beginEditing(view, caret: caret, attemptsLeft: attemptsLeft - 1)
                 }
             }
         }
 
         // MARK: Styling
 
-        func restyle() {
+        /// Styles the text. Skipped when neither the text nor the lines the cursor touches have changed.
+        func restyle(force: Bool = false) {
             guard let view = textView, view.markedTextRange == nil else { return }
             let text = view.text ?? ""
             let document: MarkdownDocument
@@ -257,10 +290,17 @@ struct MarkdownEditor: UIViewRepresentable {
                 cachedText = text
             }
             let editing = parent.isEditable && view.isFirstResponder
-            MarkdownStyler.apply(
-                to: view.textStorage, document: document, selection: editing ? view.selectedRange : nil
-            )
-            view.typingAttributes = MarkdownStyler.typingAttributes(document: document, caret: view.selectedRange.location)
+            let selection = view.selectedRange
+            let range = selection.location..<(selection.location + selection.length)
+            let active = editing ? document.lines.indices.filter { document.isActive($0, selection: range) } : []
+            let signature = StyleSignature(text: text, activeLines: active, editing: editing)
+            if force || signature != styledSignature {
+                styledSignature = signature
+                MarkdownStyler.apply(
+                    to: view.textStorage, document: document, selection: editing ? selection : nil
+                )
+            }
+            view.typingAttributes = MarkdownStyler.typingAttributes(document: document, caret: selection.location)
         }
 
         // MARK: Delegate
@@ -273,15 +313,28 @@ struct MarkdownEditor: UIViewRepresentable {
                 apply(edit)
                 return false
             }
-            // Pasted or dictated text can be Markdown. It is tidied after it lands.
+            // Pasted or dictated text can be Markdown, such as "- [ ] milk". Turn it into editor form as it goes in.
             if text.utf16.count > 1 {
-                pendingInsertion = NSRange(location: range.location, length: text.utf16.count)
+                let converted = editorForm(ofPasted: text, at: range.location, in: textView.text)
+                if converted != text {
+                    let caret = range.location + converted.utf16.count
+                    apply(TextEdit(range: replaced, replacement: converted, selection: caret..<caret))
+                    return false
+                }
             }
             return true
         }
 
+        /// A paste lands in the middle of a line unless it starts one. Only lines after the first can be list items then.
+        private func editorForm(ofPasted text: String, at location: Int, in current: String) -> String {
+            let atLineStart = location == 0 || (current as NSString).character(at: location - 1) == 0x0A
+            if atLineStart { return EditorText.fromMarkdown(text) }
+            let scalars = text.unicodeScalars
+            guard let newline = scalars.firstIndex(of: "\n") else { return text }
+            return String(scalars[..<newline]) + EditorText.fromMarkdown(String(scalars[newline...]))
+        }
+
         func textViewDidChange(_ textView: UITextView) {
-            tidyPastedText(in: textView)
             changed(textView)
         }
 
@@ -300,23 +353,10 @@ struct MarkdownEditor: UIViewRepresentable {
             restyle()
         }
 
-        private func tidyPastedText(in view: UITextView) {
-            guard let range = pendingInsertion else { return }
-            pendingInsertion = nil
-            let nsText = view.text as NSString
-            guard range.location + range.length <= nsText.length else { return }
-            let inserted = nsText.substring(with: range)
-            let converted = EditorText.fromMarkdown(inserted)
-            guard converted != inserted else { return }
-            isApplyingEdit = true
-            view.textStorage.replaceCharacters(in: range, with: converted)
-            view.selectedRange = NSRange(location: range.location + (converted as NSString).length, length: 0)
-            isApplyingEdit = false
-        }
-
         /// The text changed: save it, restyle it, and update the bar.
         private func changed(_ view: UITextView) {
             let markdown = EditorText.toMarkdown(view.text)
+            syncedText = markdown
             if markdown != parent.text {
                 parent.text = markdown
             }
@@ -377,11 +417,24 @@ struct MarkdownEditor: UIViewRepresentable {
         private func updateSlashSuggestions(_ view: UITextView) {
             guard let bar = formatBar else { return }
             let selection = view.selectedRange
-            guard selection.length == 0 else {
+            guard selection.length == 0, slashMayBeTyped(in: view) else {
                 bar.showSlashSuggestions([])
                 return
             }
             bar.showSlashSuggestions(SlashCommand.suggestions(in: view.text, caret: selection.location))
+        }
+
+        /// A cheap look back from the caret for a "/" in the current word, so the whole text isn't parsed on every key.
+        private func slashMayBeTyped(in view: UITextView) -> Bool {
+            let text = view.text as NSString
+            var index = min(view.selectedRange.location, text.length)
+            while index > 0 {
+                let unit = text.character(at: index - 1)
+                if unit == 0x2F { return true }
+                if unit == 0x20 || unit == 0x0A || unit == 0x09 || unit == 0x0D { return false }
+                index -= 1
+            }
+            return false
         }
 
         private func runSlash(_ command: SlashCommand) {
@@ -433,11 +486,21 @@ struct MarkdownEditor: UIViewRepresentable {
 
         // MARK: Focus mode
 
-        private func updateFocusInsets(_ view: UITextView) {
-            guard view.isScrollEnabled else { return }
+        /// Space above and below the text so the line being written can sit near the middle. Follows the view's size.
+        /// Returns true if the insets changed.
+        @discardableResult
+        private func updateFocusInsets(_ view: UITextView) -> Bool {
+            guard view.isScrollEnabled else { return false }
             let height = view.bounds.height
-            view.contentInset.top = parent.isFocusMode ? height * 0.35 : 0
-            view.contentInset.bottom = parent.isFocusMode ? height * 0.45 : 0
+            let top: CGFloat = parent.isFocusMode ? height * 0.35 : 0
+            let bottom: CGFloat = parent.isFocusMode ? height * 0.45 : 0
+            guard abs(view.contentInset.top - top) > 0.5 || abs(view.contentInset.bottom - bottom) > 0.5 else { return false }
+            view.contentInset.top = top
+            view.contentInset.bottom = bottom
+            if !parent.isFocusMode {
+                view.contentOffset.y = max(view.contentOffset.y, -view.adjustedContentInset.top)
+            }
+            return true
         }
 
         /// Scrolls so the line being written sits a little above the middle of the screen.

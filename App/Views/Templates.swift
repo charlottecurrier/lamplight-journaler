@@ -115,6 +115,7 @@ struct TemplateEditorView: View {
 
 private struct TemplatePage: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.scenePhase) private var scenePhase
     let template: EntryTemplate
     var onStart: (EntryTemplate) -> Void
     var onDeleted: () -> Void
@@ -156,7 +157,8 @@ private struct TemplatePage: View {
     }
 
     private func save() {
-        guard snapshot != saved else { return }
+        // A template deleted a moment ago must not come back from a late save.
+        guard model.template(template.id) != nil, snapshot != saved else { return }
         saved = snapshot
         model.save(template: current)
     }
@@ -227,6 +229,9 @@ private struct TemplatePage: View {
             save()
         }
         .onDisappear { save() }
+        .onChange(of: scenePhase) {
+            if scenePhase != .active { save() }
+        }
         .confirmationDialog("Delete this template?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete Template", role: .destructive) {
                 model.deleteTemplate(template.id)

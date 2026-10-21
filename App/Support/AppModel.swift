@@ -56,6 +56,8 @@ final class AppModel {
     var templateUseCounts: [UUID: Int] = AppModel.loadUseCounts()
     /// Entries just made, not yet written in. The editor uses this to put the caret under a template's first heading.
     private(set) var freshEntryIDs: Set<UUID> = []
+    /// The text a new entry started with (a template's page). An entry that still holds only that is not worth a file.
+    @ObservationIgnored private var startingBodies: [UUID: String] = [:]
     /// Bumps after each refresh, so photos that failed to load can try again.
     var refreshCounter = 0
     var storageName = ""
@@ -297,14 +299,22 @@ final class AppModel {
     /// Entries for a list. A new entry you haven't typed in yet is shown only while you're editing it.
     func entries(in scope: EntryScope, matching query: String = "") -> [Entry] {
         entries.filter { entry in
-            guard !entry.isBlank || entry.id == editingEntryID else { return false }
+            guard !isUnwritten(entry) || entry.id == editingEntryID else { return false }
             if case .journal(let id) = scope, entry.journalID != id { return false }
             return entry.matches(query: query)
         }
     }
 
     private var writtenEntries: [Entry] {
-        entries.filter { !$0.isBlank }
+        entries.filter { !isUnwritten($0) }
+    }
+
+    /// Nothing the person wrote: no photos, and no text beyond what the entry started with.
+    private func isUnwritten(_ entry: Entry) -> Bool {
+        if entry.isBlank { return true }
+        guard let start = startingBodies[entry.id], entry.photos.isEmpty else { return false }
+        return entry.body.trimmingCharacters(in: .whitespacesAndNewlines)
+            == start.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     func today(_ calendar: DayCalendar) -> DayStamp {
@@ -338,12 +348,16 @@ final class AppModel {
         location: EntryLocation? = nil
     ) -> UUID {
         // Forget any earlier new entry that was never typed in.
-        entries.removeAll { $0.isBlank && !persistedIDs.contains($0.id) }
+        for stale in entries where isUnwritten(stale) && !persistedIDs.contains(stale.id) {
+            startingBodies[stale.id] = nil
+        }
+        entries.removeAll { isUnwritten($0) && !persistedIDs.contains($0.id) }
         let entry = Entry(journalID: journalID, templateID: templateID, location: location, body: body)
         entries.insert(entry, at: 0)
         editingEntryID = entry.id
         freshEntryIDs.insert(entry.id)
-        if !entry.isBlank { persist(entry) }
+        // Nothing is saved until the person writes something. A template's page alone is not an entry.
+        if !body.isEmpty { startingBodies[entry.id] = body }
         return entry.id
     }
 
@@ -363,7 +377,8 @@ final class AppModel {
             freshEntryIDs.remove(id)
         }
         guard let entry = entry(id) else { return }
-        if entry.isBlank {
+        if isUnwritten(entry) {
+            startingBodies[id] = nil
             entries.removeAll { $0.id == id }
             if persistedIDs.remove(id) != nil, let library {
                 enqueueWrite { try library.moveToTrash(entryID: id) }
@@ -371,6 +386,7 @@ final class AppModel {
             return
         }
         guard wasEditing else { return }
+        startingBodies[id] = nil
         persist(entry)
         if announce { announceSaved(entry, calendar: calendar) }
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
@@ -388,7 +404,7 @@ final class AppModel {
 
     private func persist(_ entry: Entry) {
         guard let library else { return }
-        if entry.isBlank && !persistedIDs.contains(entry.id) { return }
+        if isUnwritten(entry) && !persistedIDs.contains(entry.id) { return }
         persistedIDs.insert(entry.id)
         enqueueWrite { try library.save(entry) }
     }
