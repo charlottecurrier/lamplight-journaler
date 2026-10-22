@@ -49,10 +49,8 @@ private struct ComposeToolbar: ViewModifier {
     var onChoose: (NewEntryChoice) -> Void
 
     func body(content: Content) -> some View {
-        if sizeClass == .compact {
-            content
-        } else {
-            content.toolbar {
+        content.toolbar {
+            if sizeClass != .compact {
                 ToolbarItem(placement: .primaryAction) {
                     NewEntryButton(onChoose: onChoose)
                 }

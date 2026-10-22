@@ -463,12 +463,23 @@ struct MarkdownEditor: UIViewRepresentable {
 
             // When reading, a tap on the text starts editing there. A tap on a link opens the link instead.
             guard !parent.isEditable, let beginEditing = parent.onTapToEdit else { return }
-            if let character = character(at: location, in: view),
-               view.textStorage.attribute(.link, at: character, effectiveRange: nil) != nil {
+            if let character = character(at: location, in: view), isLink(at: character, in: view) {
                 return
             }
             let position = view.closestPosition(to: location) ?? view.endOfDocument
             beginEditing(view.offset(from: view.beginningOfDocument, to: position))
+        }
+
+        private static let linkDetector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+
+        /// True if the character is part of a link: one written in Markdown, or a plain web address.
+        private func isLink(at character: Int, in view: UITextView) -> Bool {
+            if view.textStorage.attribute(.link, at: character, effectiveRange: nil) != nil { return true }
+            guard let detector = Self.linkDetector else { return false }
+            let line = (view.text as NSString).lineRange(for: NSRange(location: character, length: 0))
+            return detector.matches(in: view.text, options: [], range: line).contains { match in
+                character >= match.range.location && character < match.range.location + match.range.length
+            }
         }
 
         /// The character under a point, or nil for empty space beside or below the text.

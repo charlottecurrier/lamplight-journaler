@@ -6,6 +6,7 @@ struct EntryEditorView: View {
     @Environment(AppModel.self) private var model
     @EnvironmentObject private var prefs: AppPrefs
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     @State private var draft: Entry
     /// The last version handed to the model. Used to skip saves when nothing changed.
@@ -208,7 +209,7 @@ struct EntryEditorView: View {
         VStack(alignment: .leading, spacing: 2) {
             SectionLabel("Or begin with a template")
                 .padding(.bottom, 4)
-            ForEach(model.templatesByUse().prefix(5)) { template in
+            ForEach(model.templatesByUse().prefix(sizeClass == .compact ? 3 : 5)) { template in
                 Button {
                     add(template)
                 } label: {
@@ -334,7 +335,8 @@ struct EntryEditorView: View {
 
     /// Takes out template headings nothing was written under. What the person wrote is never touched.
     private func dropEmptyTemplateHeadings() {
-        guard let templateID = draft.templateID, let template = model.template(templateID) else { return }
+        // A page still holding only its template is dropped as a whole, so leave it as it is.
+        guard !model.isUnwritten(draft), let templateID = draft.templateID, let template = model.template(templateID) else { return }
         let cleaned = TemplateText.removingEmptyHeadings(from: draft.body, template: template.body)
         if cleaned != draft.body { draft.body = cleaned }
     }

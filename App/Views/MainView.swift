@@ -116,7 +116,6 @@ struct MainView: View {
     @State private var columns = NavigationSplitViewVisibility.automatic
     /// On a phone, which screen is in front. It starts on the list, not on the list of sections.
     @State private var compactColumn = NavigationSplitViewColumn.content
-    @State private var didOpenOnLaunch = false
 
     private var scope: EntryScope {
         if case .journal(let id) = sidebar { return .journal(id) }
@@ -165,6 +164,7 @@ struct MainView: View {
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if sizeClass == .compact {
                     CompactBar(selection: $sidebar) { create(.standard) }
+                        .ignoresSafeArea(.keyboard, edges: .bottom)
                 }
             }
     }
@@ -205,7 +205,10 @@ struct MainView: View {
             EntryDetailView(
                 entryID: entryID,
                 onCompose: create,
-                onClose: { selectedEntryID = nil }
+                onClose: {
+                    selectedEntryID = nil
+                    compactColumn = .content
+                }
             )
         } else {
             DetailPlaceholder(onCompose: create)
@@ -243,8 +246,8 @@ struct MainView: View {
     /// Opening the app begins tonight's entry, if the person turned that on and hasn't written yet today.
     /// Nothing is saved until they type, so backing out leaves no trace.
     private func openToNewEntryOnLaunch() {
-        guard !lock.isLocked, !didOpenOnLaunch else { return }
-        didOpenOnLaunch = true
+        guard !lock.isLocked, !model.didOpenToNewEntry else { return }
+        model.didOpenToNewEntry = true
         guard prefs.openToNewEntry, model.editingEntryID == nil, model.stillDownloading == 0 else { return }
         guard !model.streak(calendar: prefs.dayCalendar).wroteToday else { return }
         sidebar = .all
@@ -297,6 +300,7 @@ private struct CompactBar: View {
                     .background(Circle().fill(Theme.accent))
             }
             .buttonStyle(.plain)
+            .keyboardShortcut("n", modifiers: .command)
             .frame(maxWidth: .infinity)
             .accessibilityLabel("New Entry")
             tab("Calendar", "calendar", .calendar)
