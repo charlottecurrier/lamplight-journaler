@@ -7,8 +7,6 @@ struct EmptyStateView: View {
     let message: String
     var actionTitle: String?
     var action: (() -> Void)?
-    /// Anything to show under the message, such as a row of buttons.
-    var extra: AnyView?
 
     var body: some View {
         VStack(spacing: 14) {
@@ -29,9 +27,6 @@ struct EmptyStateView: View {
                 Button(actionTitle, action: action)
                     .buttonStyle(.primaryPaper)
                     .padding(.top, 6)
-            }
-            if let extra {
-                extra.padding(.top, 6)
             }
         }
         .padding(32)

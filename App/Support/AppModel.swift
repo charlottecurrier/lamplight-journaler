@@ -361,6 +361,12 @@ final class AppModel {
         return entry.id
     }
 
+    /// A template was added to an entry that had nothing in it. Until the person writes more, it isn't worth a file.
+    func noteTemplateApplied(to id: UUID, body: String) {
+        guard let current = entry(id), current.isBlank else { return }
+        startingBodies[id] = body
+    }
+
     func update(_ entry: Entry) {
         guard let index = entries.firstIndex(where: { $0.id == entry.id }) else { return }
         let dateChanged = entries[index].createdAt != entry.createdAt

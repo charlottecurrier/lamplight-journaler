@@ -103,6 +103,8 @@ struct MarkdownEditor: UIViewRepresentable {
     /// Where the caret starts, as a UTF-16 offset in editor text. Defaults to the end.
     var initialCaret: Int?
     var controller: MarkdownEditorController?
+    /// When reading, a tap on the text calls this with the tapped spot, as a UTF-16 offset in editor text.
+    var onTapToEdit: ((Int) -> Void)?
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -456,22 +458,40 @@ struct MarkdownEditor: UIViewRepresentable {
 
         @objc private func handleTap(_ recognizer: UITapGestureRecognizer) {
             guard recognizer.state == .ended, let view = textView else { return }
-            var point = recognizer.location(in: view)
+            let location = recognizer.location(in: view)
+            if tickCheckbox(at: location, in: view) { return }
+
+            // When reading, a tap on the text starts editing there. A tap on a link opens the link instead.
+            guard !parent.isEditable, let beginEditing = parent.onTapToEdit else { return }
+            if let character = character(at: location, in: view),
+               view.textStorage.attribute(.link, at: character, effectiveRange: nil) != nil {
+                return
+            }
+            let position = view.closestPosition(to: location) ?? view.endOfDocument
+            beginEditing(view.offset(from: view.beginningOfDocument, to: position))
+        }
+
+        /// The character under a point, or nil for empty space beside or below the text.
+        private func character(at location: CGPoint, in view: UITextView) -> Int? {
+            var point = location
             point.x -= view.textContainerInset.left
             point.y -= view.textContainerInset.top
-
             let layout = view.layoutManager
-            guard layout.numberOfGlyphs > 0 else { return }
+            guard layout.numberOfGlyphs > 0 else { return nil }
             let glyph = layout.glyphIndex(for: point, in: view.textContainer)
             let box = layout.boundingRect(forGlyphRange: NSRange(location: glyph, length: 1), in: view.textContainer)
-            // Only a tap on the box itself counts, not on the empty space after a short line.
-            guard box.insetBy(dx: -10, dy: -6).contains(point) else { return }
-            let character = layout.characterIndexForGlyph(at: glyph)
+            // Only a tap on the character itself counts, not on the empty space after a short line.
+            guard box.insetBy(dx: -10, dy: -6).contains(point) else { return nil }
+            return layout.characterIndexForGlyph(at: glyph)
+        }
 
+        /// Ticks or unticks the checklist box at a point. Returns false if there is no box there.
+        private func tickCheckbox(at location: CGPoint, in view: UITextView) -> Bool {
+            guard let character = character(at: location, in: view) else { return false }
             let selection = view.selectedRange
             guard let edit = MarkdownEditing.toggleCheckbox(
                 in: view.text, near: character, keeping: selection.location..<(selection.location + selection.length)
-            ) else { return }
+            ) else { return false }
 
             // A checklist can be ticked even while reading. Replace just the symbol, and leave the caret alone.
             isApplyingEdit = true
@@ -482,6 +502,7 @@ struct MarkdownEditor: UIViewRepresentable {
             isApplyingEdit = false
             changed(view)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            return true
         }
 
         // MARK: Focus mode

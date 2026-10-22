@@ -4,102 +4,32 @@ import SwiftUI
 
 /// What to start a new entry with.
 enum NewEntryChoice {
-    /// The journal's default template, or a blank page if it has none.
+    /// The journal's default template, or an empty page that offers your templates.
     case standard
     case blank
     case template(EntryTemplate)
 }
 
-/// The New Entry button. With templates, tapping it lists them: this journal's default first, then the rest,
-/// the ones you use most first, and a blank page last. With no templates it starts a blank entry.
-struct NewEntryMenu: View {
-    @Environment(AppModel.self) private var model
-    var scope: EntryScope = .all
-    var onChoose: (NewEntryChoice) -> Void
-
-    /// Templates in the order the menu shows them.
-    private var ordered: [EntryTemplate] {
-        let all = model.templatesByUse()
-        guard let favorite = model.defaultTemplate(for: model.defaultJournalID(for: scope)) else { return all }
-        return [favorite] + all.filter { $0.id != favorite.id }
-    }
-
-    var body: some View {
-        if model.templates.isEmpty {
-            Button {
-                onChoose(.blank)
-            } label: {
-                Label("New Entry", systemImage: "square.and.pencil")
-            }
-        } else {
-            Menu {
-                ForEach(ordered) { template in
-                    Button {
-                        onChoose(.template(template))
-                    } label: {
-                        Label(template.name, systemImage: "doc.text")
-                    }
-                }
-                Divider()
-                Button {
-                    onChoose(.blank)
-                } label: {
-                    Label("Blank Page", systemImage: "square")
-                }
-            } label: {
-                Label("New Entry", systemImage: "square.and.pencil")
-            }
-        }
-    }
-}
-
-/// A row of your templates at the top of the list, to start an entry in one tap.
-struct StartWithTemplates: View {
-    @Environment(AppModel.self) private var model
+/// The New Entry button. It opens an empty page, where your templates are offered.
+struct NewEntryButton: View {
     var onChoose: (NewEntryChoice) -> Void
 
     var body: some View {
-        let templates = model.templatesByUse()
-        if !templates.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                SectionLabel("Start with")
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        ForEach(templates) { template in
-                            chip(template.name, systemImage: "doc.text") { onChoose(.template(template)) }
-                        }
-                        chip("Blank page", systemImage: "square") { onChoose(.blank) }
-                    }
-                    .padding(.vertical, 2)
-                }
-            }
+        Button {
+            onChoose(.standard)
+        } label: {
+            Label("New Entry", systemImage: "square.and.pencil")
         }
-    }
-
-    private func chip(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Label(title, systemImage: systemImage)
-                .font(Theme.serif(.subheadline, weight: .medium))
-                .foregroundStyle(Theme.ink)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 11)
-                .background(Capsule().fill(Theme.surface))
-                .overlay(Capsule().strokeBorder(Theme.line, lineWidth: 0.75))
-        }
-        .buttonStyle(.plain)
+        .keyboardShortcut("n", modifiers: .command)
     }
 }
 
 // MARK: - Shared pieces
 
 extension View {
-    /// Adds the "New Entry" button to a screen's toolbar.
-    func composeToolbar(scope: EntryScope = .all, _ onChoose: @escaping (NewEntryChoice) -> Void) -> some View {
-        toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                NewEntryMenu(scope: scope, onChoose: onChoose)
-            }
-        }
+    /// Adds the "New Entry" button to a screen's toolbar. On a phone the bottom bar has one instead.
+    func composeToolbar(_ onChoose: @escaping (NewEntryChoice) -> Void) -> some View {
+        modifier(ComposeToolbar(onChoose: onChoose))
     }
 
     /// The long-press menu and swipe-to-delete for an entry row.
@@ -111,6 +41,23 @@ extension View {
         listRowBackground(selected ? Theme.surface : Color.clear)
             .listRowSeparatorTint(Theme.line)
             .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+    }
+}
+
+private struct ComposeToolbar: ViewModifier {
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    var onChoose: (NewEntryChoice) -> Void
+
+    func body(content: Content) -> some View {
+        if sizeClass == .compact {
+            content
+        } else {
+            content.toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    NewEntryButton(onChoose: onChoose)
+                }
+            }
+        }
     }
 }
 
@@ -269,6 +216,8 @@ struct EntryListView: View {
     @Binding var selection: UUID?
     var onCompose: (NewEntryChoice) -> Void
     var onSeeOnThisDay: () -> Void
+    /// Switches to another journal, or back to all entries.
+    var onPickScope: (SidebarItem) -> Void = { _ in }
 
     @State private var query = ""
 
@@ -311,7 +260,6 @@ struct EntryListView: View {
                                 Spacer()
                             }
                         }
-                        StartWithTemplates(onChoose: onCompose)
                         StreakCard(summary: model.streak(calendar: calendar))
                         let groups = model.onThisDay(calendar: calendar)
                         if !groups.isEmpty {
@@ -348,9 +296,17 @@ struct EntryListView: View {
         .scrollContentBackground(.hidden)
         .background(PaperBackground())
         .navigationTitle(title)
+        .toolbarTitleMenu {
+            if model.journals.count > 1 {
+                Button("All Entries") { onPickScope(.all) }
+                ForEach(model.journals) { journal in
+                    Button(journal.name) { onPickScope(.journal(journal.id)) }
+                }
+            }
+        }
         .searchable(text: $query, prompt: "Search your journal")
         .refreshable { await model.refresh() }
-        .composeToolbar(scope: scope, onCompose)
+        .composeToolbar(onCompose)
         .overlay {
             if entries.isEmpty {
                 if isSearching {

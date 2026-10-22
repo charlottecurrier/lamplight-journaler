@@ -73,8 +73,9 @@ struct EntryEditorView: View {
         .onChange(of: showPlace) { if !showPlace { controller.focus() } }
         .onDisappear {
             saveTask?.cancel()
-            commit()
             // A full-screen photo covers this screen without leaving it.
+            if viewer == nil { dropEmptyTemplateHeadings() }
+            commit()
             guard viewer == nil else { return }
             model.finishEditing(draft.id, announce: false, calendar: prefs.dayCalendar)
         }
@@ -187,14 +188,41 @@ struct EntryEditorView: View {
         )
         .overlay(alignment: .topLeading) {
             if draft.body.isEmpty {
-                Text("Start writing…")
-                    .font(Theme.serif(.title3))
-                    .foregroundStyle(Theme.inkTertiary)
-                    .padding(.top, 8)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 22) {
+                    Text("Start writing…")
+                        .font(Theme.serif(.title3))
+                        .foregroundStyle(Theme.inkTertiary)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                    if !model.templates.isEmpty {
+                        templatePicker
+                    }
+                }
+                .padding(.top, 8)
             }
         }
+    }
+
+    /// On an empty page, your templates are offered. Typing anything makes them go away.
+    private var templatePicker: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            SectionLabel("Or begin with a template")
+                .padding(.bottom, 4)
+            ForEach(model.templatesByUse().prefix(5)) { template in
+                Button {
+                    add(template)
+                } label: {
+                    Label(template.name, systemImage: "doc.text")
+                        .font(Theme.serif(.body))
+                        .foregroundStyle(Theme.ink)
+                        .padding(.vertical, 10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .frame(maxWidth: 360, alignment: .leading)
     }
 
     private var leaveFocusButton: some View {
@@ -254,9 +282,14 @@ struct EntryEditorView: View {
 
     /// Puts a template's text into the entry at the cursor.
     private func add(_ template: EntryTemplate) {
+        let wasEmpty = draft.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         controller.insertTemplate(template.body)
         model.recordTemplateUse(template.id)
         if draft.templateID == nil { draft.templateID = template.id }
+        // A page holding only the template is not worth a file until something is written in it.
+        if wasEmpty {
+            model.noteTemplateApplied(to: draft.id, body: EditorText.toMarkdown(EditorText.fromMarkdown(template.body)))
+        }
     }
 
     @ToolbarContentBuilder
@@ -299,8 +332,16 @@ struct EntryEditorView: View {
         model.update(toSave)
     }
 
+    /// Takes out template headings nothing was written under. What the person wrote is never touched.
+    private func dropEmptyTemplateHeadings() {
+        guard let templateID = draft.templateID, let template = model.template(templateID) else { return }
+        let cleaned = TemplateText.removingEmptyHeadings(from: draft.body, template: template.body)
+        if cleaned != draft.body { draft.body = cleaned }
+    }
+
     private func finish() {
         saveTask?.cancel()
+        dropEmptyTemplateHeadings()
         commit()
         controller.dismissKeyboard()
         model.finishEditing(draft.id, announce: true, calendar: prefs.dayCalendar)

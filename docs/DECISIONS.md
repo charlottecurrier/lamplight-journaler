@@ -42,7 +42,11 @@ Amber lenses cut blue light. Blues go dark and warm colors blur together, but br
 - **A template is a page of Markdown.** It is written in the same editor as an entry, and a new entry starts as a copy. Nothing links the entry back to the template, so editing a template never changes old entries. Templates from the first version (a list of questions) open as `##` headings.
 - **Live Markdown, with the symbols hidden.** The file keeps plain Markdown. On screen, symbols like `##` and `**` are hidden except on the line the cursor is on, so you can always edit by hand. Lists and checklists are shown as `•`, `☐` and `☑` and turned back into `-`, `1.` and `- [ ]` when saved.
 - **Most-used templates first.** Counts are kept on each device, not in the journal folder, so two devices never write the same file.
-- **Templates are never hidden behind a long-press.** New Entry lists them when tapped, and a row of them sits at the top of the list. A journal's default template comes first in the menu.
+- **Templates are offered on the empty page.** A new entry opens empty, with your templates listed under the cursor, like Notion and Day One. They go away once you type. A journal can have a default template, which fills in by itself instead of asking.
+- **The phone has a bottom bar, the iPad a sidebar.** On a phone the app opens on the entry list, with Journal, On This Day, Calendar and Templates along the bottom and a New Entry button in the middle. Settings is the gear at the top left. Switching journals is the title at the top of the list.
+- **Opening the app starts a new entry** if you haven't written yet today and it's a fresh launch (not each time you switch back to the app). It's a setting. A page that still holds only a template is dropped, not saved.
+- **Tap the text to edit.** There's no read mode to leave first. A link or checklist box still does its own thing when tapped.
+- **Empty template headings are removed on Done.** Only headings that came from the entry's template, with nothing written under them. Anything you wrote is kept.
 - **Swipe to delete has no confirmation.** It only moves the entry to Recently Deleted, where it stays 30 days.
 - **Working name: Lamplight.** Easy to change: `project.yml` (`CFBundleDisplayName`) and the text in `App/Views`.
 - **Minimum iOS 17.**

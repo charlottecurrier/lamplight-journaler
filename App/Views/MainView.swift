@@ -105,12 +105,18 @@ private struct WeekDotsCompact: View {
 /// Sidebar, list and reading column. An iPad shows all three side by side; a phone shows one at a time.
 struct MainView: View {
     @Environment(AppModel.self) private var model
+    @Environment(LockManager.self) private var lock
+    @EnvironmentObject private var prefs: AppPrefs
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     @State private var sidebar: SidebarItem? = .all
     @State private var selectedEntryID: UUID?
     @State private var selectedTemplateID: UUID?
     @State private var showSettings = false
     @State private var columns = NavigationSplitViewVisibility.automatic
+    /// On a phone, which screen is in front. It starts on the list, not on the list of sections.
+    @State private var compactColumn = NavigationSplitViewColumn.content
+    @State private var didOpenOnLaunch = false
 
     private var scope: EntryScope {
         if case .journal(let id) = sidebar { return .journal(id) }
@@ -118,7 +124,7 @@ struct MainView: View {
     }
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $columns) {
+        NavigationSplitView(columnVisibility: $columns, preferredCompactColumn: $compactColumn) {
             SidebarView(selection: $sidebar) { showSettings = true }
                 .navigationSplitViewColumnWidth(min: 230, ideal: 270, max: 320)
         } content: {
@@ -137,19 +143,42 @@ struct MainView: View {
         .sheet(isPresented: $showSettings) {
             SettingsView()
         }
+        // Once the journal is unlocked, open to a new entry if nothing is written yet today.
+        .task(id: lock.isLocked) { openToNewEntryOnLaunch() }
     }
 
     // MARK: Columns
 
-    @ViewBuilder
     private var contentColumn: some View {
+        screen
+            .toolbar {
+                if sizeClass == .compact {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            showSettings = true
+                        } label: {
+                            Label("Settings", systemImage: "gearshape")
+                        }
+                    }
+                }
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if sizeClass == .compact {
+                    CompactBar(selection: $sidebar) { create(.standard) }
+                }
+            }
+    }
+
+    @ViewBuilder
+    private var screen: some View {
         switch sidebar ?? .all {
         case .all, .journal:
             EntryListView(
                 scope: scope,
                 selection: $selectedEntryID,
                 onCompose: create,
-                onSeeOnThisDay: { sidebar = .onThisDay }
+                onSeeOnThisDay: { sidebar = .onThisDay },
+                onPickScope: { sidebar = $0 }
             )
         case .onThisDay:
             OnThisDayScreen(selection: $selectedEntryID, onCompose: create)
@@ -208,5 +237,76 @@ struct MainView: View {
         if sidebar == .templates { sidebar = .all }
         if let template { model.recordTemplateUse(template.id) }
         selectedEntryID = model.beginNewEntry(journalID: journalID, templateID: template?.id, body: template?.body ?? "")
+        compactColumn = .detail
+    }
+
+    /// Opening the app begins tonight's entry, if the person turned that on and hasn't written yet today.
+    /// Nothing is saved until they type, so backing out leaves no trace.
+    private func openToNewEntryOnLaunch() {
+        guard !lock.isLocked, !didOpenOnLaunch else { return }
+        didOpenOnLaunch = true
+        guard prefs.openToNewEntry, model.editingEntryID == nil, model.stillDownloading == 0 else { return }
+        guard !model.streak(calendar: prefs.dayCalendar).wroteToday else { return }
+        sidebar = .all
+        create(.standard)
+    }
+}
+
+/// The phone's bottom bar: where to look, and a button to begin writing.
+private struct CompactBar: View {
+    @Binding var selection: SidebarItem?
+    var onNewEntry: () -> Void
+
+    private func isSelected(_ item: SidebarItem) -> Bool {
+        let current = selection ?? .all
+        if item == .all, case .journal = current { return true }
+        return current == item
+    }
+
+    private func tab(_ title: String, _ symbol: String, _ item: SidebarItem) -> some View {
+        let selected = isSelected(item)
+        return Button {
+            selection = item
+        } label: {
+            VStack(spacing: 3) {
+                Image(systemName: symbol)
+                    .font(.system(size: 20))
+                Text(title)
+                    .font(Theme.serif(.caption2, weight: .medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .foregroundStyle(selected ? Theme.accent : Theme.inkTertiary)
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            tab("Journal", "book.closed", .all)
+            tab("On This Day", "clock.arrow.circlepath", .onThisDay)
+            Button(action: onNewEntry) {
+                Image(systemName: "plus")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(Theme.onAccent)
+                    .frame(width: 54, height: 54)
+                    .background(Circle().fill(Theme.accent))
+            }
+            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity)
+            .accessibilityLabel("New Entry")
+            tab("Calendar", "calendar", .calendar)
+            tab("Templates", "list.bullet.rectangle", .templates)
+        }
+        .padding(.horizontal, 6)
+        .padding(.top, 6)
+        .background(Theme.surface.ignoresSafeArea(edges: .bottom))
+        .overlay(alignment: .top) {
+            Rectangle().fill(Theme.line).frame(height: 0.5)
+        }
     }
 }

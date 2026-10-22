@@ -52,6 +52,7 @@ final class AppPrefs: ObservableObject {
         static let lockEnabled = "prefs.lockEnabled"
         static let lockTimeout = "prefs.lockTimeout"
         static let rolloverHour = "prefs.rolloverHour"
+        static let openToNewEntry = "prefs.openToNewEntry"
         static let onboardingComplete = "prefs.onboardingComplete"
     }
 
@@ -79,6 +80,11 @@ final class AppPrefs: ObservableObject {
         didSet { defaults.set(rolloverHour, forKey: Key.rolloverHour) }
     }
 
+    /// Opening the app starts a new entry, if nothing has been written yet today.
+    @Published var openToNewEntry: Bool {
+        didSet { defaults.set(openToNewEntry, forKey: Key.openToNewEntry) }
+    }
+
     @Published var onboardingComplete: Bool {
         didSet { defaults.set(onboardingComplete, forKey: Key.onboardingComplete) }
     }
@@ -89,6 +95,7 @@ final class AppPrefs: ObservableObject {
         lockEnabled = defaults.bool(forKey: Key.lockEnabled)
         lockTimeout = LockTimeout(rawValue: defaults.integer(forKey: Key.lockTimeout)) ?? .immediately
         rolloverHour = defaults.integer(forKey: Key.rolloverHour)
+        openToNewEntry = defaults.object(forKey: Key.openToNewEntry) as? Bool ?? true
         onboardingComplete = defaults.bool(forKey: Key.onboardingComplete)
     }
 

@@ -168,3 +168,77 @@ final class MarkdownBlocksTests: XCTestCase {
         XCTAssertEqual(MarkdownBlocks.parse("## Q\r\n\r\nA\r\n"), [.heading(level: 2, text: "Q"), .paragraph("A")])
     }
 }
+
+final class EmptyHeadingTests: XCTestCase {
+    let evening = "## What went well?\n\n## What was hard?\n\n## Looking forward to\n\n"
+
+    private func clean(_ body: String, template: String? = nil) -> String {
+        TemplateText.removingEmptyHeadings(from: body, template: template ?? evening)
+    }
+
+    func testNothingWrittenRemovesEverything() {
+        XCTAssertEqual(clean(evening), "")
+    }
+
+    func testKeepsAnsweredHeadingsAndDropsTheRest() {
+        let body = "## What went well?\n\nA long walk.\n\n## What was hard?\n\n## Looking forward to\n\n"
+        XCTAssertEqual(clean(body), "## What went well?\n\nA long walk.\n")
+    }
+
+    func testDropsAnEmptyHeadingInTheMiddle() {
+        let body = "## What went well?\n\nGood.\n\n## What was hard?\n\n## Looking forward to\n\nSleep.\n"
+        XCTAssertEqual(clean(body), "## What went well?\n\nGood.\n\n## Looking forward to\n\nSleep.\n")
+    }
+
+    func testTextTheSameAsAHeadingIsKeptWhenWrittenUnderIt() {
+        let body = "## What was hard?\n\n- [ ] call the bank\n"
+        XCTAssertEqual(clean(body), body)
+    }
+
+    func testHeadingsNotInTheTemplateAreNeverRemoved() {
+        let body = "# Thursday\n\n## What went well?\n\n"
+        XCTAssertEqual(clean(body), "# Thursday\n")
+    }
+
+    func testTitleOnlyEntryWithoutMatchingTemplateIsUntouched() {
+        XCTAssertEqual(clean("# Thursday\n", template: evening), "# Thursday\n")
+    }
+
+    func testWhitespaceOnlyLinesCountAsEmpty() {
+        XCTAssertEqual(clean("## What went well?\n   \n\t\n## What was hard?\nHard.\n"), "## What was hard?\nHard.\n")
+    }
+
+    func testUnchangedWhenThereIsNothingToRemove() {
+        let body = "## What went well?\nA\n## What was hard?\nB\n## Looking forward to\nC"
+        XCTAssertEqual(clean(body), body)
+    }
+
+    func testNestedHeadingsStayWhenAnythingUnderThemIsWritten() {
+        let template = "# Day\n\n## Morning\n\n## Evening\n\n"
+        let body = "# Day\n\n## Morning\n\nRan.\n\n## Evening\n\n"
+        XCTAssertEqual(clean(body, template: template), "# Day\n\n## Morning\n\nRan.\n")
+    }
+
+    func testNestedHeadingsGoTogetherWhenNothingIsWritten() {
+        let template = "# Day\n\n## Morning\n\n## Evening\n\n"
+        XCTAssertEqual(clean(template, template: template), "")
+    }
+
+    func testHeadingInsideACodeBlockIsNotAHeading() {
+        let body = "```\n## What went well?\n```\n"
+        XCTAssertEqual(clean(body), body)
+    }
+
+    func testKeepsWindowsLineEndings() {
+        let body = "## What went well?\r\n\r\n## What was hard?\r\nHard.\r\n"
+        XCTAssertEqual(clean(body), "## What was hard?\r\nHard.\r\n")
+    }
+
+    func testTemplateWithoutHeadingsChangesNothing() {
+        XCTAssertEqual(clean("Hello\n", template: "Just text"), "Hello\n")
+    }
+
+    func testWritingBelowLastHeadingWithNoBlankLineBeforeIt() {
+        XCTAssertEqual(clean("## What went well?\nOk\n## What was hard?\n"), "## What went well?\nOk\n")
+    }
+}
