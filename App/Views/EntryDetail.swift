@@ -6,18 +6,24 @@ struct DetailPlaceholder: View {
     var onCompose: (NewEntryChoice) -> Void
 
     var body: some View {
-        let hasTemplates = !model.templates.isEmpty
-        EmptyStateView(
-            systemImage: "book",
-            title: "Choose an entry",
-            message: "Or begin a new one for tonight.",
-            actionTitle: hasTemplates ? nil : "New Entry",
-            action: hasTemplates ? nil : { onCompose(.blank) },
-            extra: hasTemplates
-                ? AnyView(StartWithTemplates(onChoose: onCompose).frame(maxWidth: 520))
-                : nil
-        )
-        .background(PaperBackground())
+        if model.templates.isEmpty {
+            EmptyStateView(
+                systemImage: "book",
+                title: "Choose an entry",
+                message: "Or begin a new one for tonight.",
+                actionTitle: "New Entry",
+                action: { onCompose(.blank) }
+            )
+            .background(PaperBackground())
+        } else {
+            EmptyStateView(
+                systemImage: "book",
+                title: "Choose an entry",
+                message: "Or begin a new one for tonight.",
+                extra: AnyView(StartWithTemplates(onChoose: onCompose).frame(maxWidth: 520))
+            )
+            .background(PaperBackground())
+        }
     }
 }
 
