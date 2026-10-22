@@ -10,36 +10,83 @@ enum NewEntryChoice {
     case template(EntryTemplate)
 }
 
-/// Tap to start an entry right away, with the journal's default template if it has one.
-/// Press and hold for a blank page or any template, the ones you use most first.
+/// The New Entry button. With templates, tapping it lists them: this journal's default first, then the rest,
+/// the ones you use most first, and a blank page last. With no templates it starts a blank entry.
 struct NewEntryMenu: View {
     @Environment(AppModel.self) private var model
+    var scope: EntryScope = .all
     var onChoose: (NewEntryChoice) -> Void
 
+    /// Templates in the order the menu shows them.
+    private var ordered: [EntryTemplate] {
+        let all = model.templatesByUse()
+        guard let favorite = model.defaultTemplate(for: model.defaultJournalID(for: scope)) else { return all }
+        return [favorite] + all.filter { $0.id != favorite.id }
+    }
+
     var body: some View {
-        Menu {
+        if model.templates.isEmpty {
             Button {
                 onChoose(.blank)
             } label: {
-                Label("Blank Entry", systemImage: "square.and.pencil")
+                Label("New Entry", systemImage: "square.and.pencil")
             }
-            let templates = model.templatesByUse()
-            if !templates.isEmpty {
-                Divider()
-                ForEach(templates) { template in
+        } else {
+            Menu {
+                ForEach(ordered) { template in
                     Button {
                         onChoose(.template(template))
                     } label: {
                         Label(template.name, systemImage: "doc.text")
                     }
                 }
+                Divider()
+                Button {
+                    onChoose(.blank)
+                } label: {
+                    Label("Blank Page", systemImage: "square")
+                }
+            } label: {
+                Label("New Entry", systemImage: "square.and.pencil")
             }
-        } label: {
-            Label("New Entry", systemImage: "square.and.pencil")
-        } primaryAction: {
-            onChoose(.standard)
         }
-        .accessibilityHint("Press and hold to choose a template")
+    }
+}
+
+/// A row of your templates at the top of the list, to start an entry in one tap.
+struct StartWithTemplates: View {
+    @Environment(AppModel.self) private var model
+    var onChoose: (NewEntryChoice) -> Void
+
+    var body: some View {
+        let templates = model.templatesByUse()
+        if !templates.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                SectionLabel("Start with")
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(templates) { template in
+                            chip(template.name, systemImage: "doc.text") { onChoose(.template(template)) }
+                        }
+                        chip("Blank page", systemImage: "square") { onChoose(.blank) }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+        }
+    }
+
+    private func chip(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(Theme.serif(.subheadline, weight: .medium))
+                .foregroundStyle(Theme.ink)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 11)
+                .background(Capsule().fill(Theme.surface))
+                .overlay(Capsule().strokeBorder(Theme.line, lineWidth: 0.75))
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -47,18 +94,47 @@ struct NewEntryMenu: View {
 
 extension View {
     /// Adds the "New Entry" button to a screen's toolbar.
-    func composeToolbar(_ onChoose: @escaping (NewEntryChoice) -> Void) -> some View {
+    func composeToolbar(scope: EntryScope = .all, _ onChoose: @escaping (NewEntryChoice) -> Void) -> some View {
         toolbar {
             ToolbarItem(placement: .primaryAction) {
-                NewEntryMenu(onChoose: onChoose)
+                NewEntryMenu(scope: scope, onChoose: onChoose)
             }
         }
+    }
+
+    /// The long-press menu and swipe-to-delete for an entry row.
+    func entryActions(_ entry: Entry, selection: Binding<UUID?>) -> some View {
+        modifier(EntryRowActions(entry: entry, selection: selection))
     }
 
     func entryRowStyle(selected: Bool) -> some View {
         listRowBackground(selected ? Theme.surface : Color.clear)
             .listRowSeparatorTint(Theme.line)
             .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+    }
+}
+
+/// Gives an entry row its long-press menu and a swipe to delete. Deleting moves it to Recently Deleted.
+struct EntryRowActions: ViewModifier {
+    @Environment(AppModel.self) private var model
+    let entry: Entry
+    @Binding var selection: UUID?
+
+    func body(content: Content) -> some View {
+        content
+            .contextMenu {
+                EntryMenuItems(entry: entry) {
+                    selection = entry.id
+                    model.editingEntryID = entry.id
+                }
+            }
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                Button(role: .destructive) {
+                    model.moveToTrash(entry.id)
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
     }
 }
 
@@ -235,6 +311,7 @@ struct EntryListView: View {
                                 Spacer()
                             }
                         }
+                        StartWithTemplates(onChoose: onCompose)
                         StreakCard(summary: model.streak(calendar: calendar))
                         let groups = model.onThisDay(calendar: calendar)
                         if !groups.isEmpty {
@@ -257,12 +334,7 @@ struct EntryListView: View {
                         EntryRow(entry: entry, showJournal: scope == .all && model.journals.count > 1)
                             .tag(entry.id)
                             .entryRowStyle(selected: selection == entry.id)
-                            .contextMenu {
-                                EntryMenuItems(entry: entry) {
-                                    selection = entry.id
-                                    model.editingEntryID = entry.id
-                                }
-                            }
+                            .entryActions(entry, selection: $selection)
                     }
                 } header: {
                     Text(section.title)
@@ -278,7 +350,7 @@ struct EntryListView: View {
         .navigationTitle(title)
         .searchable(text: $query, prompt: "Search your journal")
         .refreshable { await model.refresh() }
-        .composeToolbar(onCompose)
+        .composeToolbar(scope: scope, onCompose)
         .overlay {
             if entries.isEmpty {
                 if isSearching {
@@ -321,12 +393,7 @@ struct OnThisDayScreen: View {
                         EntryRow(entry: entry, showJournal: model.journals.count > 1)
                             .tag(entry.id)
                             .entryRowStyle(selected: selection == entry.id)
-                            .contextMenu {
-                                EntryMenuItems(entry: entry) {
-                                    selection = entry.id
-                                    model.editingEntryID = entry.id
-                                }
-                            }
+                            .entryActions(entry, selection: $selection)
                     }
                 } header: {
                     Text("\(group.label) · \(String(group.year))")

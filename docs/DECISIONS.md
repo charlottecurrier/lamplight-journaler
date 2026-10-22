@@ -42,6 +42,8 @@ Amber lenses cut blue light. Blues go dark and warm colors blur together, but br
 - **A template is a page of Markdown.** It is written in the same editor as an entry, and a new entry starts as a copy. Nothing links the entry back to the template, so editing a template never changes old entries. Templates from the first version (a list of questions) open as `##` headings.
 - **Live Markdown, with the symbols hidden.** The file keeps plain Markdown. On screen, symbols like `##` and `**` are hidden except on the line the cursor is on, so you can always edit by hand. Lists and checklists are shown as `•`, `☐` and `☑` and turned back into `-`, `1.` and `- [ ]` when saved.
 - **Most-used templates first.** Counts are kept on each device, not in the journal folder, so two devices never write the same file.
+- **Templates are never hidden behind a long-press.** New Entry lists them when tapped, and a row of them sits at the top of the list. A journal's default template comes first in the menu.
+- **Swipe to delete has no confirmation.** It only moves the entry to Recently Deleted, where it stays 30 days.
 - **Working name: Lamplight.** Easy to change: `project.yml` (`CFBundleDisplayName`) and the text in `App/Views`.
 - **Minimum iOS 17.**
 

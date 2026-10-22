@@ -12,12 +12,12 @@ A calm journal for writing at the end of the day. Made for iPad first, works on 
 - **On This Day.** A strip at the top of the journal, and its own screen.
 - **Streak.** Days in a row, longest streak, and the last seven days. A "new day starts at" setting keeps a 12:30 AM entry in yesterday's streak.
 - **Writing.** Markdown shows as you type. `#` and a space makes a heading. `**bold**`, `*italic*`, `~~strike~~`, `==highlight==`, bullets, numbered lists, tappable checklists, quotes, dividers, links and code all work. The symbols hide when your cursor leaves the line. A bar above the keyboard has the same things as buttons, and typing `/` lists commands. Focus mode hides everything but the text.
-- **Templates.** A template is a page you write once, in the same editor as an entry: headings, prompts, checklists. A new entry starts with a copy of it. Tap New Entry to use the journal's default template, or press and hold to pick another (the ones you use most are first). You can also add a template to an entry you already started. No built-in prompts. You write your own.
+- **Templates.** A template is a page you write once, in the same editor as an entry: headings, prompts, checklists. A new entry starts with a copy of it. A row of your templates at the top of the list starts an entry in one tap, and the New Entry button lists them too (the journal's default first, then the ones you use most). You can also add a template to an entry you already started. No built-in prompts. You write your own.
 - **Calendar.** A month view with a dot on days you wrote.
 - **Multiple journals.**
 - **Places.** Pick Home, or search for a place. No GPS, no location permission.
 - **Photos.** Add several per entry. Tap for full screen, pinch to zoom.
-- **Recently Deleted.** Deleted entries stay for 30 days.
+- **Recently Deleted.** Swipe an entry left to delete it. Deleted entries stay for 30 days.
 
 ## Open it on your iPad
 

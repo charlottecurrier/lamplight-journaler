@@ -2,15 +2,20 @@ import SwiftUI
 
 /// Shown in the detail column when no entry is chosen.
 struct DetailPlaceholder: View {
+    @Environment(AppModel.self) private var model
     var onCompose: (NewEntryChoice) -> Void
 
     var body: some View {
+        let hasTemplates = !model.templates.isEmpty
         EmptyStateView(
             systemImage: "book",
             title: "Choose an entry",
             message: "Or begin a new one for tonight.",
-            actionTitle: "New Entry",
-            action: { onCompose(.standard) }
+            actionTitle: hasTemplates ? nil : "New Entry",
+            action: hasTemplates ? nil : { onCompose(.blank) },
+            extra: hasTemplates
+                ? AnyView(StartWithTemplates(onChoose: onCompose).frame(maxWidth: 520))
+                : nil
         )
         .background(PaperBackground())
     }
