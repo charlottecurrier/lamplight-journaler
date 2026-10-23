@@ -112,7 +112,7 @@ struct ToastView: View {
                     Image(systemName: "xmark")
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(Theme.inkTertiary)
-                        .padding(8)
+                        .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)

@@ -66,10 +66,10 @@ struct RootView: View {
     /// The page color laid over everything while the lamp is out. It fades away as the lamp comes on.
     private var dimming: some View {
         Theme.page
-            .opacity(lampOn ? 0 : 0.92)
+            .opacity(lampOn || reduceMotion ? 0 : 0.92)
             .ignoresSafeArea()
             .allowsHitTesting(false)
-            .animation(.easeOut(duration: 1.3), value: lampOn)
+            .animation(reduceMotion ? nil : .easeOut(duration: 1.3), value: lampOn)
             .accessibilityHidden(true)
     }
 

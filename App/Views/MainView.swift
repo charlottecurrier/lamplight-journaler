@@ -136,7 +136,7 @@ struct MainView: View {
         .overlay(alignment: .bottom) {
             if let toast = model.toast {
                 ToastView(toast: toast, onOpen: openLookBack, onDismiss: { model.toast = nil })
-                    .padding(.bottom, sizeClass == .compact ? 70 : 0)
+                    .padding(.bottom, sizeClass == .compact && compactColumn == .content ? 70 : 0)
             }
         }
         .animation(.spring(response: 0.45, dampingFraction: 0.9), value: model.toast)
@@ -249,6 +249,11 @@ struct MainView: View {
 
     /// The entry before or after this one in the list being read. A step of 1 is older, -1 is newer.
     private func neighbor(of id: UUID, step: Int) -> UUID? {
+        // Only turn through the journal's own list. On This Day and Calendar show other sets of entries.
+        switch sidebar ?? .all {
+        case .all, .journal: break
+        case .onThisDay, .calendar, .templates: return nil
+        }
         let list = model.entries(in: scope)
         guard let index = list.firstIndex(where: { $0.id == id }) else { return nil }
         let target = index + step

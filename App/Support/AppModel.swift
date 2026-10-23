@@ -395,6 +395,7 @@ final class AppModel {
     /// Ends an editing session. An entry with nothing in it is dropped instead of saved.
     func finishEditing(_ id: UUID, announce: Bool, calendar: DayCalendar) {
         let wasEditing = editingEntryID == id
+        let wasNew = freshEntryIDs.contains(id)
         if wasEditing {
             editingEntryID = nil
             freshEntryIDs.remove(id)
@@ -411,15 +412,16 @@ final class AppModel {
         guard wasEditing else { return }
         startingBodies[id] = nil
         persist(entry)
-        if announce { announceSaved(entry, calendar: calendar) }
+        if announce { announceSaved(entry, isNew: wasNew, calendar: calendar) }
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
     }
 
-    private func announceSaved(_ entry: Entry, calendar: DayCalendar) {
+    private func announceSaved(_ entry: Entry, isNew: Bool, calendar: DayCalendar) {
         let stamp = entry.dayStamp(using: calendar)
         let isFirstOfTheDay = writtenEntries.filter { $0.dayStamp(using: calendar) == stamp }.count == 1
         if isFirstOfTheDay && stamp == today(calendar) {
-            show(streak(calendar: calendar).savedMessage, lookBack: lookBack(calendar: calendar))
+            // Editing the day's only entry again shows the message, but not the look back a second time.
+            show(streak(calendar: calendar).savedMessage, lookBack: isNew ? lookBack(calendar: calendar) : nil)
         } else {
             show("Saved.")
         }
@@ -659,9 +661,9 @@ final class AppModel {
         toastTask?.cancel()
         toast = Toast(text: text, lookBack: lookBack)
         // A look back stays long enough to read.
-        let seconds: UInt64 = lookBack == nil ? 3_200_000_000 : 10_000_000_000
+        let nanoseconds: UInt64 = lookBack == nil ? 3_200_000_000 : 10_000_000_000
         toastTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: seconds)
+            try? await Task.sleep(nanoseconds: nanoseconds)
             guard !Task.isCancelled else { return }
             self?.toast = nil
         }
