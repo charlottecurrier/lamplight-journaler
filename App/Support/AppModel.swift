@@ -2,9 +2,19 @@ import SwiftUI
 import Observation
 import UIKit
 
+/// An entry from this date in an earlier year, shown for a moment after you save.
+struct LookBack: Equatable {
+    var entryID: UUID
+    /// "1 year ago"
+    var label: String
+    var title: String
+    var preview: String
+}
+
 struct Toast: Identifiable, Equatable {
     let id = UUID()
     var text: String
+    var lookBack: LookBack?
 }
 
 enum EntryScope: Hashable {
@@ -409,10 +419,22 @@ final class AppModel {
         let stamp = entry.dayStamp(using: calendar)
         let isFirstOfTheDay = writtenEntries.filter { $0.dayStamp(using: calendar) == stamp }.count == 1
         if isFirstOfTheDay && stamp == today(calendar) {
-            show(streak(calendar: calendar).savedMessage)
+            show(streak(calendar: calendar).savedMessage, lookBack: lookBack(calendar: calendar))
         } else {
             show("Saved.")
         }
+    }
+
+    /// What you wrote on this date in the most recent earlier year, if anything.
+    private func lookBack(calendar: DayCalendar) -> LookBack? {
+        guard let group = onThisDay(calendar: calendar).first, let entry = group.entries.first else { return nil }
+        let summary = entry.summary(maxPreview: 120)
+        var title = summary.title
+        if title.isEmpty && summary.preview.isEmpty {
+            guard !entry.photos.isEmpty else { return nil }
+            title = entry.photos.count == 1 ? "Photo" : "\(entry.photos.count) photos"
+        }
+        return LookBack(entryID: entry.id, label: group.label, title: title, preview: summary.preview)
     }
 
     private func persist(_ entry: Entry) {
@@ -633,11 +655,13 @@ final class AppModel {
 
     // MARK: Messages
 
-    func show(_ text: String) {
+    func show(_ text: String, lookBack: LookBack? = nil) {
         toastTask?.cancel()
-        toast = Toast(text: text)
+        toast = Toast(text: text, lookBack: lookBack)
+        // A look back stays long enough to read.
+        let seconds: UInt64 = lookBack == nil ? 3_200_000_000 : 10_000_000_000
         toastTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 3_200_000_000)
+            try? await Task.sleep(nanoseconds: seconds)
             guard !Task.isCancelled else { return }
             self?.toast = nil
         }

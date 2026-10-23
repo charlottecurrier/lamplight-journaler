@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// A month of days. A dot under a day means something was written. Tap a day to see it.
+/// A month of days. Each day has its moon under it, bright on days something was written. Tap a day to see it.
 struct MonthGrid: View {
     let month: Date
     let marked: Set<DayStamp>
@@ -71,15 +71,34 @@ private struct DayCell: View {
     let isSelected: Bool
     let action: () -> Void
 
+    /// The moon that evening.
+    private var phase: MoonPhase {
+        var parts = DateComponents()
+        parts.year = day.year
+        parts.month = day.month
+        parts.day = day.day
+        parts.hour = 21
+        return MoonPhase(on: Calendar.journal.date(from: parts) ?? Date())
+    }
+
+    private var moonLit: Color {
+        if isSelected { return isMarked ? Theme.onAccent : Theme.onAccent.opacity(0.5) }
+        return isMarked ? Theme.sage : Theme.inkTertiary.opacity(0.6)
+    }
+
     var body: some View {
         Button(action: action) {
             VStack(spacing: 3) {
                 Text("\(day.day)")
                     .font(Theme.serif(.body, weight: isSelected || isToday ? .semibold : .regular))
                     .foregroundStyle(isSelected ? Theme.onAccent : Theme.ink)
-                Circle()
-                    .fill(isMarked ? (isSelected ? Theme.onAccent : Theme.sage) : Color.clear)
-                    .frame(width: 6, height: 6)
+                MoonGlyph(
+                    phase: phase,
+                    lit: moonLit,
+                    shade: isSelected ? Theme.onAccent.opacity(0.18) : Theme.line.opacity(isMarked ? 0.9 : 0.5),
+                    outline: isMarked ? moonLit : Color.clear
+                )
+                .frame(width: 11, height: 11)
             }
             .frame(maxWidth: .infinity, minHeight: 46)
             .background(
