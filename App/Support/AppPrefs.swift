@@ -43,6 +43,37 @@ enum LockTimeout: Int, CaseIterable, Identifiable {
     }
 }
 
+/// The texture laid over the page. Each one is a faint tile that changes brightness only.
+enum PaperTexture: String, CaseIterable, Identifiable {
+    case plain, fibers, cotton, laid, linen, leather, wash, tooth, dots
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .plain: return "Plain"
+        case .fibers: return "Fibers"
+        case .cotton: return "Cotton"
+        case .laid: return "Laid"
+        case .linen: return "Linen"
+        case .leather: return "Leather"
+        case .wash: return "Wash"
+        case .tooth: return "Tooth"
+        case .dots: return "Dot grid"
+        }
+    }
+
+    /// The image in the asset catalog, or nil for a plain page.
+    func imageName(dark: Bool) -> String? {
+        let mode = dark ? "Dark" : "Light"
+        switch self {
+        case .plain: return nil
+        case .fibers: return "PaperGrain" + mode
+        default: return "Paper" + rawValue.capitalized + mode
+        }
+    }
+}
+
 /// Settings that belong to this device. Settings that should follow you to other devices
 /// (like your Home place) live in the journal folder instead.
 @MainActor
@@ -53,6 +84,8 @@ final class AppPrefs: ObservableObject {
         static let lockTimeout = "prefs.lockTimeout"
         static let rolloverHour = "prefs.rolloverHour"
         static let openToNewEntry = "prefs.openToNewEntry"
+        static let paperTexture = "prefs.paperTexture"
+        static let textureStrength = "prefs.textureStrength"
         static let onboardingComplete = "prefs.onboardingComplete"
     }
 
@@ -80,6 +113,15 @@ final class AppPrefs: ObservableObject {
         didSet { defaults.set(rolloverHour, forKey: Key.rolloverHour) }
     }
 
+    @Published var paperTexture: PaperTexture {
+        didSet { defaults.set(paperTexture.rawValue, forKey: Key.paperTexture) }
+    }
+
+    /// 0 is none, 1 is the texture as designed, up to 2 for twice as strong.
+    @Published var textureStrength: Double {
+        didSet { defaults.set(textureStrength, forKey: Key.textureStrength) }
+    }
+
     /// Opening the app starts a new entry, if nothing has been written yet today.
     @Published var openToNewEntry: Bool {
         didSet { defaults.set(openToNewEntry, forKey: Key.openToNewEntry) }
@@ -96,6 +138,8 @@ final class AppPrefs: ObservableObject {
         lockTimeout = LockTimeout(rawValue: defaults.integer(forKey: Key.lockTimeout)) ?? .immediately
         rolloverHour = defaults.integer(forKey: Key.rolloverHour)
         openToNewEntry = defaults.object(forKey: Key.openToNewEntry) as? Bool ?? true
+        paperTexture = defaults.string(forKey: Key.paperTexture).flatMap(PaperTexture.init(rawValue:)) ?? .fibers
+        textureStrength = defaults.object(forKey: Key.textureStrength) as? Double ?? 1.0
         onboardingComplete = defaults.bool(forKey: Key.onboardingComplete)
     }
 

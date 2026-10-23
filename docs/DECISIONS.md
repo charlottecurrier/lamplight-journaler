@@ -47,6 +47,7 @@ Amber lenses cut blue light. Blues go dark and warm colors blur together, but br
 - **Opening the app starts a new entry** if you haven't written yet today and it's a fresh launch (not each time you switch back to the app). It's a setting. A page that still holds only a template is dropped, not saved.
 - **Tap the text to edit.** There's no read mode to leave first. A link or checklist box still does its own thing when tapped.
 - **Empty template headings are removed on Done.** Only headings that came from the entry's template, with nothing written under them. Anything you wrote is kept.
+- **Textures are a setting, not a fixed look.** There are nine, with a strength slider, because the right feel is personal. Each is a faint tile that changes brightness only, so it stays easy to read through amber lenses. Pick one in Settings → Appearance → Paper.
 - **The moon is approximate.** It uses the average length of the lunar cycle, so a phase can be off by about half a day at the turning points. It's drawn by brightness, not color.
 - **Done closes the page.** A new entry goes back to the list when you tap Done, and the page fades out first. Editing an old entry returns to reading it.
 - **A look back, not a prompt.** After the first entry of a day is saved, the message shows what you wrote on this date in the most recent earlier year. It stays about 10 seconds and can be tapped or closed. It never says what to write.
