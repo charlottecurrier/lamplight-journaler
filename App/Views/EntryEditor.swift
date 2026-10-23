@@ -86,7 +86,8 @@ struct EntryEditorView: View {
             if viewer == nil { dropEmptyTemplateHeadings() }
             commit()
             guard viewer == nil else { return }
-            model.finishEditing(draft.id, announce: false, calendar: prefs.dayCalendar)
+            // If Done was tapped a moment ago, the message is still owed.
+            model.finishEditing(draft.id, announce: closing, calendar: prefs.dayCalendar)
         }
     }
 
@@ -371,6 +372,8 @@ struct EntryEditorView: View {
         withAnimation(.easeIn(duration: 0.32)) { closing = true }
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 330_000_000)
+            // The person may have left the page in that moment, which already finished it.
+            guard model.editingEntryID == id else { return }
             model.finishEditing(id, announce: true, calendar: calendar)
             onDone(wasNew)
         }

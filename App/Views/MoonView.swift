@@ -60,12 +60,13 @@ struct MoonGlyph: View {
 /// A small moon and the name of its phase, for the date of an entry.
 struct MoonLabel: View {
     let date: Date
+    @ScaledMetric(relativeTo: .subheadline) private var glyphSize: CGFloat = 12
 
     var body: some View {
         let phase = MoonPhase(on: date)
         HStack(spacing: 5) {
             MoonGlyph(phase: phase)
-                .frame(width: 12, height: 12)
+                .frame(width: glyphSize, height: glyphSize)
             Text(phase.name)
         }
         .accessibilityElement(children: .ignore)

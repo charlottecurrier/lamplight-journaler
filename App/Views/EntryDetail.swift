@@ -33,6 +33,8 @@ struct EntryDetailView: View {
     @State private var tappedCaret: Int?
     /// How far the page is slid sideways while turning.
     @State private var pageOffset: CGFloat = 0
+    /// True while a page is turning, so a second swipe can't fight it.
+    @State private var turning = false
 
     var body: some View {
         Group {
@@ -65,7 +67,7 @@ struct EntryDetailView: View {
 
     private func isPageSwipe(_ value: DragGesture.Value) -> Bool {
         // Not from the left edge, which goes back on a phone. Mostly sideways, so scrolling still works.
-        value.startLocation.x > 30 && abs(value.translation.width) > abs(value.translation.height) * 1.6
+        value.startLocation.x > 30 && abs(value.translation.width) > abs(value.translation.height) * 2.5
     }
 
     private func settlePage() {
@@ -76,10 +78,11 @@ struct EntryDetailView: View {
     private func pageTurn(for entry: Entry) -> some Gesture {
         DragGesture(minimumDistance: 30)
             .onChanged { value in
-                guard isPageSwipe(value) else { return }
+                guard !turning, isPageSwipe(value) else { return }
                 pageOffset = value.translation.width * 0.4
             }
             .onEnded { value in
+                guard !turning else { return }
                 guard isPageSwipe(value) else {
                     settlePage()
                     return
@@ -97,6 +100,7 @@ struct EntryDetailView: View {
 
     private func turn(to id: UUID, toOlder: Bool) {
         let distance: CGFloat = toOlder ? 140 : -140
+        turning = true
         withAnimation(.easeIn(duration: 0.14)) { pageOffset = distance }
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 150_000_000)
@@ -105,6 +109,8 @@ struct EntryDetailView: View {
             pageOffset = -distance
             try? await Task.sleep(nanoseconds: 40_000_000)
             withAnimation(.easeOut(duration: 0.26)) { pageOffset = 0 }
+            try? await Task.sleep(nanoseconds: 270_000_000)
+            turning = false
         }
     }
 
@@ -180,6 +186,13 @@ struct EntryDetailView: View {
             .opacity(1 - min(abs(pageOffset) / 300, 0.6))
         }
         .simultaneousGesture(pageTurn(for: entry))
+        // Swiping isn't possible with VoiceOver, so the same turns are offered as actions.
+        .accessibilityAction(named: "Older entry") {
+            if let id = olderEntry(entry.id) { onTurn(id) }
+        }
+        .accessibilityAction(named: "Newer entry") {
+            if let id = newerEntry(entry.id) { onTurn(id) }
+        }
         .background(PaperBackground())
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
