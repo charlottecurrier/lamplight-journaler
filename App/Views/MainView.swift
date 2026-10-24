@@ -245,7 +245,13 @@ struct MainView: View {
     // MARK: Actions
 
     /// Starts an entry and opens the editor for it. A template's page becomes the entry's text.
-    private func create(_ choice: NewEntryChoice, keyboard: Bool = true) {
+    private func create(_ choice: NewEntryChoice) {
+        begin(choice, keyboard: true)
+    }
+
+    /// Does the work of `create`. `keyboard` is false when the app opens to a new entry by itself, so the page
+    /// waits for a tap. It is a separate function so `create` can be handed to screens as a plain action.
+    private func begin(_ choice: NewEntryChoice, keyboard: Bool) {
         let journalID: UUID
         var template: EntryTemplate?
         switch choice {
@@ -315,7 +321,7 @@ struct MainView: View {
         guard !model.streak(calendar: prefs.dayCalendar).wroteToday else { return }
         sidebar = .today
         // The page opens quietly: the keyboard waits until the person taps it.
-        create(.standard, keyboard: false)
+        begin(.standard, keyboard: false)
     }
 }
 
