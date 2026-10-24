@@ -18,6 +18,7 @@ struct EntryFileDefaults {
 ///     template: "…"
 ///     location: {"home":true,"name":"Home"}
 ///     photos: [{"file":"….jpg","h":1600,"id":"…","w":2400}]
+///     favorite: true
 ///     ---
 ///
 ///     The text of the entry.
@@ -45,6 +46,9 @@ enum EntryFile {
         }
         if !entry.photos.isEmpty {
             lines.append("photos: \(json(entry.photos))")
+        }
+        if entry.isFavorite {
+            lines.append("favorite: true")
         }
         lines.append(fence)
         lines.append("")
@@ -88,6 +92,7 @@ enum EntryFile {
             templateID: fields["template"].flatMap { UUID(uuidString: unquoted($0)) },
             location: fields["location"].flatMap { decodeValue(EntryLocation.self, from: $0) },
             photos: fields["photos"].flatMap { decodeValue([PhotoRef].self, from: $0) } ?? [],
+            isFavorite: fields["favorite"].map { unquoted($0).lowercased() == "true" } ?? false,
             body: body
         )
     }

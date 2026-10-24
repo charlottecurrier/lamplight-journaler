@@ -1,8 +1,10 @@
 import SwiftUI
 
 enum SidebarItem: Hashable {
+    case today
     case all
     case onThisDay
+    case favorites
     case calendar
     case templates
     case journal(UUID)
@@ -19,10 +21,14 @@ struct SidebarView: View {
     var body: some View {
         List(selection: $selection) {
             Section {
+                Label("Today", systemImage: "sun.horizon")
+                    .tag(SidebarItem.today)
                 Label("All Entries", systemImage: "book.closed")
                     .tag(SidebarItem.all)
                 Label("On This Day", systemImage: "clock.arrow.circlepath")
                     .tag(SidebarItem.onThisDay)
+                Label("Favorites", systemImage: "bookmark")
+                    .tag(SidebarItem.favorites)
                 Label("Calendar", systemImage: "calendar")
                     .tag(SidebarItem.calendar)
             }
@@ -109,13 +115,15 @@ struct MainView: View {
     @EnvironmentObject private var prefs: AppPrefs
     @Environment(\.horizontalSizeClass) private var sizeClass
 
-    @State private var sidebar: SidebarItem? = .all
+    @State private var sidebar: SidebarItem? = .today
     @State private var selectedEntryID: UUID?
     @State private var selectedTemplateID: UUID?
     @State private var showSettings = false
     @State private var columns = NavigationSplitViewVisibility.automatic
     /// On a phone, which screen is in front. It starts on the list, not on the list of sections.
     @State private var compactColumn = NavigationSplitViewColumn.content
+    /// True while a new entry has the whole screen on an iPad, so the sidebar and list can come back after.
+    @State private var writingFullWidth = false
 
     private var scope: EntryScope {
         if case .journal(let id) = sidebar { return .journal(id) }
@@ -140,6 +148,13 @@ struct MainView: View {
             }
         }
         .animation(.spring(response: 0.45, dampingFraction: 0.9), value: model.toast)
+        // When the entry is finished, the sidebar and list come back.
+        .onChange(of: model.editingEntryID) {
+            if model.editingEntryID == nil, writingFullWidth {
+                writingFullWidth = false
+                withAnimation(.easeInOut(duration: 0.3)) { columns = .automatic }
+            }
+        }
         .sheet(isPresented: $showSettings) {
             SettingsView()
         }
@@ -172,7 +187,15 @@ struct MainView: View {
 
     @ViewBuilder
     private var screen: some View {
-        switch sidebar ?? .all {
+        switch sidebar ?? .today {
+        case .today:
+            TodayScreen(
+                selection: $selectedEntryID,
+                onCompose: create,
+                onSeeOnThisDay: { sidebar = .onThisDay }
+            )
+        case .favorites:
+            FavoritesScreen(selection: $selectedEntryID, onCompose: create)
         case .all, .journal:
             EntryListView(
                 scope: scope,
@@ -222,7 +245,7 @@ struct MainView: View {
     // MARK: Actions
 
     /// Starts an entry and opens the editor for it. A template's page becomes the entry's text.
-    private func create(_ choice: NewEntryChoice) {
+    private func create(_ choice: NewEntryChoice, keyboard: Bool = true) {
         let journalID: UUID
         var template: EntryTemplate?
         switch choice {
@@ -241,20 +264,35 @@ struct MainView: View {
             }
         }
         // The editor opens in the detail column, so leave the Templates screen first.
-        if sidebar == .templates { sidebar = .all }
+        if sidebar == .templates { sidebar = .today }
         if let template { model.recordTemplateUse(template.id) }
-        selectedEntryID = model.beginNewEntry(journalID: journalID, templateID: template?.id, body: template?.body ?? "")
+        let id = model.beginNewEntry(journalID: journalID, templateID: template?.id, body: template?.body ?? "")
+        if !keyboard { model.quietStartID = id }
+        selectedEntryID = id
         compactColumn = .detail
+        // On an iPad a new entry gets the whole screen: just the page, with nothing else beside it.
+        if sizeClass != .compact {
+            writingFullWidth = true
+            withAnimation(.easeInOut(duration: 0.3)) { columns = .detailOnly }
+        }
     }
 
     /// The entry before or after this one in the list being read. A step of 1 is older, -1 is newer.
     private func neighbor(of id: UUID, step: Int) -> UUID? {
-        // Only turn through the journal's own list. On This Day and Calendar show other sets of entries.
-        switch sidebar ?? .all {
-        case .all, .journal: break
-        case .onThisDay, .calendar, .templates: return nil
+        // Turn through the list on screen, newest first. On This Day, Calendar and Templates are left out.
+        let list: [Entry]
+        switch sidebar ?? .today {
+        case .all, .journal:
+            list = model.entries(in: scope)
+        case .favorites:
+            list = model.favorites
+        case .today:
+            let calendar = prefs.dayCalendar
+            let today = model.today(calendar)
+            list = model.entries(in: .all).filter { $0.dayStamp(using: calendar) == today }
+        case .onThisDay, .calendar, .templates:
+            return nil
         }
-        let list = model.entries(in: scope)
         guard let index = list.firstIndex(where: { $0.id == id }) else { return nil }
         let target = index + step
         return list.indices.contains(target) ? list[target].id : nil
@@ -275,20 +313,41 @@ struct MainView: View {
         model.didOpenToNewEntry = true
         guard prefs.openToNewEntry, model.editingEntryID == nil, model.stillDownloading == 0 else { return }
         guard !model.streak(calendar: prefs.dayCalendar).wroteToday else { return }
-        sidebar = .all
-        create(.standard)
+        sidebar = .today
+        // The page opens quietly: the keyboard waits until the person taps it.
+        create(.standard, keyboard: false)
     }
 }
 
 /// The phone's bottom bar: where to look, and a button to begin writing.
+/// Today, Journal and Calendar are tabs. On This Day, Favorites and Templates are under More.
 private struct CompactBar: View {
     @Binding var selection: SidebarItem?
     var onNewEntry: () -> Void
 
+    private var current: SidebarItem { selection ?? .today }
+
     private func isSelected(_ item: SidebarItem) -> Bool {
-        let current = selection ?? .all
         if item == .all, case .journal = current { return true }
         return current == item
+    }
+
+    private var moreIsSelected: Bool {
+        current == .onThisDay || current == .favorites || current == .templates
+    }
+
+    private func label(_ title: String, _ symbol: String, selected: Bool) -> some View {
+        VStack(spacing: 3) {
+            Image(systemName: symbol)
+                .font(.system(size: 20))
+            Text(title)
+                .font(Theme.serif(.caption2, weight: .medium))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .foregroundStyle(selected ? Theme.accent : Theme.inkTertiary)
+        .frame(maxWidth: .infinity, minHeight: 48)
+        .contentShape(Rectangle())
     }
 
     private func tab(_ title: String, _ symbol: String, _ item: SidebarItem) -> some View {
@@ -296,27 +355,41 @@ private struct CompactBar: View {
         return Button {
             selection = item
         } label: {
-            VStack(spacing: 3) {
-                Image(systemName: symbol)
-                    .font(.system(size: 20))
-                Text(title)
-                    .font(Theme.serif(.caption2, weight: .medium))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
-            .foregroundStyle(selected ? Theme.accent : Theme.inkTertiary)
-            .frame(maxWidth: .infinity, minHeight: 48)
-            .contentShape(Rectangle())
+            label(title, symbol, selected: selected)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
+    private var more: some View {
+        Menu {
+            Button {
+                selection = .onThisDay
+            } label: {
+                Label("On This Day", systemImage: "clock.arrow.circlepath")
+            }
+            Button {
+                selection = .favorites
+            } label: {
+                Label("Favorites", systemImage: "bookmark")
+            }
+            Button {
+                selection = .templates
+            } label: {
+                Label("Templates", systemImage: "list.bullet.rectangle")
+            }
+        } label: {
+            label("More", "ellipsis.circle", selected: moreIsSelected)
+        }
+        .accessibilityLabel("More")
+        .accessibilityAddTraits(moreIsSelected ? .isSelected : [])
+    }
+
     var body: some View {
         HStack(spacing: 0) {
+            tab("Today", "sun.horizon", .today)
             tab("Journal", "book.closed", .all)
-            tab("On This Day", "clock.arrow.circlepath", .onThisDay)
             Button(action: onNewEntry) {
                 Image(systemName: "plus")
                     .font(.system(size: 22, weight: .semibold))
@@ -329,7 +402,7 @@ private struct CompactBar: View {
             .frame(maxWidth: .infinity)
             .accessibilityLabel("New Entry")
             tab("Calendar", "calendar", .calendar)
-            tab("Templates", "list.bullet.rectangle", .templates)
+            more
         }
         .padding(.horizontal, 6)
         .padding(.top, 6)

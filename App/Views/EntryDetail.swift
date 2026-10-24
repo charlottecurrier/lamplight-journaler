@@ -35,6 +35,9 @@ struct EntryDetailView: View {
     @State private var pageOffset: CGFloat = 0
     /// True while a page is turning, so a second swipe can't fight it.
     @State private var turning = false
+    /// A file being prepared for sharing, and the file once it is ready.
+    @State private var exporting = false
+    @State private var shareItem: ShareItem?
 
     var body: some View {
         Group {
@@ -43,6 +46,7 @@ struct EntryDetailView: View {
                     EntryEditorView(
                         entry: entry,
                         initialCaret: tappedCaret ?? startingCaret(for: entry),
+                        startQuietly: model.quietStartID == entryID,
                         onDone: { wasNew in
                             // A new entry goes back to the list when it is finished.
                             if wasNew { onClose() }
@@ -61,6 +65,19 @@ struct EntryDetailView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: model.editingEntryID == entryID)
+        .disabled(exporting)
+        .sheet(item: $shareItem) { item in
+            ShareSheet(url: item.url) { shareItem = nil }
+                .presentationDetents([.medium, .large])
+        }
+        .overlay {
+            if exporting {
+                ProgressView("Preparing")
+                    .font(Theme.serif(.callout))
+                    .padding(20)
+                    .paperCard(radius: 18, raised: true)
+            }
+        }
     }
 
     // MARK: Turning the page
@@ -122,6 +139,26 @@ struct EntryDetailView: View {
 
     private func shareText(_ entry: Entry) -> String {
         Fmt.fullDate(entry) + "\n\n" + entry.body
+    }
+
+    /// Makes a Markdown file or PDF of the entry, then offers it to the share sheet.
+    private func share(_ entry: Entry, as format: EntryExporter.Format) {
+        guard !exporting else { return }
+        exporting = true
+        Task { @MainActor in
+            let outcome = await EntryExporter.export(entry, format: format, model: model)
+            exporting = false
+            // If the person moved on to another entry or started editing, a sheet now would be confusing.
+            guard entryID == entry.id, model.editingEntryID != entry.id else { return }
+            switch outcome {
+            case .file(let url):
+                shareItem = ShareItem(url: url)
+            case .photosNotReady:
+                model.show("Some photos are still coming down from iCloud. Try again in a moment.")
+            case .failed:
+                model.show("Couldn't prepare that to share.")
+            }
+        }
     }
 
     /// Ticking a checklist item while reading changes the entry.
@@ -198,6 +235,15 @@ struct EntryDetailView: View {
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
+                    model.toggleFavorite(entry.id)
+                } label: {
+                    Label(
+                        entry.isFavorite ? "Remove Favorite" : "Favorite",
+                        systemImage: entry.isFavorite ? "bookmark.fill" : "bookmark"
+                    )
+                }
+
+                Button {
                     tappedCaret = nil
                     model.editingEntryID = entry.id
                 } label: {
@@ -206,7 +252,21 @@ struct EntryDetailView: View {
                 .keyboardShortcut("e", modifiers: .command)
 
                 Menu {
-                    ShareLink(item: shareText(entry)) {
+                    Menu {
+                        ShareLink(item: shareText(entry)) {
+                            Label("Text", systemImage: "text.alignleft")
+                        }
+                        Button {
+                            share(entry, as: .markdown)
+                        } label: {
+                            Label("Markdown File", systemImage: "doc.plaintext")
+                        }
+                        Button {
+                            share(entry, as: .pdf)
+                        } label: {
+                            Label("PDF", systemImage: "doc.richtext")
+                        }
+                    } label: {
                         Label("Share", systemImage: "square.and.arrow.up")
                     }
                     if model.journals.count > 1 {

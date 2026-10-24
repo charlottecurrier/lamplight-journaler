@@ -11,6 +11,9 @@ A calm journal for writing at the end of the day. Made for iPad first, works on 
 - Timeline of entries with photo thumbnails, grouped by month. Search. Tap the text of an entry to edit it where you tapped.
 - **On This Day.** A strip at the top of the journal, and its own screen.
 - **Streak.** Days in a row, longest streak, and the last seven days. A "new day starts at" setting keeps a 12:30 AM entry in yesterday's streak.
+- **Today.** The home page: a New Entry button with your templates, the streak and tonight's moon, what you wrote today, and what you wrote on this date in earlier years.
+- **Favorites.** Tap the ribbon on an entry, or swipe it to the right, to keep it. Favorites has its own screen.
+- **Share.** From an entry's menu, share it as text, a Markdown file (a zip with a photos folder when it has photos), or a PDF.
 - **Little touches.** The lamp comes on when you open the journal: the page eases up out of the dark. Done closes the page and takes you back to the list. After you save the first entry of a day, the message can show a few lines you wrote on this date in an earlier year. Swipe an entry left or right to turn to the next or previous one. The calendar draws each day as the moon that evening, bright on days you wrote, and entries show the moon phase beside the time.
 - **Paper.** Settings → Appearance → Paper lets you try nine textures and set how strong they are. The even ones come first (plain, cotton, linen, laid, dot grid), then the rougher ones (tooth, leather, wash, fibers). Cotton is the default. They only change brightness, never color.
 - **Opens to a new entry.** If you haven't written yet today, opening the app starts a new page with your templates offered on it. Nothing is saved until you type, so backing out leaves nothing behind. You can turn this off in Settings.
@@ -91,7 +94,7 @@ The light in the kitchen.
 | Path | What's there |
 | --- | --- |
 | `Sources/JournalCore/` | Logic with no screens: file format, storage, streaks, On This Day, templates. Built and tested on Linux. |
-| `Tests/JournalCoreTests/` | 175 tests. Run with `swift test`, or in Xcode with ⌘U. |
+| `Tests/JournalCoreTests/` | 193 tests. Run with `swift test`, or in Xcode with ⌘U. |
 | `App/` | The SwiftUI app. |
 | `App/Editor/` | The text editor: live Markdown styling, the bar above the keyboard, focus mode. |
 | `App/Theme/Palette.swift` | Every color, in one place. |
@@ -103,7 +106,7 @@ If you add or remove Swift files, regenerate the project: `brew install xcodegen
 
 ## Honest status
 
-- The core logic (everything in `Sources/JournalCore`) is tested. 175 tests pass.
+- The core logic (everything in `Sources/JournalCore`) is tested. 193 tests pass.
 - **The screens have never been compiled or run.** They were written without Xcode. Expect a few compile errors on the first build. They should be small. Send me the messages and I'll fix them.
 - The amber-lens colors were checked with a simulation, not real lenses. If something is hard to read, tell me which screen. Colors are all in `Palette.swift`.
 

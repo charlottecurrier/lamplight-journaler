@@ -15,6 +15,8 @@ enum Theme {
     static var inkTertiary: Color { Palette.inkTertiary.color }
     static var accent: Color { Palette.accent.color }
     static var onAccent: Color { Palette.onAccent.color }
+    /// The accent as it is on the light page, dark enough for white text in both looks. Swipe buttons use it.
+    static var accentDeep: Color { Color(uiColor: UIColor(hex: Palette.accent.light)) }
     static var sage: Color { Palette.sage.color }
     static var danger: Color { Palette.danger.color }
 

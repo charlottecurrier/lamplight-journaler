@@ -94,6 +94,8 @@ struct Entry: Identifiable, Hashable {
     var templateID: UUID?
     var location: EntryLocation?
     var photos: [PhotoRef]
+    /// Kept close, with a ribbon bookmark.
+    var isFavorite: Bool
     var body: String
 
     init(
@@ -105,6 +107,7 @@ struct Entry: Identifiable, Hashable {
         templateID: UUID? = nil,
         location: EntryLocation? = nil,
         photos: [PhotoRef] = [],
+        isFavorite: Bool = false,
         body: String = ""
     ) {
         self.id = id
@@ -115,6 +118,7 @@ struct Entry: Identifiable, Hashable {
         self.templateID = templateID
         self.location = location
         self.photos = photos
+        self.isFavorite = isFavorite
         self.body = body
     }
 

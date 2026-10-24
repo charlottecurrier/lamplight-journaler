@@ -80,6 +80,17 @@ struct EntryRowActions: ViewModifier {
                     Label("Delete", systemImage: "trash")
                 }
             }
+            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                Button {
+                    model.toggleFavorite(entry.id)
+                } label: {
+                    Label(
+                        entry.isFavorite ? "Remove Favorite" : "Favorite",
+                        systemImage: entry.isFavorite ? "bookmark.slash" : "bookmark"
+                    )
+                }
+                .tint(Theme.accentDeep)
+            }
     }
 }
 
@@ -92,6 +103,14 @@ struct EntryMenuItems: View {
     var body: some View {
         Button(action: onEdit) {
             Label("Edit", systemImage: "pencil")
+        }
+        Button {
+            model.toggleFavorite(entry.id)
+        } label: {
+            Label(
+                entry.isFavorite ? "Remove Favorite" : "Favorite",
+                systemImage: entry.isFavorite ? "bookmark.slash" : "bookmark"
+            )
         }
         if model.journals.count > 1 {
             Menu {
@@ -141,10 +160,18 @@ struct EntryRow: View {
             .frame(width: 46)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(Theme.serif(.headline, weight: .semibold))
-                    .foregroundStyle(Theme.ink)
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(title)
+                        .font(Theme.serif(.headline, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                        .lineLimit(1)
+                    if entry.isFavorite {
+                        Image(systemName: "bookmark.fill")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Theme.accent)
+                            .accessibilityLabel("Favorite")
+                    }
+                }
                 if !summary.preview.isEmpty {
                     Text(summary.preview)
                         .font(Theme.serif(.subheadline))

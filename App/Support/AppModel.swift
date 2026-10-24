@@ -68,6 +68,8 @@ final class AppModel {
     private(set) var freshEntryIDs: Set<UUID> = []
     /// The text a new entry started with (a template's page). An entry that still holds only that is not worth a file.
     @ObservationIgnored private var startingBodies: [UUID: String] = [:]
+    /// A new entry opened without the keyboard, until it is finished. The page waits for a tap.
+    @ObservationIgnored var quietStartID: UUID?
     /// Set once the app has opened to a new entry for this launch, so reopening the journal doesn't do it again.
     @ObservationIgnored var didOpenToNewEntry = false
     /// Bumps after each refresh, so photos that failed to load can try again.
@@ -396,6 +398,7 @@ final class AppModel {
     func finishEditing(_ id: UUID, announce: Bool, calendar: DayCalendar) {
         let wasEditing = editingEntryID == id
         let wasNew = freshEntryIDs.contains(id)
+        if quietStartID == id { quietStartID = nil }
         if wasEditing {
             editingEntryID = nil
             freshEntryIDs.remove(id)
@@ -458,6 +461,19 @@ final class AppModel {
         show("Moved to Recently Deleted.")
     }
 
+    /// Keeps an entry close, or lets it go. Shown with a ribbon bookmark.
+    func toggleFavorite(_ id: UUID) {
+        guard var entry = entry(id) else { return }
+        entry.isFavorite.toggle()
+        entry.modifiedAt = Date()
+        update(entry)
+    }
+
+    /// Favorite entries, newest first.
+    var favorites: [Entry] {
+        writtenEntries.filter(\.isFavorite)
+    }
+
     func move(_ id: UUID, toJournal journalID: UUID) {
         guard var entry = entry(id) else { return }
         entry.journalID = journalID
@@ -502,6 +518,14 @@ final class AppModel {
         }
         if added.count < images.count { show("Some photos couldn't be added.") }
         return added
+    }
+
+    /// The saved file for a photo, for sharing. Nil if it is still downloading from iCloud.
+    func photoData(entryID: UUID, photo: PhotoRef) async -> Data? {
+        guard let library else { return nil }
+        return await IO.run { () -> Data? in
+            try? library.readPhoto(entryID: entryID, fileName: photo.fileName)
+        }
     }
 
     func removePhotoFile(_ photo: PhotoRef, from entryID: UUID) {
