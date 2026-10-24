@@ -135,7 +135,8 @@ struct MainView: View {
         .navigationSplitViewStyle(.balanced)
         .overlay(alignment: .bottom) {
             if let toast = model.toast {
-                ToastView(toast: toast)
+                ToastView(toast: toast, onOpen: openLookBack, onDismiss: { model.toast = nil })
+                    .padding(.bottom, sizeClass == .compact && compactColumn == .content ? 70 : 0)
             }
         }
         .animation(.spring(response: 0.45, dampingFraction: 0.9), value: model.toast)
@@ -204,6 +205,9 @@ struct MainView: View {
         } else if let entryID = selectedEntryID {
             EntryDetailView(
                 entryID: entryID,
+                olderEntry: { neighbor(of: $0, step: 1) },
+                newerEntry: { neighbor(of: $0, step: -1) },
+                onTurn: { selectedEntryID = $0 },
                 onCompose: create,
                 onClose: {
                     selectedEntryID = nil
@@ -240,6 +244,27 @@ struct MainView: View {
         if sidebar == .templates { sidebar = .all }
         if let template { model.recordTemplateUse(template.id) }
         selectedEntryID = model.beginNewEntry(journalID: journalID, templateID: template?.id, body: template?.body ?? "")
+        compactColumn = .detail
+    }
+
+    /// The entry before or after this one in the list being read. A step of 1 is older, -1 is newer.
+    private func neighbor(of id: UUID, step: Int) -> UUID? {
+        // Only turn through the journal's own list. On This Day and Calendar show other sets of entries.
+        switch sidebar ?? .all {
+        case .all, .journal: break
+        case .onThisDay, .calendar, .templates: return nil
+        }
+        let list = model.entries(in: scope)
+        guard let index = list.firstIndex(where: { $0.id == id }) else { return nil }
+        let target = index + step
+        return list.indices.contains(target) ? list[target].id : nil
+    }
+
+    /// Opens the entry from an earlier year that was shown after saving.
+    private func openLookBack(_ id: UUID) {
+        model.toast = nil
+        sidebar = .all
+        selectedEntryID = id
         compactColumn = .detail
     }
 

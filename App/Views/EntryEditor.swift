@@ -7,6 +7,7 @@ struct EntryEditorView: View {
     @EnvironmentObject private var prefs: AppPrefs
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var draft: Entry
     /// The last version handed to the model. Used to skip saves when nothing changed.
@@ -15,6 +16,9 @@ struct EntryEditorView: View {
     @State private var controller = MarkdownEditorController()
     @State private var focusMode = false
     private let initialCaret: Int?
+    /// Called after Done. The flag says the entry was new, so the screen can go back to the list.
+    private let onDone: (Bool) -> Void
+    @State private var closing = false
 
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var isImporting = false
@@ -22,10 +26,11 @@ struct EntryEditorView: View {
     @State private var showPlace = false
     @State private var viewer: PhotoViewerItem?
 
-    init(entry: Entry, initialCaret: Int? = nil) {
+    init(entry: Entry, initialCaret: Int? = nil, onDone: @escaping (Bool) -> Void = { _ in }) {
         _draft = State(initialValue: entry)
         _committed = State(initialValue: entry)
         self.initialCaret = initialCaret
+        self.onDone = onDone
     }
 
     // MARK: Layout
@@ -42,6 +47,9 @@ struct EntryEditorView: View {
         .padding(.horizontal, 24)
         .padding(.top, focusMode ? 0 : 14)
         .frame(maxWidth: .infinity)
+        // Done closes the page: it settles back and fades before the list is shown.
+        .scaleEffect(closing ? 0.97 : 1, anchor: .top)
+        .opacity(closing ? 0 : 1)
         .background(PaperBackground())
         .overlay(alignment: .topTrailing) {
             if focusMode { leaveFocusButton }
@@ -78,7 +86,8 @@ struct EntryEditorView: View {
             if viewer == nil { dropEmptyTemplateHeadings() }
             commit()
             guard viewer == nil else { return }
-            model.finishEditing(draft.id, announce: false, calendar: prefs.dayCalendar)
+            // If Done was tapped a moment ago, the message is still owed.
+            model.finishEditing(draft.id, announce: closing, calendar: prefs.dayCalendar)
         }
     }
 
@@ -100,10 +109,15 @@ struct EntryEditorView: View {
             .accessibilityLabel("Date: \(Fmt.fullDate(draft)), \(Fmt.time(draft))")
             .accessibilityHint("Change the date and time")
 
-            HStack(spacing: 16) {
-                Text(Fmt.time(draft))
-                if model.journals.count > 1 { journalMenu }
-                placeButton
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 14) {
+                    Text(Fmt.time(draft))
+                    MoonLabel(date: draft.createdAt)
+                }
+                HStack(spacing: 16) {
+                    if model.journals.count > 1 { journalMenu }
+                    placeButton
+                }
             }
             .font(Theme.serif(.subheadline))
             .foregroundStyle(Theme.inkSecondary)
@@ -342,11 +356,27 @@ struct EntryEditorView: View {
     }
 
     private func finish() {
+        guard !closing else { return }
         saveTask?.cancel()
         dropEmptyTemplateHeadings()
         commit()
         controller.dismissKeyboard()
-        model.finishEditing(draft.id, announce: true, calendar: prefs.dayCalendar)
+        let wasNew = model.freshEntryIDs.contains(draft.id)
+        let id = draft.id
+        let calendar = prefs.dayCalendar
+        guard !reduceMotion else {
+            model.finishEditing(id, announce: true, calendar: calendar)
+            onDone(wasNew)
+            return
+        }
+        withAnimation(.easeIn(duration: 0.32)) { closing = true }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 330_000_000)
+            // The person may have left the page in that moment, which already finished it.
+            guard model.editingEntryID == id else { return }
+            model.finishEditing(id, announce: true, calendar: calendar)
+            onDone(wasNew)
+        }
     }
 
     // MARK: Photos

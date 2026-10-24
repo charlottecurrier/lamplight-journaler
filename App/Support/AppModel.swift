@@ -2,9 +2,19 @@ import SwiftUI
 import Observation
 import UIKit
 
+/// An entry from this date in an earlier year, shown for a moment after you save.
+struct LookBack: Equatable {
+    var entryID: UUID
+    /// "1 year ago"
+    var label: String
+    var title: String
+    var preview: String
+}
+
 struct Toast: Identifiable, Equatable {
     let id = UUID()
     var text: String
+    var lookBack: LookBack?
 }
 
 enum EntryScope: Hashable {
@@ -385,6 +395,7 @@ final class AppModel {
     /// Ends an editing session. An entry with nothing in it is dropped instead of saved.
     func finishEditing(_ id: UUID, announce: Bool, calendar: DayCalendar) {
         let wasEditing = editingEntryID == id
+        let wasNew = freshEntryIDs.contains(id)
         if wasEditing {
             editingEntryID = nil
             freshEntryIDs.remove(id)
@@ -401,18 +412,31 @@ final class AppModel {
         guard wasEditing else { return }
         startingBodies[id] = nil
         persist(entry)
-        if announce { announceSaved(entry, calendar: calendar) }
+        if announce { announceSaved(entry, isNew: wasNew, calendar: calendar) }
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
     }
 
-    private func announceSaved(_ entry: Entry, calendar: DayCalendar) {
+    private func announceSaved(_ entry: Entry, isNew: Bool, calendar: DayCalendar) {
         let stamp = entry.dayStamp(using: calendar)
         let isFirstOfTheDay = writtenEntries.filter { $0.dayStamp(using: calendar) == stamp }.count == 1
         if isFirstOfTheDay && stamp == today(calendar) {
-            show(streak(calendar: calendar).savedMessage)
+            // Editing the day's only entry again shows the message, but not the look back a second time.
+            show(streak(calendar: calendar).savedMessage, lookBack: isNew ? lookBack(calendar: calendar) : nil)
         } else {
             show("Saved.")
         }
+    }
+
+    /// What you wrote on this date in the most recent earlier year, if anything.
+    private func lookBack(calendar: DayCalendar) -> LookBack? {
+        guard let group = onThisDay(calendar: calendar).first, let entry = group.entries.first else { return nil }
+        let summary = entry.summary(maxPreview: 120)
+        var title = summary.title
+        if title.isEmpty && summary.preview.isEmpty {
+            guard !entry.photos.isEmpty else { return nil }
+            title = entry.photos.count == 1 ? "Photo" : "\(entry.photos.count) photos"
+        }
+        return LookBack(entryID: entry.id, label: group.label, title: title, preview: summary.preview)
     }
 
     private func persist(_ entry: Entry) {
@@ -633,11 +657,13 @@ final class AppModel {
 
     // MARK: Messages
 
-    func show(_ text: String) {
+    func show(_ text: String, lookBack: LookBack? = nil) {
         toastTask?.cancel()
-        toast = Toast(text: text)
+        toast = Toast(text: text, lookBack: lookBack)
+        // A look back stays long enough to read.
+        let nanoseconds: UInt64 = lookBack == nil ? 3_200_000_000 : 10_000_000_000
         toastTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 3_200_000_000)
+            try? await Task.sleep(nanoseconds: nanoseconds)
             guard !Task.isCancelled else { return }
             self?.toast = nil
         }

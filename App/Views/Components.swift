@@ -78,19 +78,74 @@ struct JournalChip: View {
 }
 
 /// The short message shown after saving. Fades in and out near the bottom of the screen.
+/// When there is an entry from this date in an earlier year, it shows a few lines of it too.
 struct ToastView: View {
     let toast: Toast
+    var onOpen: (UUID) -> Void = { _ in }
+    var onDismiss: () -> Void = {}
 
     var body: some View {
-        Text(toast.text)
-            .font(Theme.serif(.callout, weight: .medium))
-            .foregroundStyle(Theme.ink)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-            .paperCard(radius: 22, raised: true)
-            .padding(.bottom, 28)
-            .transition(.move(edge: .bottom).combined(with: .opacity))
-            .accessibilityAddTraits(.isStaticText)
+        Group {
+            if let lookBack = toast.lookBack {
+                card(lookBack)
+            } else {
+                Text(toast.text)
+                    .font(Theme.serif(.callout, weight: .medium))
+                    .foregroundStyle(Theme.ink)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+                    .paperCard(radius: 22, raised: true)
+            }
+        }
+        .padding(.bottom, 28)
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+
+    private func card(_ lookBack: LookBack) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(toast.text)
+                    .font(Theme.serif(.callout, weight: .medium))
+                    .foregroundStyle(Theme.ink)
+                Spacer(minLength: 12)
+                Button(action: onDismiss) {
+                    Image(systemName: "xmark")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Theme.inkTertiary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close")
+            }
+            Rectangle().fill(Theme.line).frame(height: 0.5)
+            Button {
+                onOpen(lookBack.entryID)
+            } label: {
+                VStack(alignment: .leading, spacing: 4) {
+                    SectionLabel("\(lookBack.label) today")
+                    Text(lookBack.title)
+                        .font(Theme.serif(.headline, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                        .lineLimit(1)
+                    if !lookBack.preview.isEmpty {
+                        Text(lookBack.preview)
+                            .font(Theme.serif(.subheadline))
+                            .foregroundStyle(Theme.inkSecondary)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens that entry")
+        }
+        .padding(18)
+        .frame(maxWidth: 460)
+        .paperCard(radius: 22, raised: true)
+        .padding(.horizontal, 20)
     }
 }
 

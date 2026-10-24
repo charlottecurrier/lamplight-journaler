@@ -47,6 +47,12 @@ Amber lenses cut blue light. Blues go dark and warm colors blur together, but br
 - **Opening the app starts a new entry** if you haven't written yet today and it's a fresh launch (not each time you switch back to the app). It's a setting. A page that still holds only a template is dropped, not saved.
 - **Tap the text to edit.** There's no read mode to leave first. A link or checklist box still does its own thing when tapped.
 - **Empty template headings are removed on Done.** Only headings that came from the entry's template, with nothing written under them. Anything you wrote is kept.
+- **The moon is approximate.** It uses the average length of the lunar cycle, so a phase can be off by about half a day at the turning points. It's drawn by brightness, not color.
+- **Done closes the page.** A new entry goes back to the list when you tap Done, and the page fades out first. Editing an old entry returns to reading it.
+- **A look back, not a prompt.** After the first entry of a day is saved, the message shows what you wrote on this date in the most recent earlier year. It stays about 10 seconds and can be tapped or closed. It never says what to write.
+- **Turning pages.** Swiping right in the reader goes to the older entry, left to the newer. It starts away from the left edge so the phone's back gesture still works.
+- **The lamp.** The page starts dim and eases up when the journal opens or unlocks. It's skipped when Reduce Motion is on.
+- **No haptics on iPad.** The iPad has no haptic motor, so nothing here depends on one. The phone still gets a tap when you finish an entry or tick a box.
 - **Swipe to delete has no confirmation.** It only moves the entry to Recently Deleted, where it stays 30 days.
 - **Working name: Lamplight.** Easy to change: `project.yml` (`CFBundleDisplayName`) and the text in `App/Views`.
 - **Minimum iOS 17.**
