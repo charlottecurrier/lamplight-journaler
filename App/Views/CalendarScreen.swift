@@ -186,12 +186,7 @@ struct CalendarScreen: View {
                         EntryRow(entry: entry, showJournal: model.journals.count > 1)
                             .tag(entry.id)
                             .entryRowStyle(selected: selection == entry.id)
-                            .contextMenu {
-                                EntryMenuItems(entry: entry) {
-                                    selection = entry.id
-                                    model.editingEntryID = entry.id
-                                }
-                            }
+                            .entryActions(entry, selection: $selection)
                     }
                 }
             } header: {

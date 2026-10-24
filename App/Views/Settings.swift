@@ -66,6 +66,7 @@ struct SettingsView: View {
                 .listRowBackground(Theme.surface)
 
                 Section {
+                    Toggle("Open to a new entry", isOn: $prefs.openToNewEntry)
                     Picker("New day starts at", selection: $prefs.rolloverHour) {
                         Text("Midnight").tag(0)
                         Text("2 AM").tag(2)
@@ -79,7 +80,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Writing")
                 } footer: {
-                    Text("If you write after midnight, entries before this hour count toward the day before. That keeps your streak going.")
+                    Text("Opening the app starts a new entry if you haven't written yet today. Nothing is saved until you type. If you write after midnight, entries before this hour count toward the day before. That keeps your streak going.")
                 }
                 .listRowBackground(Theme.surface)
 
@@ -261,14 +262,14 @@ struct JournalEditor: View {
                 if !model.templates.isEmpty {
                     Section {
                         Picker("New entries start with", selection: $journal.defaultTemplateID) {
-                            Text("A blank page").tag(UUID?.none)
+                            Text("Ask me").tag(UUID?.none)
                             ForEach(model.templates) { template in
                                 Text(template.name).tag(Optional(template.id))
                             }
                         }
                         .font(Theme.serif(.body))
                     } footer: {
-                        Text("Tapping New Entry in this journal starts with this template. Press and hold New Entry to pick another.")
+                        Text("Pick a template to start every new entry in this journal with it. With Ask me, a new entry offers your templates on the empty page.")
                     }
                     .listRowBackground(Theme.surface)
                 }

@@ -58,6 +58,8 @@ final class AppModel {
     private(set) var freshEntryIDs: Set<UUID> = []
     /// The text a new entry started with (a template's page). An entry that still holds only that is not worth a file.
     @ObservationIgnored private var startingBodies: [UUID: String] = [:]
+    /// Set once the app has opened to a new entry for this launch, so reopening the journal doesn't do it again.
+    @ObservationIgnored var didOpenToNewEntry = false
     /// Bumps after each refresh, so photos that failed to load can try again.
     var refreshCounter = 0
     var storageName = ""
@@ -310,7 +312,7 @@ final class AppModel {
     }
 
     /// Nothing the person wrote: no photos, and no text beyond what the entry started with.
-    private func isUnwritten(_ entry: Entry) -> Bool {
+    func isUnwritten(_ entry: Entry) -> Bool {
         if entry.isBlank { return true }
         guard let start = startingBodies[entry.id], entry.photos.isEmpty else { return false }
         return entry.body.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -347,18 +349,29 @@ final class AppModel {
         body: String = "",
         location: EntryLocation? = nil
     ) -> UUID {
-        // Forget any earlier new entry that was never typed in.
-        for stale in entries where isUnwritten(stale) && !persistedIDs.contains(stale.id) {
-            startingBodies[stale.id] = nil
+        // Forget any earlier new entry that was never typed in. The one being edited is left for its editor to
+        // finish, since its latest typing may not have reached the model yet.
+        let stale = entries
+            .filter { isUnwritten($0) && !persistedIDs.contains($0.id) && $0.id != editingEntryID }
+            .map(\.id)
+        entries.removeAll { stale.contains($0.id) }
+        for id in stale {
+            startingBodies[id] = nil
+            freshEntryIDs.remove(id)
         }
-        entries.removeAll { isUnwritten($0) && !persistedIDs.contains($0.id) }
         let entry = Entry(journalID: journalID, templateID: templateID, location: location, body: body)
         entries.insert(entry, at: 0)
         editingEntryID = entry.id
         freshEntryIDs.insert(entry.id)
         // Nothing is saved until the person writes something. A template's page alone is not an entry.
-        if !body.isEmpty { startingBodies[entry.id] = body }
+        if !body.isEmpty { startingBodies[entry.id] = EditorText.toMarkdown(EditorText.fromMarkdown(body)) }
         return entry.id
+    }
+
+    /// A template was added to an entry that had nothing in it. Until the person writes more, it isn't worth a file.
+    func noteTemplateApplied(to id: UUID, body: String) {
+        guard let current = entry(id), current.isBlank else { return }
+        startingBodies[id] = body
     }
 
     func update(_ entry: Entry) {
@@ -413,7 +426,10 @@ final class AppModel {
         guard let library else { return }
         entries.removeAll { $0.id == id }
         if editingEntryID == id { editingEntryID = nil }
-        persistedIDs.remove(id)
+        startingBodies[id] = nil
+        freshEntryIDs.remove(id)
+        // A page that was never saved has no file to move.
+        guard persistedIDs.remove(id) != nil else { return }
         enqueueWrite { try library.moveToTrash(entryID: id) }
         show("Moved to Recently Deleted.")
     }

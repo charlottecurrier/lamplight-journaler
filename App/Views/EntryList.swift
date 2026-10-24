@@ -4,61 +4,82 @@ import SwiftUI
 
 /// What to start a new entry with.
 enum NewEntryChoice {
-    /// The journal's default template, or a blank page if it has none.
+    /// The journal's default template, or an empty page that offers your templates.
     case standard
     case blank
     case template(EntryTemplate)
 }
 
-/// Tap to start an entry right away, with the journal's default template if it has one.
-/// Press and hold for a blank page or any template, the ones you use most first.
-struct NewEntryMenu: View {
-    @Environment(AppModel.self) private var model
+/// The New Entry button. It opens an empty page, where your templates are offered.
+struct NewEntryButton: View {
     var onChoose: (NewEntryChoice) -> Void
 
     var body: some View {
-        Menu {
-            Button {
-                onChoose(.blank)
-            } label: {
-                Label("Blank Entry", systemImage: "square.and.pencil")
-            }
-            let templates = model.templatesByUse()
-            if !templates.isEmpty {
-                Divider()
-                ForEach(templates) { template in
-                    Button {
-                        onChoose(.template(template))
-                    } label: {
-                        Label(template.name, systemImage: "doc.text")
-                    }
-                }
-            }
+        Button {
+            onChoose(.standard)
         } label: {
             Label("New Entry", systemImage: "square.and.pencil")
-        } primaryAction: {
-            onChoose(.standard)
         }
-        .accessibilityHint("Press and hold to choose a template")
+        .keyboardShortcut("n", modifiers: .command)
     }
 }
 
 // MARK: - Shared pieces
 
 extension View {
-    /// Adds the "New Entry" button to a screen's toolbar.
+    /// Adds the "New Entry" button to a screen's toolbar. On a phone the bottom bar has one instead.
     func composeToolbar(_ onChoose: @escaping (NewEntryChoice) -> Void) -> some View {
-        toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                NewEntryMenu(onChoose: onChoose)
-            }
-        }
+        modifier(ComposeToolbar(onChoose: onChoose))
+    }
+
+    /// The long-press menu and swipe-to-delete for an entry row.
+    func entryActions(_ entry: Entry, selection: Binding<UUID?>) -> some View {
+        modifier(EntryRowActions(entry: entry, selection: selection))
     }
 
     func entryRowStyle(selected: Bool) -> some View {
         listRowBackground(selected ? Theme.surface : Color.clear)
             .listRowSeparatorTint(Theme.line)
             .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+    }
+}
+
+private struct ComposeToolbar: ViewModifier {
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    var onChoose: (NewEntryChoice) -> Void
+
+    func body(content: Content) -> some View {
+        content.toolbar {
+            if sizeClass != .compact {
+                ToolbarItem(placement: .primaryAction) {
+                    NewEntryButton(onChoose: onChoose)
+                }
+            }
+        }
+    }
+}
+
+/// Gives an entry row its long-press menu and a swipe to delete. Deleting moves it to Recently Deleted.
+struct EntryRowActions: ViewModifier {
+    @Environment(AppModel.self) private var model
+    let entry: Entry
+    @Binding var selection: UUID?
+
+    func body(content: Content) -> some View {
+        content
+            .contextMenu {
+                EntryMenuItems(entry: entry) {
+                    selection = entry.id
+                    model.editingEntryID = entry.id
+                }
+            }
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                Button(role: .destructive) {
+                    model.moveToTrash(entry.id)
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
     }
 }
 
@@ -193,6 +214,8 @@ struct EntryListView: View {
     @Binding var selection: UUID?
     var onCompose: (NewEntryChoice) -> Void
     var onSeeOnThisDay: () -> Void
+    /// Switches to another journal, or back to all entries.
+    var onPickScope: (SidebarItem) -> Void = { _ in }
 
     @State private var query = ""
 
@@ -257,12 +280,7 @@ struct EntryListView: View {
                         EntryRow(entry: entry, showJournal: scope == .all && model.journals.count > 1)
                             .tag(entry.id)
                             .entryRowStyle(selected: selection == entry.id)
-                            .contextMenu {
-                                EntryMenuItems(entry: entry) {
-                                    selection = entry.id
-                                    model.editingEntryID = entry.id
-                                }
-                            }
+                            .entryActions(entry, selection: $selection)
                     }
                 } header: {
                     Text(section.title)
@@ -276,6 +294,14 @@ struct EntryListView: View {
         .scrollContentBackground(.hidden)
         .background(PaperBackground())
         .navigationTitle(title)
+        .toolbarTitleMenu {
+            if model.journals.count > 1 {
+                Button("All Entries") { onPickScope(.all) }
+                ForEach(model.journals) { journal in
+                    Button(journal.name) { onPickScope(.journal(journal.id)) }
+                }
+            }
+        }
         .searchable(text: $query, prompt: "Search your journal")
         .refreshable { await model.refresh() }
         .composeToolbar(onCompose)
@@ -321,12 +347,7 @@ struct OnThisDayScreen: View {
                         EntryRow(entry: entry, showJournal: model.journals.count > 1)
                             .tag(entry.id)
                             .entryRowStyle(selected: selection == entry.id)
-                            .contextMenu {
-                                EntryMenuItems(entry: entry) {
-                                    selection = entry.id
-                                    model.editingEntryID = entry.id
-                                }
-                            }
+                            .entryActions(entry, selection: $selection)
                     }
                 } header: {
                     Text("\(group.label) · \(String(group.year))")

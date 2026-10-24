@@ -8,16 +8,17 @@ A calm journal for writing at the end of the day. Made for iPad first, works on 
 
 ## What it does
 
-- Timeline of entries with photo thumbnails, grouped by month. Search.
+- Timeline of entries with photo thumbnails, grouped by month. Search. Tap the text of an entry to edit it where you tapped.
 - **On This Day.** A strip at the top of the journal, and its own screen.
 - **Streak.** Days in a row, longest streak, and the last seven days. A "new day starts at" setting keeps a 12:30 AM entry in yesterday's streak.
+- **Opens to a new entry.** If you haven't written yet today, opening the app starts a new page with your templates offered on it. Nothing is saved until you type, so backing out leaves nothing behind. You can turn this off in Settings.
 - **Writing.** Markdown shows as you type. `#` and a space makes a heading. `**bold**`, `*italic*`, `~~strike~~`, `==highlight==`, bullets, numbered lists, tappable checklists, quotes, dividers, links and code all work. The symbols hide when your cursor leaves the line. A bar above the keyboard has the same things as buttons, and typing `/` lists commands. Focus mode hides everything but the text.
-- **Templates.** A template is a page you write once, in the same editor as an entry: headings, prompts, checklists. A new entry starts with a copy of it. Tap New Entry to use the journal's default template, or press and hold to pick another (the ones you use most are first). You can also add a template to an entry you already started. No built-in prompts. You write your own.
+- **Templates.** A template is a page you write once, in the same editor as an entry: headings, prompts, checklists. A new entry starts with a copy of it. On an empty page your templates are listed (the ones you use most first). Tap one and its page fills in. A journal can have a default template that fills in by itself. When you tap Done, template headings you left empty are removed. Anything you wrote is kept. You can also add a template to an entry you already started. No built-in prompts. You write your own.
 - **Calendar.** A month view with a dot on days you wrote.
 - **Multiple journals.**
 - **Places.** Pick Home, or search for a place. No GPS, no location permission.
 - **Photos.** Add several per entry. Tap for full screen, pinch to zoom.
-- **Recently Deleted.** Deleted entries stay for 30 days.
+- **Recently Deleted.** Swipe an entry left to delete it. Deleted entries stay for 30 days.
 
 ## Open it on your iPad
 
@@ -88,7 +89,7 @@ The light in the kitchen.
 | Path | What's there |
 | --- | --- |
 | `Sources/JournalCore/` | Logic with no screens: file format, storage, streaks, On This Day, templates. Built and tested on Linux. |
-| `Tests/JournalCoreTests/` | 155 tests. Run with `swift test`, or in Xcode with ⌘U. |
+| `Tests/JournalCoreTests/` | 169 tests. Run with `swift test`, or in Xcode with ⌘U. |
 | `App/` | The SwiftUI app. |
 | `App/Editor/` | The text editor: live Markdown styling, the bar above the keyboard, focus mode. |
 | `App/Theme/Palette.swift` | Every color, in one place. |
@@ -100,7 +101,7 @@ If you add or remove Swift files, regenerate the project: `brew install xcodegen
 
 ## Honest status
 
-- The core logic (everything in `Sources/JournalCore`) is tested. 155 tests pass.
+- The core logic (everything in `Sources/JournalCore`) is tested. 169 tests pass.
 - **The screens have never been compiled or run.** They were written without Xcode. Expect a few compile errors on the first build. They should be small. Send me the messages and I'll fix them.
 - The amber-lens colors were checked with a simulation, not real lenses. If something is hard to read, tell me which screen. Colors are all in `Palette.swift`.
 

@@ -25,12 +25,15 @@ struct EntryDetailView: View {
 
     @State private var viewer: PhotoViewerItem?
     @State private var confirmDelete = false
+    /// Where the person tapped to start editing, until they finish.
+    @State private var tappedCaret: Int?
 
     var body: some View {
         if let entry = model.entry(entryID) {
             if model.editingEntryID == entryID {
-                EntryEditorView(entry: entry, initialCaret: startingCaret(for: entry))
+                EntryEditorView(entry: entry, initialCaret: tappedCaret ?? startingCaret(for: entry))
                     .id(entryID)
+                    .onDisappear { tappedCaret = nil }
             } else {
                 reader(entry)
                     .id(entryID)
@@ -93,7 +96,10 @@ struct EntryDetailView: View {
                     }
                 }
 
-                MarkdownEditor(text: bodyBinding(entry), isEditable: false)
+                MarkdownEditor(text: bodyBinding(entry), isEditable: false, onTapToEdit: { caret in
+                    tappedCaret = caret
+                    model.editingEntryID = entry.id
+                })
             }
             .frame(maxWidth: Theme.readingWidth, alignment: .leading)
             .padding(.horizontal, 24)
@@ -106,6 +112,7 @@ struct EntryDetailView: View {
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
+                    tappedCaret = nil
                     model.editingEntryID = entry.id
                 } label: {
                     Label("Edit", systemImage: "pencil")
