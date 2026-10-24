@@ -29,6 +29,7 @@ struct RootView: View {
         }
         .animation(.easeInOut(duration: 0.25), value: lock.isLocked)
         .preferredColorScheme(prefs.appearance.colorScheme)
+        .environment(\.paperTexture, PaperTextureChoice(texture: prefs.paperTexture, strength: prefs.textureStrength))
         .tint(Theme.accent)
         .foregroundStyle(Theme.ink)
         .onChange(of: scenePhase) {

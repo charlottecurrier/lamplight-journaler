@@ -17,7 +17,8 @@ LAMPLIGHT_SAMPLE_DIR=<dir> swift test --filter SampleFolderTests   # checks tool
 xcodegen                                     # regenerate Lamplight.xcodeproj (set USER=anyname on Linux)
 tools/typecheck_support.sh                   # type-checks App/Support (model, storage) against iOS stand-ins on Linux
 python3 tools/check_palette.py               # contrast checks, writes docs/palette-preview.png
-python3 tools/make_assets.py                 # redraws textures, icon and color sets
+python3 tools/make_assets.py                 # redraws the first texture, icon and color sets
+python3 tools/make_textures.py --preview <dir>   # contact sheets of every texture; --write redraws their tiles
 python3 tools/make_sample_journal.py <dir>   # sample data for trying the app
 ```
 

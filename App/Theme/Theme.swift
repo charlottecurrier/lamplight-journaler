@@ -42,9 +42,49 @@ enum Theme {
 
 // MARK: - Paper
 
+/// Which texture is laid over the page, and how strong it is. Set once at the root and read by every page and card.
+struct PaperTextureChoice: Equatable {
+    var texture: PaperTexture = .cotton
+    var strength: Double = 1
+}
+
+private struct PaperTextureKey: EnvironmentKey {
+    static let defaultValue = PaperTextureChoice()
+}
+
+extension EnvironmentValues {
+    var paperTexture: PaperTextureChoice {
+        get { self[PaperTextureKey.self] }
+        set { self[PaperTextureKey.self] = newValue }
+    }
+}
+
+/// A texture tiled over whatever is behind it. Above a strength of 1 a second layer is added.
+struct PaperGrain: View {
+    @Environment(\.colorScheme) private var scheme
+    var texture: PaperTexture
+    var strength: Double
+
+    var body: some View {
+        if let name = texture.imageName(dark: scheme == .dark), strength > 0.01 {
+            ZStack {
+                Image(name)
+                    .resizable(resizingMode: .tile)
+                    .opacity(min(strength, 1))
+                if strength > 1 {
+                    Image(name)
+                        .resizable(resizingMode: .tile)
+                        .opacity(min(strength - 1, 1))
+                }
+            }
+        }
+    }
+}
+
 /// The page behind every screen: a warm base, a faint lamp glow in dark mode, and paper grain.
 struct PaperBackground: View {
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.paperTexture) private var paper
 
     var body: some View {
         ZStack {
@@ -55,10 +95,9 @@ struct PaperBackground: View {
                     center: .top, startRadius: 0, endRadius: 560
                 )
             }
-            Image(scheme == .dark ? "PaperGrainDark" : "PaperGrainLight")
-                .resizable(resizingMode: .tile)
+            PaperGrain(texture: paper.texture, strength: paper.strength)
             RadialGradient(
-                colors: [Color.clear, Color.black.opacity(scheme == .dark ? 0.30 : 0.05)],
+                colors: [Color.clear, Color.black.opacity(scheme == .dark ? 0.14 : 0.04)],
                 center: .center, startRadius: 240, endRadius: 980
             )
         }
@@ -71,6 +110,7 @@ struct PaperBackground: View {
 /// A sheet of paper: soft fill, grain, hairline edge and a gentle shadow.
 struct PaperCard: ViewModifier {
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.paperTexture) private var paper
     var radius: CGFloat
     var raised: Bool
 
@@ -80,8 +120,7 @@ struct PaperCard: ViewModifier {
             .background(
                 ZStack {
                     shape.fill(raised ? Theme.raised : Theme.surface)
-                    Image(scheme == .dark ? "PaperGrainDark" : "PaperGrainLight")
-                        .resizable(resizingMode: .tile)
+                    PaperGrain(texture: paper.texture, strength: paper.strength)
                         .clipShape(shape)
                 }
             )

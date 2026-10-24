@@ -58,6 +58,11 @@ struct SettingsView: View {
                             Text(choice.title).tag(choice)
                         }
                     }
+                    NavigationLink {
+                        PaperPickerView()
+                    } label: {
+                        LabeledContent("Paper", value: prefs.paperTexture.title)
+                    }
                 } header: {
                     Text("Appearance")
                 } footer: {
