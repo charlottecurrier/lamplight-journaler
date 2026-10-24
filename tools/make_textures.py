@@ -50,17 +50,16 @@ def coords():
 # ---------- the textures: each returns a field, light flecks where positive and dark where negative ----------
 
 def cotton(rng):
-    """Fine, soft grain like good notebook paper."""
-    return 0.55 * noise(rng, 0) + 0.7 * noise(rng, 0.9) + 0.25 * noise(rng, 9)
+    """Fine, even grain like good notebook paper. No patches or flecks, so it never looks like dirt."""
+    return 0.35 * noise(rng, 0.7) + 0.9 * noise(rng, 1.3)
 
 
 def laid(rng):
-    """Faint lines running both ways, like laid stationery."""
+    """Faint, regular lines running both ways, like laid stationery."""
     x, y = coords()
-    cloud = noise(rng, 18)
-    lines = np.sin(2 * np.pi * y / 8) * (0.7 + 0.3 * cloud)
+    lines = np.sin(2 * np.pi * y / 8)
     chain = np.exp(-(((x % 128) - 64) ** 2) / (2 * 1.6 ** 2))
-    return 0.45 * noise(rng, 0) + 0.45 * noise(rng, 1.0) + 0.55 * lines + 0.9 * chain - 0.2
+    return 0.4 * noise(rng, 0) + 0.4 * noise(rng, 1.0) + 0.5 * lines + 0.8 * chain - 0.2
 
 
 def linen(rng):
@@ -70,7 +69,7 @@ def linen(rng):
     down = base.normalize(blur_xy(rng.normal(size=(TILE, TILE)), 0.55, 5.0))
     weave = np.sin(2 * np.pi * x / 8) * np.sin(2 * np.pi * y / 8) > 0
     threads = np.where(weave, across, down)
-    return 0.9 * threads + 0.3 * noise(rng, 0.8) + 0.2 * noise(rng, 14)
+    return 0.9 * threads + 0.3 * noise(rng, 0.8)
 
 
 def leather(rng):
@@ -123,14 +122,14 @@ def fibers(rng):
 
 # id, title, field function, signed (light and dark flecks) or one sided, strength on dark, strength on light
 TEXTURES = [
-    ("fibers", "Fibers", fibers, False, 0.075, 0.085),
-    ("cotton", "Cotton", cotton, True, 0.060, 0.070),
+    ("cotton", "Cotton", cotton, True, 0.045, 0.055),
+    ("linen", "Linen", linen, True, 0.065, 0.070),
     ("laid", "Laid", laid, True, 0.090, 0.095),
-    ("linen", "Linen", linen, True, 0.080, 0.085),
+    ("dots", "Dot grid", dots, True, 0.130, 0.140),
+    ("tooth", "Tooth", tooth, True, 0.055, 0.065),
     ("leather", "Leather", leather, True, 0.050, 0.060),
     ("wash", "Wash", wash, True, 0.040, 0.050),
-    ("tooth", "Tooth", tooth, True, 0.055, 0.065),
-    ("dots", "Dot grid", dots, True, 0.130, 0.140),
+    ("fibers", "Fibers", fibers, False, 0.075, 0.085),
 ]
 
 

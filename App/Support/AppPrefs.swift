@@ -45,7 +45,8 @@ enum LockTimeout: Int, CaseIterable, Identifiable {
 
 /// The texture laid over the page. Each one is a faint tile that changes brightness only.
 enum PaperTexture: String, CaseIterable, Identifiable {
-    case plain, fibers, cotton, laid, linen, leather, wash, tooth, dots
+    // Even, regular textures first. The rough ones, with flecks or patches, come last.
+    case plain, cotton, linen, laid, dots, tooth, leather, wash, fibers
 
     var id: String { rawValue }
 
@@ -138,7 +139,7 @@ final class AppPrefs: ObservableObject {
         lockTimeout = LockTimeout(rawValue: defaults.integer(forKey: Key.lockTimeout)) ?? .immediately
         rolloverHour = defaults.integer(forKey: Key.rolloverHour)
         openToNewEntry = defaults.object(forKey: Key.openToNewEntry) as? Bool ?? true
-        paperTexture = defaults.string(forKey: Key.paperTexture).flatMap(PaperTexture.init(rawValue:)) ?? .fibers
+        paperTexture = defaults.string(forKey: Key.paperTexture).flatMap(PaperTexture.init(rawValue:)) ?? .cotton
         textureStrength = defaults.object(forKey: Key.textureStrength) as? Double ?? 1.0
         onboardingComplete = defaults.bool(forKey: Key.onboardingComplete)
     }

@@ -44,7 +44,7 @@ enum Theme {
 
 /// Which texture is laid over the page, and how strong it is. Set once at the root and read by every page and card.
 struct PaperTextureChoice: Equatable {
-    var texture: PaperTexture = .fibers
+    var texture: PaperTexture = .cotton
     var strength: Double = 1
 }
 
@@ -97,7 +97,7 @@ struct PaperBackground: View {
             }
             PaperGrain(texture: paper.texture, strength: paper.strength)
             RadialGradient(
-                colors: [Color.clear, Color.black.opacity(scheme == .dark ? 0.30 : 0.05)],
+                colors: [Color.clear, Color.black.opacity(scheme == .dark ? 0.14 : 0.04)],
                 center: .center, startRadius: 240, endRadius: 980
             )
         }
