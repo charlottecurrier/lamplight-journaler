@@ -10,8 +10,13 @@ struct TodayScreen: View {
     var onCompose: (NewEntryChoice) -> Void
     var onSeeOnThisDay: () -> Void
 
+    /// The current day as the journal counts it: before the new day starts, it is still yesterday.
+    private var journalDay: Date {
+        Date().addingTimeInterval(-Double(prefs.dayCalendar.rolloverHour) * 3600)
+    }
+
     private var dateTitle: String {
-        Date().formatted(Date.FormatStyle(calendar: .journal).weekday(.wide).month(.wide).day())
+        journalDay.formatted(Date.FormatStyle(calendar: .journal).weekday(.wide).month(.wide).day())
     }
 
     var body: some View {
@@ -74,7 +79,7 @@ struct TodayScreen: View {
                 .font(Theme.serif(.largeTitle, weight: .bold))
                 .foregroundStyle(Theme.ink)
                 .accessibilityAddTraits(.isHeader)
-            MoonLabel(date: Date())
+            MoonLabel(date: journalDay)
                 .font(Theme.serif(.subheadline))
                 .foregroundStyle(Theme.inkSecondary)
         }

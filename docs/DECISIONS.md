@@ -44,6 +44,7 @@ Amber lenses cut blue light. Blues go dark and warm colors blur together, but br
 - **Most-used templates first.** Counts are kept on each device, not in the journal folder, so two devices never write the same file.
 - **Templates are offered on the empty page.** A new entry opens empty, with your templates listed under the cursor, like Notion and Day One. They go away once you type. A journal can have a default template, which fills in by itself instead of asking.
 - **The phone has a bottom bar, the iPad a sidebar.** On a phone the app opens on the entry list, with Journal, On This Day, Calendar and Templates along the bottom and a New Entry button in the middle. Settings is the gear at the top left. Switching journals is the title at the top of the list.
+- **On an iPad a new entry takes the whole screen.** The sidebar and list slip away while you write, and come back when you tap Done. Opening the app to a new entry is quiet: the keyboard waits until you tap the page. Tapping New Entry yourself brings the keyboard up at once.
 - **Opening the app starts a new entry** if you haven't written yet today and it's a fresh launch (not each time you switch back to the app). It's a setting. A page that still holds only a template is dropped, not saved.
 - **Tap the text to edit.** There's no read mode to leave first. A link or checklist box still does its own thing when tapped.
 - **Empty template headings are removed on Done.** Only headings that came from the entry's template, with nothing written under them. Anything you wrote is kept.

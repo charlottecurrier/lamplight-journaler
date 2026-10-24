@@ -122,6 +122,8 @@ struct MainView: View {
     @State private var columns = NavigationSplitViewVisibility.automatic
     /// On a phone, which screen is in front. It starts on the list, not on the list of sections.
     @State private var compactColumn = NavigationSplitViewColumn.content
+    /// True while a new entry has the whole screen on an iPad, so the sidebar and list can come back after.
+    @State private var writingFullWidth = false
 
     private var scope: EntryScope {
         if case .journal(let id) = sidebar { return .journal(id) }
@@ -146,6 +148,13 @@ struct MainView: View {
             }
         }
         .animation(.spring(response: 0.45, dampingFraction: 0.9), value: model.toast)
+        // When the entry is finished, the sidebar and list come back.
+        .onChange(of: model.editingEntryID) {
+            if model.editingEntryID == nil, writingFullWidth {
+                writingFullWidth = false
+                withAnimation(.easeInOut(duration: 0.3)) { columns = .automatic }
+            }
+        }
         .sheet(isPresented: $showSettings) {
             SettingsView()
         }
@@ -236,7 +245,7 @@ struct MainView: View {
     // MARK: Actions
 
     /// Starts an entry and opens the editor for it. A template's page becomes the entry's text.
-    private func create(_ choice: NewEntryChoice) {
+    private func create(_ choice: NewEntryChoice, keyboard: Bool = true) {
         let journalID: UUID
         var template: EntryTemplate?
         switch choice {
@@ -257,18 +266,33 @@ struct MainView: View {
         // The editor opens in the detail column, so leave the Templates screen first.
         if sidebar == .templates { sidebar = .today }
         if let template { model.recordTemplateUse(template.id) }
-        selectedEntryID = model.beginNewEntry(journalID: journalID, templateID: template?.id, body: template?.body ?? "")
+        let id = model.beginNewEntry(journalID: journalID, templateID: template?.id, body: template?.body ?? "")
+        if !keyboard { model.quietStartID = id }
+        selectedEntryID = id
         compactColumn = .detail
+        // On an iPad a new entry gets the whole screen: just the page, with nothing else beside it.
+        if sizeClass != .compact {
+            writingFullWidth = true
+            withAnimation(.easeInOut(duration: 0.3)) { columns = .detailOnly }
+        }
     }
 
     /// The entry before or after this one in the list being read. A step of 1 is older, -1 is newer.
     private func neighbor(of id: UUID, step: Int) -> UUID? {
-        // Only turn through the journal's own list. On This Day and Calendar show other sets of entries.
+        // Turn through the list on screen, newest first. On This Day, Calendar and Templates are left out.
+        let list: [Entry]
         switch sidebar ?? .today {
-        case .all, .journal: break
-        case .today, .onThisDay, .favorites, .calendar, .templates: return nil
+        case .all, .journal:
+            list = model.entries(in: scope)
+        case .favorites:
+            list = model.favorites
+        case .today:
+            let calendar = prefs.dayCalendar
+            let today = model.today(calendar)
+            list = model.entries(in: .all).filter { $0.dayStamp(using: calendar) == today }
+        case .onThisDay, .calendar, .templates:
+            return nil
         }
-        let list = model.entries(in: scope)
         guard let index = list.firstIndex(where: { $0.id == id }) else { return nil }
         let target = index + step
         return list.indices.contains(target) ? list[target].id : nil
@@ -290,7 +314,8 @@ struct MainView: View {
         guard prefs.openToNewEntry, model.editingEntryID == nil, model.stillDownloading == 0 else { return }
         guard !model.streak(calendar: prefs.dayCalendar).wroteToday else { return }
         sidebar = .today
-        create(.standard)
+        // The page opens quietly: the keyboard waits until the person taps it.
+        create(.standard, keyboard: false)
     }
 }
 

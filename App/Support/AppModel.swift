@@ -68,6 +68,8 @@ final class AppModel {
     private(set) var freshEntryIDs: Set<UUID> = []
     /// The text a new entry started with (a template's page). An entry that still holds only that is not worth a file.
     @ObservationIgnored private var startingBodies: [UUID: String] = [:]
+    /// A new entry opened without the keyboard, until it is finished. The page waits for a tap.
+    @ObservationIgnored var quietStartID: UUID?
     /// Set once the app has opened to a new entry for this launch, so reopening the journal doesn't do it again.
     @ObservationIgnored var didOpenToNewEntry = false
     /// Bumps after each refresh, so photos that failed to load can try again.
@@ -396,6 +398,7 @@ final class AppModel {
     func finishEditing(_ id: UUID, announce: Bool, calendar: DayCalendar) {
         let wasEditing = editingEntryID == id
         let wasNew = freshEntryIDs.contains(id)
+        if quietStartID == id { quietStartID = nil }
         if wasEditing {
             editingEntryID = nil
             freshEntryIDs.remove(id)

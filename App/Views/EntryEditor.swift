@@ -19,6 +19,8 @@ struct EntryEditorView: View {
     /// Called after Done. The flag says the entry was new, so the screen can go back to the list.
     private let onDone: (Bool) -> Void
     @State private var closing = false
+    /// Decided when the page opens and kept, so the keyboard doesn't jump up when the entry is finished.
+    @State private var startQuietly: Bool
 
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var isImporting = false
@@ -26,9 +28,13 @@ struct EntryEditorView: View {
     @State private var showPlace = false
     @State private var viewer: PhotoViewerItem?
 
-    init(entry: Entry, initialCaret: Int? = nil, onDone: @escaping (Bool) -> Void = { _ in }) {
+    init(
+        entry: Entry, initialCaret: Int? = nil, startQuietly: Bool = false,
+        onDone: @escaping (Bool) -> Void = { _ in }
+    ) {
         _draft = State(initialValue: entry)
         _committed = State(initialValue: entry)
+        _startQuietly = State(initialValue: startQuietly)
         self.initialCaret = initialCaret
         self.onDone = onDone
     }
@@ -197,7 +203,8 @@ struct EntryEditorView: View {
         MarkdownEditor(
             text: $draft.body,
             isFocusMode: focusMode,
-            wantsFocus: true,
+            // An entry the app opened by itself waits for a tap before showing the keyboard.
+            wantsFocus: !startQuietly,
             initialCaret: initialCaret,
             controller: controller
         )

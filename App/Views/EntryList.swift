@@ -89,7 +89,7 @@ struct EntryRowActions: ViewModifier {
                         systemImage: entry.isFavorite ? "bookmark.slash" : "bookmark"
                     )
                 }
-                .tint(Theme.accent)
+                .tint(Theme.accentDeep)
             }
     }
 }
@@ -160,10 +160,18 @@ struct EntryRow: View {
             .frame(width: 46)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(Theme.serif(.headline, weight: .semibold))
-                    .foregroundStyle(Theme.ink)
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(title)
+                        .font(Theme.serif(.headline, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                        .lineLimit(1)
+                    if entry.isFavorite {
+                        Image(systemName: "bookmark.fill")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Theme.accent)
+                            .accessibilityLabel("Favorite")
+                    }
+                }
                 if !summary.preview.isEmpty {
                     Text(summary.preview)
                         .font(Theme.serif(.subheadline))
@@ -213,15 +221,6 @@ struct EntryRow: View {
         }
         .padding(.vertical, 6)
         .contentShape(Rectangle())
-        .overlay(alignment: .topTrailing) {
-            if entry.isFavorite {
-                Image(systemName: "bookmark.fill")
-                    .font(.system(size: 15))
-                    .foregroundStyle(Theme.accent)
-                    .offset(x: 8, y: -6)
-                    .accessibilityLabel("Favorite")
-            }
-        }
         .accessibilityElement(children: .combine)
     }
 }

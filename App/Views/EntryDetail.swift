@@ -46,6 +46,7 @@ struct EntryDetailView: View {
                     EntryEditorView(
                         entry: entry,
                         initialCaret: tappedCaret ?? startingCaret(for: entry),
+                        startQuietly: model.quietStartID == entryID,
                         onDone: { wasNew in
                             // A new entry goes back to the list when it is finished.
                             if wasNew { onClose() }
@@ -64,6 +65,19 @@ struct EntryDetailView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: model.editingEntryID == entryID)
+        .disabled(exporting)
+        .sheet(item: $shareItem) { item in
+            ShareSheet(url: item.url) { shareItem = nil }
+                .presentationDetents([.medium, .large])
+        }
+        .overlay {
+            if exporting {
+                ProgressView("Preparing")
+                    .font(Theme.serif(.callout))
+                    .padding(20)
+                    .paperCard(radius: 18, raised: true)
+            }
+        }
     }
 
     // MARK: Turning the page
@@ -132,11 +146,16 @@ struct EntryDetailView: View {
         guard !exporting else { return }
         exporting = true
         Task { @MainActor in
-            let url = await EntryExporter.export(entry, format: format, model: model)
+            let outcome = await EntryExporter.export(entry, format: format, model: model)
             exporting = false
-            if let url {
+            // If the person moved on to another entry or started editing, a sheet now would be confusing.
+            guard entryID == entry.id, model.editingEntryID != entry.id else { return }
+            switch outcome {
+            case .file(let url):
                 shareItem = ShareItem(url: url)
-            } else {
+            case .photosNotReady:
+                model.show("Some photos are still coming down from iCloud. Try again in a moment.")
+            case .failed:
                 model.show("Couldn't prepare that to share.")
             }
         }
@@ -280,17 +299,6 @@ struct EntryDetailView: View {
         }
         .fullScreenCover(item: $viewer) { item in
             PhotoViewer(item: item)
-        }
-        .sheet(item: $shareItem) { item in
-            ShareSheet(url: item.url)
-        }
-        .overlay {
-            if exporting {
-                ProgressView("Preparing")
-                    .font(Theme.serif(.callout))
-                    .padding(20)
-                    .paperCard(radius: 18, raised: true)
-            }
         }
     }
 }
