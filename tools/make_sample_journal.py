@@ -129,6 +129,9 @@ def write_entry(root: Path, *, when: datetime, journal: str, body: str, photos=0
         lines.append(f"location: {json_value(place)}")
     if refs:
         lines.append(f"photos: {json_value(refs)}")
+    # About one entry in nine is a favorite, so the Favorites screen has something to show.
+    if zlib.crc32(entry_id.encode()) % 9 == 0:
+        lines.append("favorite: true")
     lines += ["---", ""]
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "entry.md").write_text("\n".join(lines) + "\n" + body, encoding="utf-8")

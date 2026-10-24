@@ -458,6 +458,19 @@ final class AppModel {
         show("Moved to Recently Deleted.")
     }
 
+    /// Keeps an entry close, or lets it go. Shown with a ribbon bookmark.
+    func toggleFavorite(_ id: UUID) {
+        guard var entry = entry(id) else { return }
+        entry.isFavorite.toggle()
+        entry.modifiedAt = Date()
+        update(entry)
+    }
+
+    /// Favorite entries, newest first.
+    var favorites: [Entry] {
+        writtenEntries.filter(\.isFavorite)
+    }
+
     func move(_ id: UUID, toJournal journalID: UUID) {
         guard var entry = entry(id) else { return }
         entry.journalID = journalID
@@ -502,6 +515,14 @@ final class AppModel {
         }
         if added.count < images.count { show("Some photos couldn't be added.") }
         return added
+    }
+
+    /// The saved file for a photo, for sharing. Nil if it is still downloading from iCloud.
+    func photoData(entryID: UUID, photo: PhotoRef) async -> Data? {
+        guard let library else { return nil }
+        return await IO.run { () -> Data? in
+            try? library.readPhoto(entryID: entryID, fileName: photo.fileName)
+        }
     }
 
     func removePhotoFile(_ photo: PhotoRef, from entryID: UUID) {

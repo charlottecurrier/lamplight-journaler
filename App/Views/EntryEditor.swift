@@ -343,6 +343,8 @@ struct EntryEditorView: View {
         guard draft != committed else { return }
         var toSave = draft
         toSave.modifiedAt = Date()
+        // The editor never changes this, so keep what the list or reader set while it was open.
+        toSave.isFavorite = model.entry(draft.id)?.isFavorite ?? draft.isFavorite
         committed = draft
         model.update(toSave)
     }

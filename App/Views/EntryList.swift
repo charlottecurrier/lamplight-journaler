@@ -80,6 +80,17 @@ struct EntryRowActions: ViewModifier {
                     Label("Delete", systemImage: "trash")
                 }
             }
+            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                Button {
+                    model.toggleFavorite(entry.id)
+                } label: {
+                    Label(
+                        entry.isFavorite ? "Remove Favorite" : "Favorite",
+                        systemImage: entry.isFavorite ? "bookmark.slash" : "bookmark"
+                    )
+                }
+                .tint(Theme.accent)
+            }
     }
 }
 
@@ -92,6 +103,14 @@ struct EntryMenuItems: View {
     var body: some View {
         Button(action: onEdit) {
             Label("Edit", systemImage: "pencil")
+        }
+        Button {
+            model.toggleFavorite(entry.id)
+        } label: {
+            Label(
+                entry.isFavorite ? "Remove Favorite" : "Favorite",
+                systemImage: entry.isFavorite ? "bookmark.slash" : "bookmark"
+            )
         }
         if model.journals.count > 1 {
             Menu {
@@ -194,6 +213,15 @@ struct EntryRow: View {
         }
         .padding(.vertical, 6)
         .contentShape(Rectangle())
+        .overlay(alignment: .topTrailing) {
+            if entry.isFavorite {
+                Image(systemName: "bookmark.fill")
+                    .font(.system(size: 15))
+                    .foregroundStyle(Theme.accent)
+                    .offset(x: 8, y: -6)
+                    .accessibilityLabel("Favorite")
+            }
+        }
         .accessibilityElement(children: .combine)
     }
 }

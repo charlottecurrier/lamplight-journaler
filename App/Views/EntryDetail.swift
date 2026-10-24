@@ -35,6 +35,9 @@ struct EntryDetailView: View {
     @State private var pageOffset: CGFloat = 0
     /// True while a page is turning, so a second swipe can't fight it.
     @State private var turning = false
+    /// A file being prepared for sharing, and the file once it is ready.
+    @State private var exporting = false
+    @State private var shareItem: ShareItem?
 
     var body: some View {
         Group {
@@ -124,6 +127,21 @@ struct EntryDetailView: View {
         Fmt.fullDate(entry) + "\n\n" + entry.body
     }
 
+    /// Makes a Markdown file or PDF of the entry, then offers it to the share sheet.
+    private func share(_ entry: Entry, as format: EntryExporter.Format) {
+        guard !exporting else { return }
+        exporting = true
+        Task { @MainActor in
+            let url = await EntryExporter.export(entry, format: format, model: model)
+            exporting = false
+            if let url {
+                shareItem = ShareItem(url: url)
+            } else {
+                model.show("Couldn't prepare that to share.")
+            }
+        }
+    }
+
     /// Ticking a checklist item while reading changes the entry.
     private func bodyBinding(_ entry: Entry) -> Binding<String> {
         Binding(
@@ -198,6 +216,15 @@ struct EntryDetailView: View {
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
+                    model.toggleFavorite(entry.id)
+                } label: {
+                    Label(
+                        entry.isFavorite ? "Remove Favorite" : "Favorite",
+                        systemImage: entry.isFavorite ? "bookmark.fill" : "bookmark"
+                    )
+                }
+
+                Button {
                     tappedCaret = nil
                     model.editingEntryID = entry.id
                 } label: {
@@ -206,7 +233,21 @@ struct EntryDetailView: View {
                 .keyboardShortcut("e", modifiers: .command)
 
                 Menu {
-                    ShareLink(item: shareText(entry)) {
+                    Menu {
+                        ShareLink(item: shareText(entry)) {
+                            Label("Text", systemImage: "text.alignleft")
+                        }
+                        Button {
+                            share(entry, as: .markdown)
+                        } label: {
+                            Label("Markdown File", systemImage: "doc.plaintext")
+                        }
+                        Button {
+                            share(entry, as: .pdf)
+                        } label: {
+                            Label("PDF", systemImage: "doc.richtext")
+                        }
+                    } label: {
                         Label("Share", systemImage: "square.and.arrow.up")
                     }
                     if model.journals.count > 1 {
@@ -239,6 +280,17 @@ struct EntryDetailView: View {
         }
         .fullScreenCover(item: $viewer) { item in
             PhotoViewer(item: item)
+        }
+        .sheet(item: $shareItem) { item in
+            ShareSheet(url: item.url)
+        }
+        .overlay {
+            if exporting {
+                ProgressView("Preparing")
+                    .font(Theme.serif(.callout))
+                    .padding(20)
+                    .paperCard(radius: 18, raised: true)
+            }
         }
     }
 }
