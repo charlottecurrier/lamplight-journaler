@@ -271,17 +271,22 @@ struct EntryEditorView: View {
             } label: {
                 Label("Heading", systemImage: "textformat.size")
             }
-            Button { controller.apply(.bold) } label: { Label("Bold", systemImage: "bold") }
-            Button { controller.apply(.italic) } label: { Label("Italic", systemImage: "italic") }
-            Button { controller.apply(.strike) } label: { Label("Strikethrough", systemImage: "strikethrough") }
-            Button { controller.apply(.highlight) } label: { Label("Highlight", systemImage: "highlighter") }
+            // Grouped so the menu never has more than ten direct children.
+            Group {
+                Button { controller.apply(.bold) } label: { Label("Bold", systemImage: "bold") }
+                Button { controller.apply(.italic) } label: { Label("Italic", systemImage: "italic") }
+                Button { controller.apply(.strike) } label: { Label("Strikethrough", systemImage: "strikethrough") }
+                Button { controller.apply(.highlight) } label: { Label("Highlight", systemImage: "highlighter") }
+            }
             Divider()
-            Button { controller.apply(.bullet) } label: { Label("Bulleted List", systemImage: "list.bullet") }
-            Button { controller.apply(.numbered) } label: { Label("Numbered List", systemImage: "list.number") }
-            Button { controller.apply(.checklist) } label: { Label("Checklist", systemImage: "checklist") }
-            Button { controller.apply(.quote) } label: { Label("Quote", systemImage: "text.quote") }
-            Button { controller.apply(.link) } label: { Label("Link", systemImage: "link") }
-            Button { controller.apply(.divider) } label: { Label("Divider", systemImage: "minus") }
+            Group {
+                Button { controller.apply(.bullet) } label: { Label("Bulleted List", systemImage: "list.bullet") }
+                Button { controller.apply(.numbered) } label: { Label("Numbered List", systemImage: "list.number") }
+                Button { controller.apply(.checklist) } label: { Label("Checklist", systemImage: "checklist") }
+                Button { controller.apply(.quote) } label: { Label("Quote", systemImage: "text.quote") }
+                Button { controller.apply(.link) } label: { Label("Link", systemImage: "link") }
+                Button { controller.apply(.divider) } label: { Label("Divider", systemImage: "minus") }
+            }
             Divider()
             if !model.templates.isEmpty {
                 Menu {
