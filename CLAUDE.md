@@ -26,7 +26,7 @@ On Linux, a Swift toolchain can be downloaded from `download.swift.org` (Ubuntu 
 
 ## What can and can't be verified without a Mac
 
-- Verified in CI-less environments: everything in `Sources/JournalCore` (193 tests, including the Markdown engine and every editing rule), the model and storage code in `App/Support` (type-checked against stand-ins by `tools/typecheck_support.sh`), the Python tools, the project structure. `ImageTools`, `PlaceSearcher`, `AppPrefs` and `Theme` are read-checked only.
+- Verified in CI-less environments: everything in `Sources/JournalCore` (215 tests, including the Markdown engine and every editing rule), the model and storage code in `App/Support` (type-checked against stand-ins by `tools/typecheck_support.sh`), the Python tools, the project structure. `ImageTools`, `PlaceSearcher`, `AppPrefs` and `Theme` are read-checked only.
 - **Not compilable on Linux:** all SwiftUI/UIKit code in `App/`. Review it by reading. Check every call against the declarations in Core and `AppModel` before assuming it compiles.
 
 ## Rules that matter

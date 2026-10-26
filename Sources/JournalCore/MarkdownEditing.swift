@@ -21,6 +21,8 @@ enum FormatCommand: Equatable {
     case bold, italic, strike, highlight, code
     case bullet, numbered, checklist, quote
     case divider
+    /// A titled break: "--- Title ---".
+    case section
     case link
     case indent, outdent
 }
@@ -165,6 +167,8 @@ enum MarkdownEditing {
             return toggleBlock(doc, selection: selection, matches: { $0 == .quote }) { _ in "> " }
         case .divider:
             return insertDivider(doc, selection: selection)
+        case .section:
+            return toggleSection(doc, selection: selection)
         case .link:
             return makeLink(text: text, selection: selection)
         case .indent:
@@ -177,7 +181,7 @@ enum MarkdownEditing {
     /// Lines the format commands may rewrite. Code, dividers and blank lines are left alone.
     private static func canRewrite(_ line: MDLine) -> Bool {
         switch line.kind {
-        case .blank, .divider, .fence, .code: return false
+        case .blank, .divider, .section, .fence, .code: return false
         default: return true
         }
     }
@@ -281,6 +285,29 @@ enum MarkdownEditing {
             ? caretAfter..<caretAfter
             : block.lowerBound..<(block.lowerBound + joined.utf16.count)
         return TextEdit(range: block, replacement: joined, selection: selectionAfter)
+    }
+
+    /// Makes the line a section, or turns a section back into plain text. A blank line becomes an empty section
+    /// with the caret where the title goes.
+    private static func toggleSection(_ doc: MarkdownDocument, selection: Range<Int>) -> TextEdit? {
+        let line = doc.lines[doc.lineIndex(containing: selection.lowerBound)]
+        switch line.kind {
+        case .fence, .code, .divider:
+            return nil
+        case .section:
+            let title = doc.string(line.content)
+            let caret = line.range.lowerBound + title.utf16.count
+            return TextEdit(range: line.range, replacement: title, selection: caret..<caret)
+        case .blank:
+            let caret = line.range.lowerBound + 4
+            return TextEdit(range: line.range, replacement: "---  ---", selection: caret..<caret)
+        default:
+            let title = doc.string(line.content).trimmingCharacters(in: .whitespaces)
+            guard !title.isEmpty else { return nil }
+            let replacement = "--- \(title) ---"
+            let caret = line.range.lowerBound + replacement.utf16.count - 4
+            return TextEdit(range: line.range, replacement: replacement, selection: caret..<caret)
+        }
     }
 
     private static func insertDivider(_ doc: MarkdownDocument, selection: Range<Int>) -> TextEdit? {

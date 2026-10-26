@@ -76,6 +76,7 @@ final class FormatBar: UIInputView {
             divider(),
             symbolButton("link", "Link", .link),
             symbolButton("minus", "Divider", .divider),
+            symbolButton("minus.rectangle", "Section", .section),
             divider(),
             symbolButton("decrease.indent", "Outdent", .outdent),
             symbolButton("increase.indent", "Indent", .indent),

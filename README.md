@@ -18,6 +18,7 @@ A calm journal for writing at the end of the day. Made for iPad first, works on 
 - **Paper.** Settings → Appearance → Paper lets you try nine textures and set how strong they are. The even ones come first (plain, cotton, linen, laid, dot grid), then the rougher ones (tooth, leather, wash, fibers). Cotton is the default. They only change brightness, never color.
 - **Opens to a new entry.** If you haven't written yet today, opening the app starts a new page with your templates offered on it. Nothing is saved until you type, so backing out leaves nothing behind. You can turn this off in Settings.
 - **Writing.** Markdown shows as you type. `#` and a space makes a heading. `**bold**`, `*italic*`, `~~strike~~`, `==highlight==`, bullets, numbered lists, tappable checklists, quotes, dividers, links and code all work. The symbols hide when your cursor leaves the line. A bar above the keyboard has the same things as buttons, and typing `/` lists commands. Focus mode hides everything but the text.
+- **Sections.** A section is a titled break, like Day One's. Add one from the format bar, the Format menu, or by typing `/section`. It shows as a small title with a thin line running to the edge. In the file it is one line, `--- Evening ---`, so any other app just shows that line. Headers stay for the questions under a section.
 - **Templates.** A template is a page you write once, in the same editor as an entry: headings, prompts, checklists. A new entry starts with a copy of it. On an empty page your templates are listed (the ones you use most first). Tap one and its page fills in. A journal can have a default template that fills in by itself. When you tap Done, template headings you left empty are removed. Anything you wrote is kept. You can also add a template to an entry you already started. No built-in prompts. You write your own.
 - **Calendar.** A month view with a dot on days you wrote.
 - **Multiple journals.**
@@ -94,7 +95,7 @@ The light in the kitchen.
 | Path | What's there |
 | --- | --- |
 | `Sources/JournalCore/` | Logic with no screens: file format, storage, streaks, On This Day, templates. Built and tested on Linux. |
-| `Tests/JournalCoreTests/` | 193 tests. Run with `swift test`, or in Xcode with ⌘U. |
+| `Tests/JournalCoreTests/` | 215 tests. Run with `swift test`, or in Xcode with ⌘U. |
 | `App/` | The SwiftUI app. |
 | `App/Editor/` | The text editor: live Markdown styling, the bar above the keyboard, focus mode. |
 | `App/Theme/Palette.swift` | Every color, in one place. |
@@ -106,7 +107,7 @@ If you add or remove Swift files, regenerate the project: `brew install xcodegen
 
 ## Honest status
 
-- The core logic (everything in `Sources/JournalCore`) is tested. 193 tests pass.
+- The core logic (everything in `Sources/JournalCore`) is tested. 215 tests pass.
 - **The screens have never been compiled or run.** They were written without Xcode. Expect a few compile errors on the first build. They should be small. Send me the messages and I'll fix them.
 - The amber-lens colors were checked with a simulation, not real lenses. If something is hard to read, tell me which screen. Colors are all in `Palette.swift`.
 

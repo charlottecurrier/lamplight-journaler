@@ -1,5 +1,10 @@
 import UIKit
 
+extension NSAttributedString.Key {
+    /// Marks the text of a section line. The value is the color of its rule, which the layout manager draws.
+    static let sectionRule = NSAttributedString.Key("lamplight.sectionRule")
+}
+
 /// Gives the editor its look: serif fonts, heading sizes, list indents, and which Markdown symbols show.
 ///
 /// Symbols such as `##` and `**` are hidden by making them tiny and clear, but only on lines the cursor isn't on.
@@ -156,6 +161,17 @@ enum MarkdownStyler {
         case .divider:
             storage.addAttribute(.foregroundColor, value: tertiary, range: whole)
 
+        case .section:
+            // A small, spaced title in the accent color. The layout manager draws the rule after it.
+            lineFont = serif(.subheadline, weight: .semibold)
+            storage.addAttributes([
+                .font: lineFont,
+                .foregroundColor: accent,
+                .kern: 1.0,
+                .paragraphStyle: paragraph(before: 24, after: 6),
+                .sectionRule: Palette.line.uiColor,
+            ], range: whole)
+
         case .fence:
             storage.addAttributes([.font: codeFont(relativeTo: lineFont), .foregroundColor: tertiary], range: whole)
 
@@ -197,7 +213,7 @@ enum MarkdownStyler {
             if active {
                 storage.addAttribute(.foregroundColor, value: tertiary, range: nsRange(symbol))
             } else {
-                storage.addAttributes([.font: hiddenFont, .foregroundColor: UIColor.clear], range: nsRange(symbol))
+                storage.addAttributes([.font: hiddenFont, .foregroundColor: UIColor.clear, .kern: 0], range: nsRange(symbol))
             }
         }
     }
