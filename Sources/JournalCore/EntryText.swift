@@ -59,8 +59,8 @@ enum EntryText {
 
     /// A line like "--- Evening ---". It divides an entry, so it is no use as a title or preview.
     static func isSection(_ line: String) -> Bool {
-        let units = Array(line.utf16)
-        let doc = MarkdownDocument(String(decoding: units, as: UTF16.self))
+        guard line.hasPrefix("---") else { return false }
+        let doc = MarkdownDocument(line)
         return doc.lines.count == 1 && doc.lines[0].kind == .section
     }
 

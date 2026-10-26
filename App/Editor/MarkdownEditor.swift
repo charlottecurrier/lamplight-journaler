@@ -25,9 +25,18 @@ final class RuleLayoutManager: NSLayoutManager {
             let left = origin.x + usedRect.maxX + 12
             let right = origin.x + rect.maxX
             guard right - left > 12 else { return }
-            let thickness = 1 / max(UITraitCollection.current.displayScale, 1)
+
+            // Level with the middle of the lower-case letters in the title: the line's baseline, less half an x-height.
+            // The title is the largest text on the line, since its dashes are hidden at a tiny size.
+            var xHeight: CGFloat = 0
+            storage.enumerateAttribute(.font, in: characters) { value, _, _ in
+                if let font = value as? UIFont { xHeight = max(xHeight, font.xHeight) }
+            }
+            let baseline = rect.minY + self.location(forGlyphAt: glyphRange.location).y
+            let scale = max(UITraitCollection.current.displayScale, 1)
+            let y = ((origin.y + baseline - xHeight / 2) * scale).rounded() / scale
             color.setFill()
-            UIRectFill(CGRect(x: left, y: origin.y + usedRect.midY - thickness / 2, width: right - left, height: thickness))
+            UIRectFill(CGRect(x: left, y: y, width: right - left, height: 1 / scale))
         }
     }
 }
@@ -144,6 +153,8 @@ struct MarkdownEditor: UIViewRepresentable {
         let storage = NSTextStorage()
         let layoutManager = RuleLayoutManager()
         storage.addLayoutManager(layoutManager)
+        // Long entries are laid out as they are shown, not all at once, as in a text view's own layout.
+        layoutManager.allowsNonContiguousLayout = true
         let container = NSTextContainer(size: CGSize(width: 0, height: CGFloat.greatestFiniteMagnitude))
         container.widthTracksTextView = true
         layoutManager.addTextContainer(container)

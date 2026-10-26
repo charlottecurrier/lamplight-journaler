@@ -518,4 +518,30 @@ final class SectionTests: XCTestCase {
         let body = "--- Notes ---\n\n## Slept?\n\n"
         XCTAssertEqual(TemplateText.removingEmptyHeadings(from: body, template: template), "--- Notes ---\n")
     }
+
+    // MARK: From the review
+
+    func testAnIndentedSectionHidesItsIndentToo() {
+        let line = lines("  --- A ---")[0]
+        XCTAssertEqual(line.kind, .section)
+        XCTAssertEqual(line.marker, 0..<6)
+    }
+
+    func testStylingMarksDoNotGoIntoASectionTitle() {
+        let text = "--- Evening ---"
+        for command in [FormatCommand.bold, .italic, .strike, .highlight, .code, .link] {
+            XCTAssertNil(MarkdownEditing.apply(command, to: text, selection: 6..<6))
+        }
+    }
+
+    func testWindowsLineEndingsSurviveTurningALineIntoASection() {
+        XCTAssertEqual(apply("Evening\r", caret: 3)?.applied(to: "Evening\r"), "--- Evening ---\r")
+        XCTAssertEqual(apply("--- Evening ---\r", caret: 6)?.applied(to: "--- Evening ---\r"), "Evening\r")
+    }
+
+    func testTheCaretStartsUnderTheFirstSectionWhenThereAreNoHeadings() {
+        let text = "--- Morning ---\n\n--- Evening ---\n\n"
+        XCTAssertEqual(TemplateText.initialCaret(inEditorText: text), "--- Morning ---\n".utf16.count)
+        XCTAssertEqual(TemplateText.initialCaret(inEditorText: "--- Morning ---"), "--- Morning ---".utf16.count)
+    }
 }

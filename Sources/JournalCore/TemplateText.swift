@@ -10,6 +10,12 @@ enum TemplateText {
             if case .heading = $0.kind { return true }
             return false
         }) else {
+            // No headings: start under the first section, or at the end.
+            if let section = doc.lines.firstIndex(where: { $0.kind == .section }) {
+                let next = section + 1
+                if next < doc.lines.count, doc.lines[next].kind == .blank { return doc.lines[next].range.lowerBound }
+                return doc.lines[section].range.upperBound
+            }
             return doc.units.count
         }
         let next = heading + 1

@@ -95,7 +95,7 @@ The light in the kitchen.
 | Path | What's there |
 | --- | --- |
 | `Sources/JournalCore/` | Logic with no screens: file format, storage, streaks, On This Day, templates. Built and tested on Linux. |
-| `Tests/JournalCoreTests/` | 215 tests. Run with `swift test`, or in Xcode with ⌘U. |
+| `Tests/JournalCoreTests/` | 219 tests. Run with `swift test`, or in Xcode with ⌘U. |
 | `App/` | The SwiftUI app. |
 | `App/Editor/` | The text editor: live Markdown styling, the bar above the keyboard, focus mode. |
 | `App/Theme/Palette.swift` | Every color, in one place. |
@@ -107,7 +107,7 @@ If you add or remove Swift files, regenerate the project: `brew install xcodegen
 
 ## Honest status
 
-- The core logic (everything in `Sources/JournalCore`) is tested. 215 tests pass.
+- The core logic (everything in `Sources/JournalCore`) is tested. 219 tests pass.
 - **The screens have never been compiled or run.** They were written without Xcode. Expect a few compile errors on the first build. They should be small. Send me the messages and I'll fix them.
 - The amber-lens colors were checked with a simulation, not real lenses. If something is hard to read, tell me which screen. Colors are all in `Palette.swift`.
 

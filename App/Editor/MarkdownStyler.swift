@@ -92,6 +92,10 @@ enum MarkdownStyler {
         switch line.kind {
         case .heading(let level):
             attributes[.font] = headingFont(level: level)
+        case .section:
+            attributes[.font] = serif(.subheadline, weight: .semibold)
+            attributes[.foregroundColor] = accent
+            attributes[.kern] = 1.0
         case .code, .fence:
             attributes[.font] = codeFont(relativeTo: bodyFont())
         default:

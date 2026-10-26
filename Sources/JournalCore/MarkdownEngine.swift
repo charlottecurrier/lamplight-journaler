@@ -192,7 +192,7 @@ struct MarkdownDocument {
 
         // Section: "--- Title ---". At least three dashes either side, with a space between them and the title.
         if indent <= 3, u[body] == 0x2D, let title = sectionTitle(u, body, r.upperBound) {
-            var section = line(.section, marker: body..<title.lowerBound, hides: true, inline: false)
+            var section = line(.section, marker: r.lowerBound..<title.lowerBound, hides: true, inline: false)
             section.content = title
             section.inlineMarkers = [title.upperBound..<r.upperBound]
             return section

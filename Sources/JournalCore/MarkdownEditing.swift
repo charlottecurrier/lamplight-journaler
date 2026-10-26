@@ -142,6 +142,13 @@ enum MarkdownEditing {
     static func apply(_ command: FormatCommand, to text: String, selection: Range<Int>) -> TextEdit? {
         let doc = MarkdownDocument(text)
         switch command {
+        case .bold, .italic, .strike, .highlight, .code, .link:
+            // A section's title is plain text, so styling marks would only show up as stray symbols.
+            if doc.lines[doc.lineIndex(containing: selection.lowerBound)].kind == .section { return nil }
+        default:
+            break
+        }
+        switch command {
         case .heading(let level):
             return setHeading(doc, level: max(0, min(6, level)), selection: selection)
         case .bold: return toggleInline("**", text: text, selection: selection)
@@ -297,17 +304,24 @@ enum MarkdownEditing {
         case .section:
             let title = doc.string(line.content)
             let caret = line.range.lowerBound + title.utf16.count
-            return TextEdit(range: line.range, replacement: title, selection: caret..<caret)
+            return TextEdit(range: line.range, replacement: title + lineEnding(doc, line), selection: caret..<caret)
         case .blank:
             let caret = line.range.lowerBound + 4
             return TextEdit(range: line.range, replacement: "---  ---", selection: caret..<caret)
         default:
-            let title = doc.string(line.content).trimmingCharacters(in: .whitespaces)
+            let title = doc.string(line.content).trimmingCharacters(in: .whitespacesAndNewlines)
             guard !title.isEmpty else { return nil }
             let replacement = "--- \(title) ---"
             let caret = line.range.lowerBound + replacement.utf16.count - 4
-            return TextEdit(range: line.range, replacement: replacement, selection: caret..<caret)
+            return TextEdit(
+                range: line.range, replacement: replacement + lineEnding(doc, line), selection: caret..<caret
+            )
         }
+    }
+
+    /// The carriage return a line ends with, if it has one (a Windows line ending), so it isn't lost.
+    private static func lineEnding(_ doc: MarkdownDocument, _ line: MDLine) -> String {
+        line.range.upperBound > line.range.lowerBound && doc.units[line.range.upperBound - 1] == 0x0D ? "\r" : ""
     }
 
     private static func insertDivider(_ doc: MarkdownDocument, selection: Range<Int>) -> TextEdit? {
