@@ -245,7 +245,7 @@ struct JournalEditor: View {
                                     Circle().fill(Theme.journalColor(key))
                                     if journal.colorKey == key {
                                         Image(systemName: "checkmark")
-                                            .font(.footnote.weight(.bold))
+                                            .font(.footnote.weight(.medium))
                                             .foregroundStyle(Theme.page)
                                     }
                                 }

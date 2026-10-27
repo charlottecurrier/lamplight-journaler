@@ -18,8 +18,9 @@ struct NewEntryButton: View {
         Button {
             onChoose(.standard)
         } label: {
-            Label("New Entry", systemImage: "square.and.pencil")
+            PaperIcon("square.and.pencil")
         }
+        .accessibilityLabel("New Entry")
         .keyboardShortcut("n", modifiers: .command)
     }
 }

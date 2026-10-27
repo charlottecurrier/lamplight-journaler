@@ -40,6 +40,9 @@ struct RootView: View {
             )
             if scenePhase == .active {
                 Task { @MainActor in await model.refresh() }
+            } else {
+                // Anything still waiting to be written goes out before the app can be closed.
+                model.flushPendingWrites()
             }
         }
         .onChange(of: prefs.lockEnabled) {

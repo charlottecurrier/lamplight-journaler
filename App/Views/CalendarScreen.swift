@@ -156,14 +156,14 @@ struct CalendarScreen: View {
 
                     VStack(spacing: 12) {
                         HStack {
-                            Button { shiftMonth(-1) } label: { Image(systemName: "chevron.left") }
+                            Button { shiftMonth(-1) } label: { PaperIcon("chevron.left", size: .small) }
                                 .accessibilityLabel("Previous month")
                             Spacer()
                             Text(Fmt.monthYear(month))
                                 .font(Theme.serif(.title3, weight: .semibold))
                                 .foregroundStyle(Theme.ink)
                             Spacer()
-                            Button { shiftMonth(1) } label: { Image(systemName: "chevron.right") }
+                            Button { shiftMonth(1) } label: { PaperIcon("chevron.right", size: .small) }
                                 .accessibilityLabel("Next month")
                         }
                         .buttonStyle(.borderless)

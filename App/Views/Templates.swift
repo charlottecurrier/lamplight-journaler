@@ -38,9 +38,7 @@ struct TemplatesScreen: View {
                     Button {
                         onStart(template)
                     } label: {
-                        Label("Write", systemImage: "square.and.pencil")
-                            .labelStyle(.iconOnly)
-                            .font(.title3)
+                        PaperIcon("square.and.pencil", size: .large)
                     }
                     .buttonStyle(.borderless)
                     .tint(Theme.accent)
@@ -66,8 +64,9 @@ struct TemplatesScreen: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button(action: createTemplate) {
-                    Label("New Template", systemImage: "plus")
+                    PaperIcon("plus")
                 }
+                .accessibilityLabel("New Template")
             }
         }
         .overlay {
@@ -202,9 +201,10 @@ private struct TemplatePage: View {
         return updated
     }
 
+    /// Hands the page's latest text to the model. The model keeps it at once and writes the file shortly after typing
+    /// stops, and it ignores a template that was just deleted, so this is safe to call as often as needed.
     private func save() {
-        // A template deleted a moment ago must not come back from a late save.
-        guard model.template(template.id) != nil, snapshot != saved else { return }
+        guard snapshot != saved else { return }
         saved = snapshot
         model.save(template: current)
     }
@@ -248,15 +248,17 @@ private struct TemplatePage: View {
                             }
                         }
                     } label: {
-                        Label("Journal", systemImage: "book.closed")
+                        PaperIcon("book.closed")
                     }
+                    .accessibilityLabel("Journal")
                 }
                 Button {
                     save()
                     onStart(current)
                 } label: {
-                    Label("Write with This Template", systemImage: "square.and.pencil")
+                    PaperIcon("square.and.pencil")
                 }
+                .accessibilityLabel("Write with This Template")
                 Menu {
                     Button(role: .destructive) {
                         confirmDelete = true
@@ -264,16 +266,13 @@ private struct TemplatePage: View {
                         Label("Delete Template", systemImage: "trash")
                     }
                 } label: {
-                    Label("More", systemImage: "ellipsis.circle")
+                    PaperIcon("ellipsis")
                 }
+                .accessibilityLabel("More")
             }
         }
-        // Wait for a pause in typing before saving.
-        .task(id: snapshot) {
-            try? await Task.sleep(nanoseconds: 600_000_000)
-            guard !Task.isCancelled else { return }
-            save()
-        }
+        // Every change goes to the model as it is made, so leaving the page at any moment can't lose the last of it.
+        .onChange(of: snapshot) { save() }
         .onDisappear { save() }
         .onChange(of: scenePhase) {
             if scenePhase != .active { save() }

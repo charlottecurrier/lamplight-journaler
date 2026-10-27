@@ -20,6 +20,7 @@ python3 tools/check_palette.py               # contrast checks, writes docs/pale
 python3 tools/make_assets.py                 # redraws the first texture, icon and color sets
 python3 tools/make_textures.py --preview <dir>   # contact sheets of every texture; --write redraws their tiles
 python3 tools/make_sample_journal.py <dir>   # sample data for trying the app
+python3 tools/dayone_inspect.py <export>     # counts what a Day One export holds (zip, folder or .json). Never prints text
 ```
 
 On Linux, a Swift toolchain can be downloaded from `download.swift.org` (Ubuntu 24.04, Swift 6.1.x worked) and XcodeGen can be built from its GitHub source with `swift build -c release --product xcodegen`.

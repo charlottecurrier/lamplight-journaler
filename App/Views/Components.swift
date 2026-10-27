@@ -110,7 +110,7 @@ struct ToastView: View {
                 Spacer(minLength: 12)
                 Button(action: onDismiss) {
                     Image(systemName: "xmark")
-                        .font(.footnote.weight(.semibold))
+                        .font(.system(size: 13, weight: Theme.iconWeight))
                         .foregroundStyle(Theme.inkTertiary)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())

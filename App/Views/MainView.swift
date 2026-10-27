@@ -52,7 +52,7 @@ struct SidebarView: View {
             }
 
             Section {
-                Label("Templates", systemImage: "list.bullet.rectangle")
+                Label("Templates", systemImage: "doc.text")
                     .sidebarRow(.templates, onChoose: onChoose)
             }
         }
@@ -64,8 +64,9 @@ struct SidebarView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button(action: onSettings) {
-                    Label("Settings", systemImage: "gearshape")
+                    PaperIcon("gearshape")
                 }
+                .accessibilityLabel("Settings")
                 .keyboardShortcut(",", modifiers: .command)
             }
         }
@@ -184,8 +185,9 @@ struct MainView: View {
                         Button {
                             showSettings = true
                         } label: {
-                            Label("Settings", systemImage: "gearshape")
+                            PaperIcon("gearshape")
                         }
+                        .accessibilityLabel("Settings")
                     }
                 }
             }
@@ -383,8 +385,7 @@ private struct CompactBar: View {
 
     private func label(_ title: String, _ symbol: String, selected: Bool) -> some View {
         VStack(spacing: 3) {
-            Image(systemName: symbol)
-                .font(.system(size: 20))
+            PaperIcon(symbol, size: .large)
             Text(title)
                 .font(Theme.serif(.caption2, weight: .medium))
                 .lineLimit(1)
@@ -422,10 +423,10 @@ private struct CompactBar: View {
             Button {
                 selection = .templates
             } label: {
-                Label("Templates", systemImage: "list.bullet.rectangle")
+                Label("Templates", systemImage: "doc.text")
             }
         } label: {
-            label("More", "ellipsis.circle", selected: moreIsSelected)
+            label("More", "ellipsis", selected: moreIsSelected)
         }
         .accessibilityLabel("More")
         .accessibilityAddTraits(moreIsSelected ? .isSelected : [])
@@ -437,7 +438,7 @@ private struct CompactBar: View {
             tab("Journal", "book.closed", .all)
             Button(action: onNewEntry) {
                 Image(systemName: "plus")
-                    .font(.system(size: 22, weight: .semibold))
+                    .font(.system(size: 22, weight: .regular))
                     .foregroundStyle(Theme.onAccent)
                     .frame(width: 54, height: 54)
                     .background(Circle().fill(Theme.accent))

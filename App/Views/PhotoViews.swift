@@ -115,11 +115,9 @@ struct PhotoViewer: View {
             Button {
                 dismiss()
             } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 32))
-                    .symbolRenderingMode(.palette)
-                    .foregroundStyle(Theme.ink, Theme.surface)
+                PaperCloseChip(diameter: 36)
                     .padding(16)
+                    .contentShape(Rectangle())
             }
             .accessibilityLabel("Close")
             .keyboardShortcut(.cancelAction)

@@ -116,6 +116,7 @@ struct EntryEditorView: View {
                         .foregroundStyle(Theme.ink)
                     Image(systemName: "chevron.down")
                         .imageScale(.small)
+                        .fontWeight(Theme.iconWeight)
                         .foregroundStyle(Theme.inkTertiary)
                 }
             }
@@ -234,12 +235,12 @@ struct EntryEditorView: View {
                         Button {
                             removePhoto(photo)
                         } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 22))
-                                .symbolRenderingMode(.palette)
-                                .foregroundStyle(Theme.ink, Theme.surface)
+                            // A thin cross on a paper chip, with a full-size area to tap around it.
+                            PaperCloseChip(diameter: 24)
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
                         }
-                        .offset(x: 6, y: -6)
+                        .offset(x: 16, y: -16)
                         .accessibilityLabel("Remove photo \(index + 1)")
                     }
                 }
@@ -306,8 +307,7 @@ struct EntryEditorView: View {
         Button {
             focusMode = false
         } label: {
-            Image(systemName: "arrow.down.right.and.arrow.up.left")
-                .font(.footnote)
+            PaperIcon("arrow.down.right.and.arrow.up.left", size: .small)
                 .foregroundStyle(Theme.inkTertiary)
                 .padding(14)
         }
@@ -359,8 +359,9 @@ struct EntryEditorView: View {
                 Label("Focus Mode", systemImage: "arrow.up.left.and.arrow.down.right")
             }
         } label: {
-            Label("Format", systemImage: "textformat")
+            PaperIcon("textformat")
         }
+        .accessibilityLabel("Format")
     }
 
     /// Puts a template's text into the entry at the cursor.
@@ -379,13 +380,15 @@ struct EntryEditorView: View {
     private var toolbarItems: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
             PhotosPicker(selection: $pickerItems, maxSelectionCount: 12, matching: .images) {
-                Label("Add Photos", systemImage: "photo.on.rectangle")
+                PaperIcon("photo.on.rectangle")
             }
+            .accessibilityLabel("Add Photos")
             Button {
                 showPlace = true
             } label: {
-                Label("Place", systemImage: "mappin.and.ellipse")
+                PaperIcon("mappin.and.ellipse")
             }
+            .accessibilityLabel("Place")
             formatMenu
             Button {
                 finish()
