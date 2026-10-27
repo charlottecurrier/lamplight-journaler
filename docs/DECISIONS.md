@@ -84,6 +84,7 @@ Amber lenses cut blue light. Blues go dark and warm colors blur together, but br
 - Pinned entries become favorites, along with starred ones.
 - Audio and PDFs are copied into the entry's folder so nothing is lost, even though the app can't show them yet.
 - Video has to be supported, so video is imported as video, not just copied.
+- Video you add yourself keeps the same photo picker. It is saved as a link to the video in your Photos library, so the journal doesn't hold a second copy. A still frame is saved in the entry so something always shows, and each video has a Keep a Copy button. The link points inside Photos, not at a web address, so it plays in Lamplight and other apps show the still frame. The app has to ask to read your Photos library, and finding the same video on your other device depends on iCloud Photos. If that proves unreliable, the fallback is copying the original. Imported Day One videos can't be linked, because they only exist in the export, so those are copied.
 
 **How the fields map.** This comes from third-party descriptions of the export. Day One publishes no schema. Check it against a real export with `tools/dayone_inspect.py` before writing the importer.
 - `uuid` becomes the entry id, the same id every time, so running the import twice doesn't duplicate entries.
