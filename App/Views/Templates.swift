@@ -93,14 +93,9 @@ struct TemplatePlaceholder: View {
 
     var body: some View {
         if model.templates.isEmpty {
-            EmptyStateView(
-                systemImage: "doc.text",
-                title: "No templates yet",
-                message: "A template is a page you write once, with headings, prompts or checklists. New entries can start with a copy of it.",
-                actionTitle: "New Template",
-                action: onNew
-            )
-            .background(PaperBackground())
+            // With no templates, the list beside this page already says so and has the button. Saying it twice
+            // looks like a mistake, so this stays an empty page.
+            Color.clear.background(PaperBackground())
         } else {
             ScrollView {
                 VStack(alignment: .leading, spacing: 4) {
