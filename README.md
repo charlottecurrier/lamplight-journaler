@@ -40,13 +40,24 @@ You need a Mac with Xcode 16 or newer, and your Apple ID. A free Apple account i
 
 ## Try it with sample data
 
-On day one there's nothing to show in On This Day and the streak is empty. To see them working, make a sample journal:
+On day one there's nothing to show in On This Day and the streak is empty. To see them working, make a sample journal on your Mac:
 
 ```
+pip3 install pillow
 python3 tools/make_sample_journal.py ~/Desktop
 ```
 
-That makes `~/Desktop/Lamplight/` with about 65 made-up entries, photos, two journals and two templates. It includes a 12-day streak that ended yesterday and entries on today's date from 1, 2 and 3 years ago. Copy the `Lamplight` folder into the iCloud Drive folder you chose, then pull down on the list. Delete the sample entries when you're done. It needs Python with Pillow (`pip3 install pillow`).
+That makes `~/Desktop/Lamplight/` with about 65 made-up entries, photos, two journals and two templates. It includes a 12-day streak that ended yesterday and entries on today's date from 1, 2 and 3 years ago.
+
+Keep the demo in its own folder, away from your real journal:
+
+1. In Finder, open iCloud Drive and make a new folder called **Journal Demo**.
+2. Drag the sample `Lamplight` folder into it. Wait for it to upload.
+3. In the app, choose **Journal Demo** as the journal folder (at first launch, or Settings → Storage → Choose a Different Folder).
+
+**Never drag the sample `Lamplight` folder into a folder that already holds your real journal.** Finder offers to replace a folder with the same name, and replacing it deletes your entries.
+
+To leave the demo behind and start your real journal: delete the app from the iPad, press Run in Xcode again, and choose a new folder. (Switching folders in Settings copies your entries across, so the demo entries would come with you.)
 
 ## Sync between iPad and iPhone
 
