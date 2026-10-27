@@ -70,7 +70,10 @@ enum SlashCommand: String, CaseIterable {
     /// The "/word" that ends at the caret, if there is one. It has to start the line or follow a space.
     static func typedToken(in doc: MarkdownDocument, caret: Int) -> (range: Range<Int>, name: String)? {
         let line = doc.lines[doc.lineIndex(containing: caret)]
-        if line.kind == .divider || line.kind == .section || line.kind == .fence || line.kind == .code { return nil }
+        switch line.kind {
+        case .divider, .section, .media, .fence, .code: return nil
+        default: break
+        }
         var start = caret
         while start > line.range.lowerBound, doc.units[start - 1] != 0x20 { start -= 1 }
         guard start < caret, doc.units[start] == 0x2F else { return nil }

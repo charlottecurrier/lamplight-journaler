@@ -3,6 +3,33 @@ import UIKit
 extension NSAttributedString.Key {
     /// Marks the text of a section line. The value is the color of its rule, which the layout manager draws.
     static let sectionRule = NSAttributedString.Key("lamplight.sectionRule")
+    /// Marks a picture line. The value is the photo's file name, and the layout manager draws the photo there.
+    static let mediaFile = NSAttributedString.Key("lamplight.mediaFile")
+    /// True on a picture line the caret or selection is on, so it is drawn with an outline.
+    static let mediaActive = NSAttributedString.Key("lamplight.mediaActive")
+}
+
+/// How tall photos placed in the text are drawn: the full width of the page, kept to a sensible height.
+struct MediaLayout: Equatable {
+    /// Space above and below a photo. It is part of the line's height, so the line is exactly as tall as it is drawn.
+    static let padding: CGFloat = 12
+
+    var width: CGFloat
+    /// Width over height, by file name. A file that isn't here is not a photo this entry has.
+    var aspect: [String: CGFloat]
+
+    func knows(_ file: String) -> Bool { aspect[file] != nil }
+
+    /// The photo itself.
+    func height(forFile file: String) -> CGFloat {
+        let ratio = min(max(aspect[file] ?? 1.5, 0.4), 4)
+        return max(ceil(min(width / ratio, width * 1.2)), 80)
+    }
+
+    /// The whole line: the photo with its padding.
+    func lineHeight(forFile file: String) -> CGFloat {
+        height(forFile: file) + 2 * Self.padding
+    }
 }
 
 /// Gives the editor its look: serif fonts, heading sizes, list indents, and which Markdown symbols show.
@@ -108,7 +135,9 @@ enum MarkdownStyler {
 
     /// Styles all of the text. `selection` is the caret or selection while editing, or nil when reading,
     /// in which case every line looks finished.
-    static func apply(to storage: NSTextStorage, document: MarkdownDocument, selection: NSRange?) {
+    static func apply(
+        to storage: NSTextStorage, document: MarkdownDocument, selection: NSRange?, media: MediaLayout? = nil
+    ) {
         guard storage.length == document.units.count else { return }
         let selectionRange = selection.map { $0.location..<($0.location + $0.length) }
 
@@ -116,7 +145,7 @@ enum MarkdownStyler {
         storage.setAttributes(baseAttributes(), range: NSRange(location: 0, length: storage.length))
         for (index, line) in document.lines.enumerated() {
             let active = selectionRange.map { document.isActive(index, selection: $0) } ?? false
-            style(line, active: active, document: document, storage: storage)
+            style(line, active: active, document: document, storage: storage, media: media)
         }
         storage.endEditing()
     }
@@ -125,7 +154,9 @@ enum MarkdownStyler {
         NSRange(location: range.lowerBound, length: range.count)
     }
 
-    private static func style(_ line: MDLine, active: Bool, document: MarkdownDocument, storage: NSTextStorage) {
+    private static func style(
+        _ line: MDLine, active: Bool, document: MarkdownDocument, storage: NSTextStorage, media: MediaLayout?
+    ) {
         let whole = nsRange(line.range)
         var lineFont = bodyFont()
 
@@ -175,6 +206,27 @@ enum MarkdownStyler {
                 .paragraphStyle: paragraph(before: 24, after: 6),
                 .sectionRule: Palette.line.uiColor,
             ], range: whole)
+
+        case .media:
+            // Without a place to draw it, or without the photo it names, the line stays as the plain text it is in
+            // the file. That way a line for a photo that isn't here is never an invisible block.
+            let file = document.string(line.content)
+            guard let media, media.knows(file) else { break }
+            // The line's own text is hidden. It is given the height of the photo and its padding, and the layout
+            // manager draws the photo in that space. No line or paragraph spacing, so the line is exactly that tall.
+            let height = media.lineHeight(forFile: file)
+            let style = NSMutableParagraphStyle()
+            style.minimumLineHeight = height
+            style.maximumLineHeight = height
+            storage.addAttributes([
+                .font: hiddenFont,
+                .foregroundColor: UIColor.clear,
+                .kern: 0,
+                .paragraphStyle: style,
+                .mediaFile: file,
+                .mediaActive: active,
+            ], range: whole)
+            return
 
         case .fence:
             storage.addAttributes([.font: codeFont(relativeTo: lineFont), .foregroundColor: tertiary], range: whole)

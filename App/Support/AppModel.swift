@@ -542,6 +542,11 @@ final class AppModel {
     }
 
     /// A downsized photo, cached in memory. Returns nil while the file is still downloading from iCloud.
+    /// An image that is already loaded, or nil. Quick enough to ask while drawing.
+    func cachedImage(entryID: UUID, photo: PhotoRef, maxPixel: CGFloat) -> UIImage? {
+        thumbnails.object(forKey: "\(entryID.uuidString)/\(photo.fileName)@\(Int(maxPixel))" as NSString)
+    }
+
     func image(entryID: UUID, photo: PhotoRef, maxPixel: CGFloat) async -> UIImage? {
         let key = "\(entryID.uuidString)/\(photo.fileName)@\(Int(maxPixel))" as NSString
         if let cached = thumbnails.object(forKey: key) { return cached }

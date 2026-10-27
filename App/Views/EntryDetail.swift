@@ -137,8 +137,29 @@ struct EntryDetailView: View {
         return TemplateText.initialCaret(inEditorText: EditorText.fromMarkdown(entry.body))
     }
 
+    /// The words only: a photo in the text is a line of Markdown that means nothing to the person it is sent to.
     private func shareText(_ entry: Entry) -> String {
-        Fmt.fullDate(entry) + "\n\n" + entry.body
+        Fmt.fullDate(entry) + "\n\n" + MediaLine.stripped(entry.body)
+    }
+
+    /// Opens a photo full screen. Swiping goes on through the entry's other photos, in reading order.
+    private func openPhoto(_ photo: PhotoRef, in entry: Entry) {
+        let photos = entry.orderedPhotos
+        guard let index = photos.firstIndex(where: { $0.id == photo.id }) else { return }
+        viewer = PhotoViewerItem(entryID: entry.id, photos: photos, index: index)
+    }
+
+    private func mediaContext(for entry: Entry) -> MediaContext {
+        let entryID = entry.id
+        return MediaContext(
+            photos: entry.photos,
+            cached: { photo, size in model.cachedImage(entryID: entryID, photo: photo, maxPixel: size) },
+            load: { photo, size in await model.image(entryID: entryID, photo: photo, maxPixel: size) },
+            onOpen: { photo in
+                if let current = model.entry(entryID) { openPhoto(photo, in: current) }
+            },
+            refreshToken: model.refreshCounter
+        )
     }
 
     /// Makes a Markdown file or PDF of the entry, then offers it to the share sheet.
@@ -203,16 +224,22 @@ struct EntryDetailView: View {
                     .foregroundStyle(Theme.inkSecondary)
                 }
 
-                if !entry.photos.isEmpty {
-                    PhotoMosaic(entry: entry) { index in
-                        viewer = PhotoViewerItem(entryID: entry.id, photos: entry.photos, index: index)
+                let unplaced = entry.unplacedPhotos
+                if !unplaced.isEmpty {
+                    PhotoMosaic(entryID: entry.id, photos: unplaced) { index in
+                        openPhoto(unplaced[index], in: entry)
                     }
                 }
 
-                MarkdownEditor(text: bodyBinding(entry), isEditable: false, onTapToEdit: { caret in
-                    tappedCaret = caret
-                    model.editingEntryID = entry.id
-                })
+                MarkdownEditor(
+                    text: bodyBinding(entry),
+                    isEditable: false,
+                    onTapToEdit: { caret in
+                        tappedCaret = caret
+                        model.editingEntryID = entry.id
+                    },
+                    media: mediaContext(for: entry)
+                )
             }
             .frame(maxWidth: Theme.readingWidth, alignment: .leading)
             .padding(.horizontal, 24)

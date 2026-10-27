@@ -38,18 +38,20 @@ struct PhotoThumb: View {
     }
 }
 
-/// An entry's photos, laid out like Day One: one large photo, or a grid of squares.
+/// Photos laid out like Day One: one large photo, or a grid of squares. Used for the photos that are not placed
+/// in the text, which is all of them for entries from before photos could be placed.
 struct PhotoMosaic: View {
-    let entry: Entry
+    let entryID: UUID
+    let photos: [PhotoRef]
+    /// Called with the position of the tapped photo in `photos`.
     var onOpen: (Int) -> Void
 
     var body: some View {
-        let photos = entry.photos
         if photos.count == 1, let photo = photos.first {
             Button {
                 onOpen(0)
             } label: {
-                PhotoThumb(entryID: entry.id, photo: photo, maxPixel: 1600)
+                PhotoThumb(entryID: entryID, photo: photo, maxPixel: 1600)
                     .aspectRatio(min(max(photo.aspectRatio, 0.8), 1.8), contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
@@ -68,7 +70,7 @@ struct PhotoMosaic: View {
                     } label: {
                         Color.clear
                             .aspectRatio(1, contentMode: .fit)
-                            .overlay { PhotoThumb(entryID: entry.id, photo: photo, maxPixel: 800) }
+                            .overlay { PhotoThumb(entryID: entryID, photo: photo, maxPixel: 800) }
                             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     }
                     .buttonStyle(.plain)

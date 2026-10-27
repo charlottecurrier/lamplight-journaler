@@ -24,6 +24,9 @@ struct EntryEditorView: View {
 
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var isImporting = false
+    /// File names of photos that have been in the text during this visit. One taken out of the text is kept until
+    /// the entry is finished, so deleting it can still be undone.
+    @State private var placedThisVisit: Set<String>
     @State private var showDate = false
     @State private var showPlace = false
     @State private var viewer: PhotoViewerItem?
@@ -34,6 +37,7 @@ struct EntryEditorView: View {
     ) {
         _draft = State(initialValue: entry)
         _committed = State(initialValue: entry)
+        _placedThisVisit = State(initialValue: Set(entry.placedFileNames))
         _startQuietly = State(initialValue: startQuietly)
         self.initialCaret = initialCaret
         self.onDone = onDone
@@ -45,7 +49,7 @@ struct EntryEditorView: View {
         VStack(alignment: .leading, spacing: 12) {
             if !focusMode {
                 header
-                if !draft.photos.isEmpty || isImporting { photoStrip }
+                if !stripPhotos.isEmpty || isImporting { photoStrip }
             }
             editor
         }
@@ -76,6 +80,7 @@ struct EntryEditorView: View {
             PhotoViewer(item: item)
         }
         .onChange(of: draft) { scheduleSave() }
+        .onChange(of: draft.body) { notePlacedPhotos() }
         .onChange(of: draft.createdAt) { draft.timeZoneID = TimeZone.current.identifier }
         .onChange(of: pickerItems) { importPicked() }
         .onChange(of: scenePhase) {
@@ -89,7 +94,10 @@ struct EntryEditorView: View {
         .onDisappear {
             saveTask?.cancel()
             // A full-screen photo covers this screen without leaving it.
-            if viewer == nil { dropEmptyTemplateHeadings() }
+            if viewer == nil {
+                dropEmptyTemplateHeadings()
+                removeDeletedPhotos()
+            }
             commit()
             guard viewer == nil else { return }
             // If Done was tapped a moment ago, the message is still owed.
@@ -163,20 +171,66 @@ struct EntryEditorView: View {
         return place.isHome ? "house" : "mappin"
     }
 
+    /// Photos that are not in the text. Entries from before photos could be placed show theirs here.
+    private var stripPhotos: [PhotoRef] {
+        let placed = Set(draft.placedFileNames)
+        return draft.photos.filter { !placed.contains($0.fileName) && !placedThisVisit.contains($0.fileName) }
+    }
+
+    /// The photos that came from the text stay out of the strip even after they are deleted from the text.
+    private func notePlacedPhotos() {
+        guard MediaLine.mayContain(draft.body) else { return }
+        placedThisVisit.formUnion(draft.placedFileNames)
+    }
+
+    /// A photo taken out of the text goes where removed photos go: it is kept in the entry's Removed folder.
+    /// This waits until the entry is finished, so that deleting a photo can still be undone while writing.
+    private func removeDeletedPhotos() {
+        let placed = Set(draft.placedFileNames)
+        for photo in draft.photos where placedThisVisit.contains(photo.fileName) && !placed.contains(photo.fileName) {
+            // If the text still names the file anywhere, such as in a line that didn't read as a picture, the photo
+            // is still wanted. Only a photo nothing mentions is removed.
+            if draft.body.contains("\(MediaLine.photosFolder)/\(photo.fileName)") { continue }
+            draft.photos.removeAll { $0.id == photo.id }
+            model.removePhotoFile(photo, from: draft.id)
+        }
+    }
+
+    private func openPhoto(_ photo: PhotoRef) {
+        // Photos taken out of the text this visit are waiting to be removed, so swiping doesn't go to them.
+        let placed = Set(draft.placedFileNames)
+        let photos = draft.orderedPhotos.filter { placed.contains($0.fileName) || !placedThisVisit.contains($0.fileName) }
+        guard let index = photos.firstIndex(where: { $0.id == photo.id }) else { return }
+        controller.dismissKeyboard()
+        viewer = PhotoViewerItem(entryID: draft.id, photos: photos, index: index)
+    }
+
+    private var mediaContext: MediaContext {
+        let entryID = draft.id
+        return MediaContext(
+            photos: draft.photos,
+            cached: { photo, size in model.cachedImage(entryID: entryID, photo: photo, maxPixel: size) },
+            load: { photo, size in await model.image(entryID: entryID, photo: photo, maxPixel: size) },
+            onOpen: { photo in openPhoto(photo) },
+            refreshToken: model.refreshCounter
+        )
+    }
+
     private var photoStrip: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        let photos = stripPhotos
+        return ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
-                ForEach(Array(draft.photos.enumerated()), id: \.element.id) { index, photo in
+                ForEach(Array(photos.enumerated()), id: \.element.id) { index, photo in
                     ZStack(alignment: .topTrailing) {
                         Button {
-                            viewer = PhotoViewerItem(entryID: draft.id, photos: draft.photos, index: index)
+                            openPhoto(photo)
                         } label: {
                             PhotoThumb(entryID: draft.id, photo: photo, maxPixel: 320)
                                 .frame(width: 84, height: 84)
                                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Photo \(index + 1) of \(draft.photos.count)")
+                        .accessibilityLabel("Photo \(index + 1) of \(photos.count)")
 
                         Button {
                             removePhoto(photo)
@@ -207,7 +261,8 @@ struct EntryEditorView: View {
             // An entry the app opened by itself waits for a tap before showing the keyboard.
             wantsFocus: !startQuietly,
             initialCaret: initialCaret,
-            controller: controller
+            controller: controller,
+            media: mediaContext
         )
         .overlay(alignment: .topLeading) {
             if draft.body.isEmpty {
@@ -377,6 +432,7 @@ struct EntryEditorView: View {
         guard !closing else { return }
         saveTask?.cancel()
         dropEmptyTemplateHeadings()
+        removeDeletedPhotos()
         commit()
         controller.dismissKeyboard()
         let wasNew = model.freshEntryIDs.contains(draft.id)
@@ -413,6 +469,8 @@ struct EntryEditorView: View {
             }
             let added = await model.addPhotos(images, to: draft.id)
             draft.photos.append(contentsOf: added)
+            // Each photo goes into the text at the caret, on a line of its own.
+            controller.insertPhotos(added)
             isImporting = false
             saveTask?.cancel()
             commit()

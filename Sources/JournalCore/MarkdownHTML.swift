@@ -3,7 +3,9 @@ import Foundation
 /// Turns an entry's Markdown into HTML, for the PDF. Uses the same line and inline analysis as the editor,
 /// so what is printed matches what is on screen.
 enum MarkdownHTML {
-    static func render(_ markdown: String) -> String {
+    /// `mediaSource` gives the address an image tag can use, such as a data URL, for a photo placed in the text.
+    /// A photo it has no address for is left out.
+    static func render(_ markdown: String, mediaSource: (String) -> String? = { _ in nil }) -> String {
         let doc = MarkdownDocument(EditorText.fromMarkdown(markdown))
         var out: [String] = []
         var paragraph: [String] = []
@@ -67,6 +69,11 @@ enum MarkdownHTML {
             case .section:
                 closeBlocks()
                 out.append("<div class=\"section\"><span>\(escape(doc.string(line.content)))</span></div>")
+            case .media:
+                closeBlocks()
+                if let source = mediaSource(doc.string(line.content)) {
+                    out.append("<figure><img src=\"\(escape(source))\"></figure>")
+                }
             case .bullet:
                 openList("ul", "ul")
                 out.append("<li>\(inline(doc, line))</li>")

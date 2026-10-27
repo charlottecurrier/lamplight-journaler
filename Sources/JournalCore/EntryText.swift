@@ -15,7 +15,7 @@ extension Entry {
     }
 
     var wordCount: Int {
-        body.split(whereSeparator: { $0.isWhitespace || $0.isNewline }).count
+        MediaLine.stripped(body).split(whereSeparator: { $0.isWhitespace || $0.isNewline }).count
     }
 
     /// Case- and accent-insensitive match on the text and location name.
@@ -23,7 +23,7 @@ extension Entry {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty else { return true }
         let options: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive]
-        if body.range(of: q, options: options) != nil { return true }
+        if MediaLine.stripped(body).range(of: q, options: options) != nil { return true }
         if let name = location?.name, name.range(of: q, options: options) != nil { return true }
         return false
     }
@@ -34,7 +34,7 @@ enum EntryText {
         let lines = body
             .split(whereSeparator: { $0.isNewline })
             .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty && !isSection($0) }
+            .filter { !$0.isEmpty && !isSection($0) && !isPicture($0) }
         guard !lines.isEmpty else { return EntrySummary(title: "", preview: "") }
 
         func isHeading(_ line: String) -> Bool { line.hasPrefix("#") }
@@ -62,6 +62,13 @@ enum EntryText {
         guard line.hasPrefix("---") else { return false }
         let doc = MarkdownDocument(line)
         return doc.lines.count == 1 && doc.lines[0].kind == .section
+    }
+
+    /// A line like "![](photos/ABC.jpg)". It holds a picture, not words.
+    static func isPicture(_ line: String) -> Bool {
+        guard line.hasPrefix("![") else { return false }
+        let doc = MarkdownDocument(line)
+        return doc.lines.count == 1 && doc.lines[0].kind == .media
     }
 
     /// Removes heading marks, bullets and quote marks from the start of a line.

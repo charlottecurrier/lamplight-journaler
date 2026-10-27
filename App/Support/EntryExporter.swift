@@ -82,7 +82,8 @@ enum EntryExporter {
         let name = EntryExport.baseFileName(for: entry)
         let text = EntryExport.markdown(
             title: Fmt.fullDate(entry), details: details(entry, model: model),
-            body: entry.body, photoFiles: photos.map(\.photo.fileName)
+            // Photos in the text are linked from the text. The rest are added at the end.
+            body: entry.body, photoFiles: entry.unplacedPhotos.map(\.fileName)
         )
         do {
             let (container, folder) = try freshFolder(named: name)
@@ -127,16 +128,21 @@ enum EntryExporter {
         _ entry: Entry, photos: [(photo: PhotoRef, data: Data)], model: AppModel
     ) async -> URL? {
         // Shrinking the photos and encoding them is slow, so it happens off the main thread.
-        let datas = photos.map(\.data)
-        let sources = await IO.run { () -> [String] in
-            datas.compactMap { data in
-                ImageTools.prepareForStorage(data, maxPixel: 1400, quality: 0.8)
-                    .map { "data:image/jpeg;base64," + $0.data.base64EncodedString() }
+        let items = photos.map { ($0.photo.fileName, $0.data) }
+        let sources = await IO.run { () -> [String: String] in
+            var result: [String: String] = [:]
+            for (fileName, data) in items {
+                if let prepared = ImageTools.prepareForStorage(data, maxPixel: 1400, quality: 0.8) {
+                    result[fileName] = "data:image/jpeg;base64," + prepared.data.base64EncodedString()
+                }
             }
+            return result
         }
+        // Photos in the text are printed where they are. The rest follow the text.
         let html = EntryExport.html(
             title: Fmt.fullDate(entry), details: details(entry, model: model),
-            body: entry.body, photoSources: sources
+            body: entry.body, photoSources: entry.unplacedPhotos.compactMap { sources[$0.fileName] },
+            inlineSources: sources
         )
         guard let data = render(html: html) else { return nil }
         do {

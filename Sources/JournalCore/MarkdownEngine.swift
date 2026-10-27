@@ -43,6 +43,8 @@ enum MDLineKind: Equatable {
     case divider
     /// "--- Evening ---": a titled break, drawn as the title with a rule running to the edge.
     case section
+    /// "![](photos/NAME.jpg)": a picture on a line of its own. `content` is the file name.
+    case media
     /// A line of three backticks that opens or closes a code block.
     case fence
     /// A line inside a code block.
@@ -198,6 +200,13 @@ struct MarkdownDocument {
             return section
         }
 
+        // Picture: "![](photos/NAME)" and nothing else on the line.
+        if indent <= 3, u[body] == 0x21, let name = mediaName(u, body, r.upperBound) {
+            var picture = line(.media, inline: false)
+            picture.content = name
+            return picture
+        }
+
         // Divider: three or more of the same - * _ and nothing else.
         let first = u[body]
         if first == 0x2D || first == 0x2A || first == 0x5F {
@@ -260,6 +269,35 @@ struct MarkdownDocument {
         while titleEnd > titleStart && u[titleEnd - 1] == 0x20 { titleEnd -= 1 }
         guard titleStart < titleEnd else { return nil }
         return titleStart..<titleEnd
+    }
+
+    private static let photosPrefix: [UInt16] = Array("photos/".utf16)
+
+    /// The file name in a line like "![](photos/ABC.jpg)". Alt text is allowed. Nil if the line holds anything else,
+    /// or if the path goes anywhere but straight into the photos folder.
+    private static func mediaName(_ u: [UInt16], _ start: Int, _ end: Int) -> Range<Int>? {
+        guard start + 1 < end, u[start] == 0x21, u[start + 1] == 0x5B else { return nil }
+        var k = start + 2
+        while k < end, u[k] != 0x5D {
+            if u[k] == 0x5B { return nil }
+            k += 1
+        }
+        guard k + 1 < end, u[k + 1] == 0x28 else { return nil }
+        let pathStart = k + 2
+        guard starts(u, photosPrefix, at: pathStart) else { return nil }
+        let nameStart = pathStart + photosPrefix.count
+        var m = nameStart
+        while m < end, u[m] != 0x29 {
+            // Spaces, slashes and brackets can't be in a file name here.
+            switch u[m] {
+            case 0x20, 0x2F, 0x28, 0x5B, 0x5D, 0x3C, 0x3E: return nil
+            default: m += 1
+            }
+        }
+        guard m < end, m > nameStart else { return nil }
+        var rest = m + 1
+        while rest < end, u[rest] == 0x20 || u[rest] == 0x09 || u[rest] == 0x0D { rest += 1 }
+        return rest == end ? nameStart..<m : nil
     }
 
     // MARK: Inline scanning
