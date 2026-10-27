@@ -84,15 +84,65 @@ struct TemplatesScreen: View {
     }
 }
 
-/// Shown in the detail column on the Templates screen when none is chosen.
+/// Shown in the detail column on the Templates screen when none is chosen. It lists your templates itself,
+/// so the screen is never just a message, even when the list in the column beside it is out of sight.
 struct TemplatePlaceholder: View {
+    @Environment(AppModel.self) private var model
+    @Binding var selection: UUID?
+    var onNew: () -> Void
+
     var body: some View {
-        EmptyStateView(
-            systemImage: "doc.text",
-            title: "Choose a template",
-            message: "Edit it here like any entry, or tap the pencil beside it to write with it."
-        )
-        .background(PaperBackground())
+        if model.templates.isEmpty {
+            EmptyStateView(
+                systemImage: "doc.text",
+                title: "No templates yet",
+                message: "A template is a page you write once, with headings, prompts or checklists. New entries can start with a copy of it.",
+                actionTitle: "New Template",
+                action: onNew
+            )
+            .background(PaperBackground())
+        } else {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Your templates")
+                        .font(Theme.serif(.title2, weight: .bold))
+                        .foregroundStyle(Theme.ink)
+                        .accessibilityAddTraits(.isHeader)
+                    Text("Choose one to edit it. The pencil beside a template in the list starts an entry with it.")
+                        .font(Theme.serif(.callout))
+                        .foregroundStyle(Theme.inkSecondary)
+                        .padding(.bottom, 12)
+
+                    ForEach(model.templatesByUse()) { template in
+                        Button {
+                            selection = template.id
+                        } label: {
+                            HStack(spacing: 12) {
+                                Label(template.name, systemImage: "doc.text")
+                                    .font(Theme.serif(.body))
+                                    .foregroundStyle(Theme.ink)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.footnote)
+                                    .foregroundStyle(Theme.inkTertiary)
+                            }
+                            .padding(.vertical, 13)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        Rectangle().fill(Theme.line).frame(height: 0.5)
+                    }
+
+                    Button("New Template", action: onNew)
+                        .buttonStyle(.quietPaper)
+                        .padding(.top, 16)
+                }
+                .frame(maxWidth: 520, alignment: .leading)
+                .padding(24)
+                .frame(maxWidth: .infinity)
+            }
+            .background(PaperBackground())
+        }
     }
 }
 
@@ -108,7 +158,8 @@ struct TemplateEditorView: View {
             TemplatePage(template: template, onStart: onStart, onDeleted: onDeleted)
                 .id(templateID)
         } else {
-            TemplatePlaceholder()
+            // The template was just deleted. The screen goes back to the list in a moment.
+            Color.clear.background(PaperBackground())
         }
     }
 }

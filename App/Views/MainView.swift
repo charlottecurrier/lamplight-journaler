@@ -132,7 +132,7 @@ struct MainView: View {
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columns, preferredCompactColumn: $compactColumn) {
-            SidebarView(selection: $sidebar) { showSettings = true }
+            SidebarView(selection: sidebarSelection) { showSettings = true }
                 .navigationSplitViewColumnWidth(min: 230, ideal: 270, max: 320)
         } content: {
             contentColumn
@@ -179,7 +179,7 @@ struct MainView: View {
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if sizeClass == .compact {
-                    CompactBar(selection: $sidebar) { create(.standard) }
+                    CompactBar(selection: sidebarSelection) { create(.standard) }
                         .ignoresSafeArea(.keyboard, edges: .bottom)
                 }
             }
@@ -223,7 +223,7 @@ struct MainView: View {
                     onDeleted: { selectedTemplateID = nil }
                 )
             } else {
-                TemplatePlaceholder()
+                TemplatePlaceholder(selection: $selectedTemplateID, onNew: newTemplate)
             }
         } else if let entryID = selectedEntryID {
             EntryDetailView(
@@ -243,6 +243,33 @@ struct MainView: View {
     }
 
     // MARK: Actions
+
+    /// Picking a section from the sidebar or the phone's bar goes through `show`.
+    private var sidebarSelection: Binding<SidebarItem?> {
+        Binding(
+            get: { sidebar },
+            set: { item in
+                if let item { show(item) } else { sidebar = nil }
+            }
+        )
+    }
+
+    /// Goes to a section and makes sure its list can be seen: on a phone the list comes to the front, and on an
+    /// iPad the sidebar and list return if a new entry had the whole screen.
+    private func show(_ item: SidebarItem) {
+        sidebar = item
+        compactColumn = .content
+        if columns == .detailOnly {
+            writingFullWidth = false
+            withAnimation(.easeInOut(duration: 0.3)) { columns = .automatic }
+        }
+    }
+
+    private func newTemplate() {
+        let template = model.newTemplate()
+        model.save(template: template)
+        selectedTemplateID = template.id
+    }
 
     /// Starts an entry and opens the editor for it. A template's page becomes the entry's text.
     private func create(_ choice: NewEntryChoice) {

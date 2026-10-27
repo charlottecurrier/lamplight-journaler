@@ -220,7 +220,7 @@ struct EntryDetailView: View {
             .padding(.bottom, 60)
             .frame(maxWidth: .infinity)
             .offset(x: pageOffset)
-            .opacity(1 - min(abs(pageOffset) / 300, 0.6))
+            .opacity(1 - min(Double(abs(pageOffset)) / 300, 0.6))
         }
         .simultaneousGesture(pageTurn(for: entry))
         // Swiping isn't possible with VoiceOver, so the same turns are offered as actions.
