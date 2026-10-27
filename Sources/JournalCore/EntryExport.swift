@@ -13,6 +13,7 @@ enum EntryExport {
     }
 
     /// Markdown that reads well anywhere. Photos are linked from a "photos" folder beside the file.
+    /// Photos placed in the text are already linked there, so `photoFiles` is the ones that are not.
     static func markdown(title: String, details: String, body: String, photoFiles: [String]) -> String {
         var parts = ["# " + title]
         if !details.isEmpty { parts.append("*\(details)*") }
@@ -23,8 +24,11 @@ enum EntryExport {
     }
 
     /// A page of HTML in dark ink on white paper, for printing as a PDF. `photoSources` are addresses an image
-    /// tag can use, such as data URLs.
-    static func html(title: String, details: String, body: String, photoSources: [String]) -> String {
+    /// tag can use, such as data URLs, for photos that are not placed in the text. `inlineSources` has the same
+    /// for the ones that are, by file name.
+    static func html(
+        title: String, details: String, body: String, photoSources: [String], inlineSources: [String: String] = [:]
+    ) -> String {
         let text = body.trimmingCharacters(in: .whitespacesAndNewlines)
         let photos = photoSources
             .map { "<figure><img src=\"\(MarkdownHTML.escape($0))\"></figure>" }
@@ -58,7 +62,7 @@ enum EntryExport {
         </style></head><body>
         <h1 class="title">\(MarkdownHTML.escape(title))</h1>
         <p class="details">\(MarkdownHTML.escape(details))</p>
-        \(MarkdownHTML.render(text))
+        \(MarkdownHTML.render(text, mediaSource: { inlineSources[$0] }))
         \(photos)
         </body></html>
         """

@@ -3,11 +3,54 @@ import UIKit
 
 // MARK: - The text view
 
-/// Draws the thin rule that runs from a section's title to the edge of the page.
+/// Draws what the text itself can't: the thin rule that runs from a section's title to the edge of the page,
+/// and the photos placed in the text.
 final class RuleLayoutManager: NSLayoutManager {
+    /// The picture for a photo's file name, or nil while it is still coming down.
+    var mediaImage: ((String) -> UIImage?)?
+
     override func drawBackground(forGlyphRange glyphsToShow: NSRange, at origin: CGPoint) {
         super.drawBackground(forGlyphRange: glyphsToShow, at: origin)
         guard let storage = textStorage, storage.length > 0 else { return }
+        drawRules(storage: storage, glyphsToShow: glyphsToShow, origin: origin)
+        drawPictures(storage: storage, glyphsToShow: glyphsToShow, origin: origin)
+    }
+
+    /// A picture line is as tall as its photo and its own text is hidden. The photo is drawn in that space, as wide
+    /// as fits. A photo that hasn't loaded yet is a quiet block the same size.
+    private func drawPictures(storage: NSTextStorage, glyphsToShow: NSRange, origin: CGPoint) {
+        enumerateLineFragments(forGlyphRange: glyphsToShow) { rect, _, _, glyphRange, _ in
+            let characters = self.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
+            guard characters.length > 0, characters.location < storage.length,
+                  let file = storage.attribute(.mediaFile, at: characters.location, effectiveRange: nil) as? String
+            else { return }
+            let active = (storage.attribute(.mediaActive, at: characters.location, effectiveRange: nil) as? Bool) ?? false
+
+            let box = CGRect(x: origin.x + rect.minX, y: origin.y + rect.minY, width: rect.width, height: rect.height)
+            var frame = box
+            let radius: CGFloat = 12
+            if let image = self.mediaImage?(file), image.size.width > 0, image.size.height > 0 {
+                let scale = min(box.width / image.size.width, box.height / image.size.height)
+                let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+                frame = CGRect(x: box.midX - size.width / 2, y: box.minY, width: size.width, height: size.height)
+                UIGraphicsGetCurrentContext()?.saveGState()
+                UIBezierPath(roundedRect: frame, cornerRadius: radius).addClip()
+                image.draw(in: frame)
+                UIGraphicsGetCurrentContext()?.restoreGState()
+            } else {
+                Palette.surfaceRaised.uiColor.setFill()
+                UIBezierPath(roundedRect: frame, cornerRadius: radius).fill()
+            }
+            if active {
+                let outline = UIBezierPath(roundedRect: frame.insetBy(dx: 1, dy: 1), cornerRadius: radius)
+                outline.lineWidth = 2
+                Palette.accent.uiColor.setStroke()
+                outline.stroke()
+            }
+        }
+    }
+
+    private func drawRules(storage: NSTextStorage, glyphsToShow: NSRange, origin: CGPoint) {
         let text = storage.string as NSString
 
         enumerateLineFragments(forGlyphRange: glyphsToShow) { rect, usedRect, _, glyphRange, _ in
@@ -123,6 +166,22 @@ final class MarkdownEditorController {
     @MainActor func insertTemplate(_ markdown: String) { coordinator?.insertTemplate(markdown) }
     @MainActor func focus() { coordinator?.focus() }
     @MainActor func dismissKeyboard() { coordinator?.dismissKeyboard() }
+    /// Puts photos into the text at the caret, each on a line of its own.
+    @MainActor func insertPhotos(_ photos: [PhotoRef]) { coordinator?.insertPhotos(photos) }
+}
+
+/// What the editor needs to show the photos placed in the text.
+struct MediaContext {
+    /// The entry's photos. A picture line in the text names one of them by file name.
+    var photos: [PhotoRef]
+    /// A photo already loaded, or nil. Used while drawing, so it must be quick.
+    var cached: (PhotoRef, CGFloat) -> UIImage?
+    /// Loads a photo as an image about this many pixels on its long edge. Nil if it can't be read yet.
+    var load: (PhotoRef, CGFloat) async -> UIImage?
+    /// Called when a photo in the text is tapped.
+    var onOpen: (PhotoRef) -> Void
+    /// Changes when files may have finished coming down from iCloud, so photos that failed are tried again.
+    var refreshToken: Int
 }
 
 // MARK: - The SwiftUI view
@@ -143,6 +202,8 @@ struct MarkdownEditor: UIViewRepresentable {
     var controller: MarkdownEditorController?
     /// When reading, a tap on the text calls this with the tapped spot, as a UTF-16 offset in editor text.
     var onTapToEdit: ((Int) -> Void)?
+    /// The photos placed in the text. Without this, a picture line is shown as the plain text it is in the file.
+    var media: MediaContext?
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -175,6 +236,8 @@ struct MarkdownEditor: UIViewRepresentable {
         // For reading, the text takes the height it needs. For writing, it fills the space it is given.
         guard !isEditable else { return nil }
         let width = proposal.width ?? 600
+        // Photos in the text are as wide as the page, so their height depends on this width.
+        context.coordinator.noteWidth(width, restyleNow: true)
         let fitted = uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
         return CGSize(width: width, height: ceil(fitted.height))
     }
@@ -201,11 +264,26 @@ struct MarkdownEditor: UIViewRepresentable {
         private var sizeObserver: NSObjectProtocol?
         private var lastFocusMode = false
 
+        // Photos placed in the text.
+        private var photosByFile: [String: PhotoRef] = [:]
+        private var aspects: [String: CGFloat] = [:]
+        /// Photos put into the text a moment ago, which the entry the editor was given may not list yet.
+        private var justInserted: [String: PhotoRef] = [:]
+        private var loading = Set<UUID>()
+        private var failed = Set<UUID>()
+        private var mediaToken = 0
+        /// How wide the page is, which is how wide a photo is drawn. Zero until it is known.
+        private var mediaWidth: CGFloat = 0
+        private var isSnapping = false
+        private var lastCaret = 0
+        private static let pictureSize: CGFloat = 1600
+
         /// What the last styling pass looked at. If none of it changed, the text needs no new styling.
         private struct StyleSignature: Equatable {
             var text: String
             var activeLines: [Int]
             var editing: Bool
+            var media: MediaLayout?
         }
 
         init(_ parent: MarkdownEditor) {
@@ -242,6 +320,12 @@ struct MarkdownEditor: UIViewRepresentable {
             view.onLayout = { [weak self, weak view] in
                 guard let self, let view else { return }
                 if self.updateFocusInsets(view), self.parent.isFocusMode { self.centerCaret(view) }
+                self.noteWidth(view.bounds.width - view.textContainerInset.left - view.textContainerInset.right, restyleNow: false)
+            }
+            if let layout = view.layoutManager as? RuleLayoutManager {
+                layout.mediaImage = { [weak self] file in
+                    MainActor.assumeIsolated { self?.image(forFile: file) }
+                }
             }
 
             if parent.isEditable {
@@ -265,6 +349,7 @@ struct MarkdownEditor: UIViewRepresentable {
 
             syncedText = parent.text
             view.text = EditorText.fromMarkdown(parent.text)
+            syncMedia()
             restyle(force: true)
         }
 
@@ -280,6 +365,9 @@ struct MarkdownEditor: UIViewRepresentable {
             if view.isEditable != parent.isEditable {
                 view.isEditable = parent.isEditable
             }
+
+            // Photos may have been added or loaded since last time, which changes how tall their lines are.
+            if syncMedia() { restyle(force: true) }
 
             // The text was changed from outside, such as by a checklist tap in the reader or a new template.
             if parent.text != syncedText {
@@ -324,29 +412,161 @@ struct MarkdownEditor: UIViewRepresentable {
             }
         }
 
+        // MARK: Photos in the text
+
+        /// The text's analysis, kept while the text stays the same.
+        private func analysis(for text: String) -> MarkdownDocument {
+            if let cached = cachedDocument, cachedText == text { return cached }
+            let document = MarkdownDocument(text)
+            cachedDocument = document
+            cachedText = text
+            return document
+        }
+
+        /// Where photos in the text are drawn, or nil if this editor has no photos to show. Until the page's width
+        /// is known a plausible one is used, so picture lines never show their text for a moment.
+        private func mediaLayout() -> MediaLayout? {
+            guard parent.media != nil else { return nil }
+            return MediaLayout(width: mediaWidth > 1 ? mediaWidth : 600, aspect: aspects)
+        }
+
+        /// Takes in the photos SwiftUI last handed over. Returns true if something that changes the layout did.
+        @discardableResult
+        private func syncMedia() -> Bool {
+            guard let media = parent.media else {
+                photosByFile = [:]
+                aspects = [:]
+                return false
+            }
+            var map = Dictionary(media.photos.map { ($0.fileName, $0) }, uniquingKeysWith: { first, _ in first })
+            for (name, photo) in justInserted {
+                if map[name] != nil { justInserted[name] = nil } else { map[name] = photo }
+            }
+            photosByFile = map
+            let newAspects = map.mapValues { CGFloat($0.aspectRatio) }
+            var changed = newAspects != aspects
+            aspects = newAspects
+            if media.refreshToken != mediaToken {
+                mediaToken = media.refreshToken
+                failed.removeAll()
+                invalidatePictures()
+                changed = true
+            }
+            return changed
+        }
+
+        /// The page's width changed, such as by turning the iPad. Photos are drawn as wide as the page.
+        func noteWidth(_ width: CGFloat, restyleNow: Bool) {
+            guard parent.media != nil, width > 1, abs(width - mediaWidth) > 0.5 else { return }
+            mediaWidth = width
+            if restyleNow {
+                restyle(force: true)
+            } else {
+                // Called while the view is being laid out, so the text is restyled right after.
+                DispatchQueue.main.async { [weak self] in self?.restyle(force: true) }
+            }
+        }
+
+        /// The loaded image for a photo in the text. While it is still coming, nil, and it is asked for.
+        private func image(forFile file: String) -> UIImage? {
+            guard let media = parent.media, let photo = photosByFile[file] else { return nil }
+            if let image = media.cached(photo, Self.pictureSize) { return image }
+            if !loading.contains(photo.id), !failed.contains(photo.id) {
+                loading.insert(photo.id)
+                Task { @MainActor [weak self] in
+                    let image = await media.load(photo, Self.pictureSize)
+                    guard let self else { return }
+                    self.loading.remove(photo.id)
+                    if image == nil { self.failed.insert(photo.id) }
+                    self.invalidatePictures()
+                }
+            }
+            return nil
+        }
+
+        private func invalidatePictures() {
+            guard let view = textView else { return }
+            view.layoutManager.invalidateDisplay(forCharacterRange: NSRange(location: 0, length: view.textStorage.length))
+        }
+
+        func insertPhotos(_ photos: [PhotoRef]) {
+            guard let view = textView, parent.isEditable, !photos.isEmpty else { return }
+            for photo in photos {
+                justInserted[photo.fileName] = photo
+                photosByFile[photo.fileName] = photo
+                aspects[photo.fileName] = CGFloat(photo.aspectRatio)
+            }
+            let edit = MediaLine.insertionEdit(
+                fileNames: photos.map(\.fileName), into: view.text, caret: view.selectedRange.location
+            )
+            apply(edit)
+            view.becomeFirstResponder()
+            view.scrollRangeToVisible(view.selectedRange)
+        }
+
+        /// The text of a picture line is hidden, so the caret and any selection are kept out of it. A caret goes to
+        /// the end of the line, or the start if it was moving backwards.
+        private func keepSelectionOutOfPictures(_ view: UITextView) {
+            defer { lastCaret = view.selectedRange.location }
+            guard parent.media != nil, MediaLine.mayContain(view.text) else { return }
+            let pictures = analysis(for: view.text).lines.filter { $0.kind == .media }.map(\.range)
+            guard !pictures.isEmpty else { return }
+
+            let selection = view.selectedRange
+            let start = selection.location
+            let end = selection.location + selection.length
+            var target: NSRange?
+            if selection.length == 0 {
+                if let picture = pictures.first(where: { $0.lowerBound < start && start < $0.upperBound }) {
+                    target = NSRange(location: start < lastCaret ? picture.lowerBound : picture.upperBound, length: 0)
+                }
+            } else {
+                let newStart = pictures.first(where: { $0.lowerBound < start && start < $0.upperBound })?.lowerBound ?? start
+                let newEnd = pictures.first(where: { $0.lowerBound < end && end < $0.upperBound })?.upperBound ?? end
+                if newStart != start || newEnd != end {
+                    target = NSRange(location: newStart, length: newEnd - newStart)
+                }
+            }
+            guard let target else { return }
+            isSnapping = true
+            view.selectedRange = target
+            isSnapping = false
+        }
+
+        /// The photo under a point, if the point is on a picture line.
+        private func photo(at location: CGPoint, in view: UITextView) -> PhotoRef? {
+            guard parent.media != nil, view.layoutManager.numberOfGlyphs > 0 else { return nil }
+            var point = location
+            point.x -= view.textContainerInset.left
+            point.y -= view.textContainerInset.top
+            let layout = view.layoutManager
+            let glyph = layout.glyphIndex(for: point, in: view.textContainer)
+            let rect = layout.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
+            guard rect.contains(point) else { return nil }
+            let index = layout.characterIndexForGlyph(at: glyph)
+            guard index < view.textStorage.length,
+                  let file = view.textStorage.attribute(.mediaFile, at: index, effectiveRange: nil) as? String
+            else { return nil }
+            return photosByFile[file]
+        }
+
         // MARK: Styling
 
         /// Styles the text. Skipped when neither the text nor the lines the cursor touches have changed.
         func restyle(force: Bool = false) {
             guard let view = textView, view.markedTextRange == nil else { return }
             let text = view.text ?? ""
-            let document: MarkdownDocument
-            if let cached = cachedDocument, cachedText == text {
-                document = cached
-            } else {
-                document = MarkdownDocument(text)
-                cachedDocument = document
-                cachedText = text
-            }
+            let document = analysis(for: text)
             let editing = parent.isEditable && view.isFirstResponder
             let selection = view.selectedRange
             let range = selection.location..<(selection.location + selection.length)
             let active = editing ? document.lines.indices.filter { document.isActive($0, selection: range) } : []
-            let signature = StyleSignature(text: text, activeLines: active, editing: editing)
+            let media = mediaLayout()
+            let signature = StyleSignature(text: text, activeLines: active, editing: editing, media: media)
             if force || signature != styledSignature {
                 styledSignature = signature
                 MarkdownStyler.apply(
-                    to: view.textStorage, document: document, selection: editing ? selection : nil
+                    to: view.textStorage, document: document, selection: editing ? selection : nil, media: media
                 )
             }
             view.typingAttributes = MarkdownStyler.typingAttributes(document: document, caret: selection.location)
@@ -358,18 +578,16 @@ struct MarkdownEditor: UIViewRepresentable {
             guard parent.isEditable, !isApplyingEdit, textView.markedTextRange == nil else { return true }
 
             let replaced = range.location..<(range.location + range.length)
-            if let edit = MarkdownEditing.intercept(text: textView.text, range: replaced, replacement: text) {
+            // Pasted or dictated text can be Markdown, such as "- [ ] milk". Turn it into editor form as it goes in.
+            let replacement = text.utf16.count > 1 ? editorForm(ofPasted: text, at: range.location, in: textView.text) : text
+            if let edit = MarkdownEditing.intercept(text: textView.text, range: replaced, replacement: replacement) {
                 apply(edit)
                 return false
             }
-            // Pasted or dictated text can be Markdown, such as "- [ ] milk". Turn it into editor form as it goes in.
-            if text.utf16.count > 1 {
-                let converted = editorForm(ofPasted: text, at: range.location, in: textView.text)
-                if converted != text {
-                    let caret = range.location + converted.utf16.count
-                    apply(TextEdit(range: replaced, replacement: converted, selection: caret..<caret))
-                    return false
-                }
+            if replacement != text {
+                let caret = range.location + replacement.utf16.count
+                apply(TextEdit(range: replaced, replacement: replacement, selection: caret..<caret))
+                return false
             }
             return true
         }
@@ -388,7 +606,8 @@ struct MarkdownEditor: UIViewRepresentable {
         }
 
         func textViewDidChangeSelection(_ textView: UITextView) {
-            guard !isApplyingEdit else { return }
+            guard !isApplyingEdit, !isSnapping else { return }
+            keepSelectionOutOfPictures(textView)
             restyle()
             updateSlashSuggestions(textView)
             if parent.isFocusMode { centerCaret(textView) }
@@ -417,18 +636,24 @@ struct MarkdownEditor: UIViewRepresentable {
         // MARK: Edits
 
         /// Makes an edit the engine asked for, in a way that can be undone.
-        func apply(_ edit: TextEdit) {
+        func apply(_ requested: TextEdit) {
             guard let view = textView else { return }
+            // Whatever asked for this, a picture line never ends up sharing its line with text.
+            let edit = MediaLine.repaired(requested, in: view.text)
             isApplyingEdit = true
             let range = NSRange(location: edit.range.lowerBound, length: edit.range.count)
-            if let start = view.position(from: view.beginningOfDocument, offset: range.location),
-               let end = view.position(from: start, offset: range.length),
-               let textRange = view.textRange(from: start, to: end) {
-                view.replace(textRange, withText: edit.replacement)
-            } else {
-                view.textStorage.replaceCharacters(in: range, with: edit.replacement)
+            // An edit that changes nothing, such as a Backspace that is refused, only moves the caret.
+            if !(range.length == 0 && edit.replacement.isEmpty) {
+                if let start = view.position(from: view.beginningOfDocument, offset: range.location),
+                   let end = view.position(from: start, offset: range.length),
+                   let textRange = view.textRange(from: start, to: end) {
+                    view.replace(textRange, withText: edit.replacement)
+                } else {
+                    view.textStorage.replaceCharacters(in: range, with: edit.replacement)
+                }
             }
             view.selectedRange = NSRange(location: edit.selection.lowerBound, length: edit.selection.count)
+            lastCaret = view.selectedRange.location
             isApplyingEdit = false
             changed(view)
         }
@@ -507,6 +732,12 @@ struct MarkdownEditor: UIViewRepresentable {
             guard recognizer.state == .ended, let view = textView else { return }
             let location = recognizer.location(in: view)
             if tickCheckbox(at: location, in: view) { return }
+
+            // A tap on a photo in the text opens it, whether writing or reading.
+            if let photo = photo(at: location, in: view) {
+                parent.media?.onOpen(photo)
+                return
+            }
 
             // When reading, a tap on the text starts editing there. A tap on a link opens the link instead.
             guard !parent.isEditable, let beginEditing = parent.onTapToEdit else { return }

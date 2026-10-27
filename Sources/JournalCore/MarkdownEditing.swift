@@ -37,6 +37,14 @@ enum MarkdownEditing {
     static func intercept(
         text: String, range: Range<Int>, replacement: String, context: SlashContext = .current
     ) -> TextEdit? {
+        if let edit = listRules(text: text, range: range, replacement: replacement, context: context) { return edit }
+        // Whatever else is typed, deleted or pasted must not mix a picture with other text.
+        return MediaLine.guarded(text: text, range: range, replacement: replacement)
+    }
+
+    private static func listRules(
+        text: String, range: Range<Int>, replacement: String, context: SlashContext
+    ) -> TextEdit? {
         let isReturn = replacement == "\n" && range.isEmpty
         let isSpace = replacement == " " && range.isEmpty
         let isBackspace = replacement.isEmpty && range.count == 1
@@ -144,7 +152,9 @@ enum MarkdownEditing {
         switch command {
         case .bold, .italic, .strike, .highlight, .code, .link:
             // A section's title is plain text, so styling marks would only show up as stray symbols.
-            if doc.lines[doc.lineIndex(containing: selection.lowerBound)].kind == .section { return nil }
+            // A picture line is not text at all.
+            let kind = doc.lines[doc.lineIndex(containing: selection.lowerBound)].kind
+            if kind == .section || kind == .media { return nil }
         default:
             break
         }
@@ -188,7 +198,7 @@ enum MarkdownEditing {
     /// Lines the format commands may rewrite. Code, dividers and blank lines are left alone.
     private static func canRewrite(_ line: MDLine) -> Bool {
         switch line.kind {
-        case .blank, .divider, .section, .fence, .code: return false
+        case .blank, .divider, .section, .media, .fence, .code: return false
         default: return true
         }
     }
@@ -299,7 +309,7 @@ enum MarkdownEditing {
     private static func toggleSection(_ doc: MarkdownDocument, selection: Range<Int>) -> TextEdit? {
         let line = doc.lines[doc.lineIndex(containing: selection.lowerBound)]
         switch line.kind {
-        case .fence, .code, .divider:
+        case .fence, .code, .divider, .media:
             return nil
         case .section:
             let title = doc.string(line.content)
