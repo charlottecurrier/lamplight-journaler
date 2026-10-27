@@ -66,14 +66,36 @@ Amber lenses cut blue light. Blues go dark and warm colors blur together, but br
 
 ## Not built
 
-- Day One import (you chose to wait).
+- Day One import (planned, after inline photos and video). See the next section.
 - Mood, tags, weather.
 - Rich text beyond Markdown. No colors, fonts or alignment.
-- Photos placed inline in the text (planned, next). Photos sit above the text for now.
-- Audio, drawings and video (planned, after that).
+- Photos and video placed inline in the text (planned, next). Photos sit above the text for now. Video isn't supported yet, and you said it has to be.
+- Audio and drawings (planned, after that).
 - Export. The files are the export. Sharing a single entry is planned.
 - iPad Stage Manager multiple windows. One window only, so two windows can't edit one entry.
 - Sign-in with Apple or accounts. There aren't any.
+
+## Day One import (planned)
+
+**Order.** Inline photos and video first, then the importer, so imported entries keep their media where it was in Day One.
+
+**What you decided.**
+- Tags become a `#tag` line at the end of the entry.
+- Pinned entries become favorites, along with starred ones.
+- Audio and PDFs are copied into the entry's folder so nothing is lost, even though the app can't show them yet.
+- Video has to be supported, so video is imported as video, not just copied.
+
+**How the fields map.** This comes from third-party descriptions of the export. Day One publishes no schema. Check it against a real export with `tools/dayone_inspect.py` before writing the importer.
+- `uuid` becomes the entry id, the same id every time, so running the import twice doesn't duplicate entries.
+- `creationDate` with `timeZone` becomes created time and time zone. `modifiedDate` becomes modified time.
+- `text` becomes the body. Day One's backslash escapes are removed, and its media markers (`![](dayone-moment://…)`) become inline media.
+- `starred` becomes favorite. `location` becomes location. `photos` are saved the way new photos are.
+- Each journal file becomes a journal.
+- Weather and camera details are dropped. Day One tables show as plain text.
+
+**Things to keep in mind.**
+- The entry file header only keeps fields the app knows. Anything else is dropped the next time the app saves that entry, so anything extra needs a model field.
+- iOS has no built-in unzip. Unzip the export in the Files app, then pick the folder.
 
 ## Known limits
 
