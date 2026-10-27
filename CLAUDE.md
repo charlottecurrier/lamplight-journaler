@@ -27,7 +27,7 @@ On Linux, a Swift toolchain can be downloaded from `download.swift.org` (Ubuntu 
 
 ## What can and can't be verified without a Mac
 
-- Verified in CI-less environments: everything in `Sources/JournalCore` (219 tests, including the Markdown engine and every editing rule), the model and storage code in `App/Support` (type-checked against stand-ins by `tools/typecheck_support.sh`), the Python tools, the project structure. `ImageTools`, `PlaceSearcher`, `AppPrefs` and `Theme` are read-checked only.
+- Verified in CI-less environments: everything in `Sources/JournalCore` (274 tests, including the Markdown engine, every editing rule and the picture-line rules), the model and storage code in `App/Support` (type-checked against stand-ins by `tools/typecheck_support.sh`), the Python tools, the project structure. `ImageTools`, `PlaceSearcher`, `AppPrefs` and `Theme` are read-checked only.
 - **Not compilable on Linux:** all SwiftUI/UIKit code in `App/`. Review it by reading. Check every call against the declarations in Core and `AppModel` before assuming it compiles.
 
 ## Rules that matter
@@ -39,5 +39,6 @@ On Linux, a Swift toolchain can be downloaded from `download.swift.org` (Ubuntu 
 - **Swift 5 language mode, iOS 17 minimum.** Use `@MainActor in` on `Task` created in views.
 - **Plain, quiet UI copy.** Short sentences. No exclamation marks, no cheering, no prompts or suggestions for what to write. The person asked for no AI, reminders or suggested prompts.
 - **Editing rules live in Core, not in the editor.** `MarkdownEngine` (line and inline analysis), `MarkdownEditing` (Return, Space, Backspace, Tab, format commands), `SlashCommand` and `EditorText` are pure Swift on UTF-16 offsets and are unit tested. `App/Editor` only applies their `TextEdit`s to the `UITextView`. Add a test in Core before changing a rule.
+- **A photo in the text is a line of its own: `![](photos/NAME.jpg)`.** `MediaLine` (Core) keeps it that way. `MarkdownEditing.intercept` and `Coordinator.apply` send every edit through `MediaLine.repaired`, and `Coordinator.changed` runs `MediaLine.separated` after each change. The editor hides that line's text and draws the photo in its place (`RuleLayoutManager`). Don't add an edit path that skips them. The header's `photos` list stays the registry of an entry's photos, so a photo not named in the text still shows above it.
 - **Editor text is not file text.** The editor shows `•`, `☐` and `☑` for list markers. `EditorText.fromMarkdown` and `toMarkdown` convert at the load and save boundary. Never write editor text to disk or read file text into the editor without converting.
 - The `EntryFile` header values are JSON. Splitting text on `"\n"` must be done on bytes (Swift treats `\r\n` as one character).

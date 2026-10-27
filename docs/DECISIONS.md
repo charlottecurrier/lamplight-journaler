@@ -63,6 +63,7 @@ Amber lenses cut blue light. Blues go dark and warm colors blur together, but br
 - **Swipe to delete has no confirmation.** It only moves the entry to Recently Deleted, where it stays 30 days.
 - **Working name: Lamplight.** Easy to change: `project.yml` (`CFBundleDisplayName`) and the text in `App/Views`.
 - **Minimum iOS 17.**
+- **Photos in the text.** A photo you add goes into the text at the caret, on a line of its own, `![](photos/NAME.jpg)`, full width. That is plain Markdown, so other apps can read the file. The editor hides the line's text and draws the photo in its place. Tap a photo to open it large. Photos in older entries stay above the text, and a photo that isn't named in the text always shows above it, so none is hidden. Backspace on the line after a photo moves the caret up to it, and a second Backspace removes it. Typing, pasting or deleting next to a photo can never mix it with words. A photo taken out of the text is kept in the entry's `Removed` folder when the entry is finished, so deleting it can still be undone while writing. Sharing as text leaves the picture lines out. Markdown and PDF exports put the photos where they are in the text.
 - **Icons.** Everything you tap uses one light weight, set in one place (`Theme.iconWeight`), in three sizes (`PaperIcon`). The big decorative icons on empty and lock screens stay lighter. Close and remove buttons are a thin cross on a paper chip. Templates has one icon, `doc.text`, everywhere. The format bar uses the same weight and has taps about 44 points wide.
 - **Flat system bars.** The toolbar buttons stay flat, the way they were before iOS 26, so they sit on the paper without glass chips. This is `UIDesignRequiresCompatibility` in `project.yml`. Apple says the key will stop working in a later release. Delete the line to try the glass.
 
@@ -71,7 +72,7 @@ Amber lenses cut blue light. Blues go dark and warm colors blur together, but br
 - Day One import (planned, after inline photos and video). See the next section.
 - Mood, tags, weather.
 - Rich text beyond Markdown. No colors, fonts or alignment.
-- Photos and video placed inline in the text (planned, next). Photos sit above the text for now. Video isn't supported yet, and you said it has to be.
+- Video, placed in the text like photos (planned, next). Video isn't supported yet, and you said it has to be.
 - Audio and drawings (planned, after that).
 - Export. The files are the export. Sharing a single entry is planned.
 - iPad Stage Manager multiple windows. One window only, so two windows can't edit one entry.
@@ -106,4 +107,5 @@ Amber lenses cut blue light. Blues go dark and warm colors blur together, but br
 - **Free account:** the app must be reinstalled from Xcode every 7 days. Data is safe in iCloud Drive.
 - **First open on a second device** can take a while if there are many photos, because iCloud downloads each file. The app shows progress and retries.
 - **Photo zoom** works with pinch and double-tap. The photo can't be dragged until it is zoomed.
+- **Photos in the text** are drawn by the editor, which I could only type-check, not run. The line height, where the photo sits in it, and the caret around it are the parts to watch. VoiceOver may read out the hidden picture line. Not checked.
 - **Saving problems** (for example the folder is offline) show a message and keep your text in the app. Saving is tried again on your next change. There is no queue that survives quitting the app.
