@@ -3,6 +3,44 @@ import UIKit
 
 // MARK: - The text view
 
+/// Draws the thin rule that runs from a section's title to the edge of the page.
+final class RuleLayoutManager: NSLayoutManager {
+    override func drawBackground(forGlyphRange glyphsToShow: NSRange, at origin: CGPoint) {
+        super.drawBackground(forGlyphRange: glyphsToShow, at: origin)
+        guard let storage = textStorage, storage.length > 0 else { return }
+        let text = storage.string as NSString
+
+        enumerateLineFragments(forGlyphRange: glyphsToShow) { rect, usedRect, _, glyphRange, _ in
+            let characters = self.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
+            guard characters.length > 0, characters.location < storage.length,
+                  let color = storage.attribute(.sectionRule, at: characters.location, effectiveRange: nil) as? UIColor
+            else { return }
+
+            // One rule per section, on the last line of its title.
+            let paragraph = text.paragraphRange(for: NSRange(location: characters.location, length: 0))
+            var paragraphEnd = NSMaxRange(paragraph)
+            while paragraphEnd > paragraph.location, text.character(at: paragraphEnd - 1) == 0x0A { paragraphEnd -= 1 }
+            guard NSMaxRange(characters) >= paragraphEnd else { return }
+
+            let left = origin.x + usedRect.maxX + 12
+            let right = origin.x + rect.maxX
+            guard right - left > 12 else { return }
+
+            // Level with the middle of the lower-case letters in the title: the line's baseline, less half an x-height.
+            // The title is the largest text on the line, since its dashes are hidden at a tiny size.
+            var xHeight: CGFloat = 0
+            storage.enumerateAttribute(.font, in: characters) { value, _, _ in
+                if let font = value as? UIFont { xHeight = max(xHeight, font.xHeight) }
+            }
+            let baseline = rect.minY + self.location(forGlyphAt: glyphRange.location).y
+            let scale = max(UITraitCollection.current.displayScale, 1)
+            let y = ((origin.y + baseline - xHeight / 2) * scale).rounded() / scale
+            color.setFill()
+            UIRectFill(CGRect(x: left, y: y, width: right - left, height: 1 / scale))
+        }
+    }
+}
+
 /// A text view that knows a few keyboard shortcuts for formatting.
 final class MarkdownUITextView: UITextView {
     var onFormat: ((FormatCommand) -> Void)?
@@ -111,7 +149,16 @@ struct MarkdownEditor: UIViewRepresentable {
     }
 
     func makeUIView(context: Context) -> MarkdownUITextView {
-        let view = MarkdownUITextView(usingTextLayoutManager: false)
+        // Built with its own text layout, so the layout manager above can draw section rules.
+        let storage = NSTextStorage()
+        let layoutManager = RuleLayoutManager()
+        storage.addLayoutManager(layoutManager)
+        // Long entries are laid out as they are shown, not all at once, as in a text view's own layout.
+        layoutManager.allowsNonContiguousLayout = true
+        let container = NSTextContainer(size: CGSize(width: 0, height: CGFloat.greatestFiniteMagnitude))
+        container.widthTracksTextView = true
+        layoutManager.addTextContainer(container)
+        let view = MarkdownUITextView(frame: .zero, textContainer: container)
         context.coordinator.configure(view)
         controller?.coordinator = context.coordinator
         return view

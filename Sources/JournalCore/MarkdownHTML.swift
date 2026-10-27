@@ -64,6 +64,9 @@ enum MarkdownHTML {
             case .divider:
                 closeBlocks()
                 out.append("<hr>")
+            case .section:
+                closeBlocks()
+                out.append("<div class=\"section\"><span>\(escape(doc.string(line.content)))</span></div>")
             case .bullet:
                 openList("ul", "ul")
                 out.append("<li>\(inline(doc, line))</li>")

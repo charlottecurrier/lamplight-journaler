@@ -49,6 +49,9 @@ enum EntryExport {
         code, pre { font-family: Menlo, Courier, monospace; font-size: 10.5pt; }
         pre { background: #f4eee3; padding: 8pt; white-space: pre-wrap; }
         hr { border: 0; border-top: 0.5pt solid #c9b99e; margin: 14pt 0; }
+        div.section { display: flex; align-items: center; margin: 18pt 0 10pt 0; }
+        div.section span { font-size: 10.5pt; font-weight: bold; letter-spacing: 0.06em; color: #7a3510; margin-right: 10pt; }
+        div.section::after { content: ""; flex: 1; border-top: 0.5pt solid #c9b99e; }
         figure { margin: 12pt 0; text-align: center; }
         img { max-width: 100%; max-height: 330pt; }
         a { color: #7a3510; }

@@ -286,6 +286,7 @@ struct EntryEditorView: View {
                 Button { controller.apply(.quote) } label: { Label("Quote", systemImage: "text.quote") }
                 Button { controller.apply(.link) } label: { Label("Link", systemImage: "link") }
                 Button { controller.apply(.divider) } label: { Label("Divider", systemImage: "minus") }
+                Button { controller.apply(.section) } label: { Label("Section", systemImage: "minus.rectangle") }
             }
             Divider()
             if !model.templates.isEmpty {

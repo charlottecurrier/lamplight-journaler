@@ -41,6 +41,8 @@ enum MDLineKind: Equatable {
     case numbered(number: Int)
     case quote
     case divider
+    /// "--- Evening ---": a titled break, drawn as the title with a rule running to the edge.
+    case section
     /// A line of three backticks that opens or closes a code block.
     case fence
     /// A line inside a code block.
@@ -188,6 +190,14 @@ struct MarkdownDocument {
             }
         }
 
+        // Section: "--- Title ---". At least three dashes either side, with a space between them and the title.
+        if indent <= 3, u[body] == 0x2D, let title = sectionTitle(u, body, r.upperBound) {
+            var section = line(.section, marker: r.lowerBound..<title.lowerBound, hides: true, inline: false)
+            section.content = title
+            section.inlineMarkers = [title.upperBound..<r.upperBound]
+            return section
+        }
+
         // Divider: three or more of the same - * _ and nothing else.
         let first = u[body]
         if first == 0x2D || first == 0x2A || first == 0x5F {
@@ -229,6 +239,27 @@ struct MarkdownDocument {
         }
 
         return line(.paragraph)
+    }
+
+    /// The title of a line like "--- Evening ---", or nil if the line isn't one. Dashes and spaces around the title
+    /// are not part of it.
+    private static func sectionTitle(_ u: [UInt16], _ start: Int, _ end: Int) -> Range<Int>? {
+        var lead = 0
+        while start + lead < end && u[start + lead] == 0x2D { lead += 1 }
+        guard lead >= 3, start + lead < end, u[start + lead] == 0x20 else { return nil }
+
+        var last = end
+        while last > start + lead && (u[last - 1] == 0x20 || u[last - 1] == 0x09 || u[last - 1] == 0x0D) { last -= 1 }
+        var trail = 0
+        while last - trail > start + lead && u[last - trail - 1] == 0x2D { trail += 1 }
+        guard trail >= 3, last - trail > start + lead, u[last - trail - 1] == 0x20 else { return nil }
+
+        var titleStart = start + lead
+        var titleEnd = last - trail
+        while titleStart < titleEnd && u[titleStart] == 0x20 { titleStart += 1 }
+        while titleEnd > titleStart && u[titleEnd - 1] == 0x20 { titleEnd -= 1 }
+        guard titleStart < titleEnd else { return nil }
+        return titleStart..<titleEnd
     }
 
     // MARK: Inline scanning

@@ -10,6 +10,12 @@ enum TemplateText {
             if case .heading = $0.kind { return true }
             return false
         }) else {
+            // No headings: start under the first section, or at the end.
+            if let section = doc.lines.firstIndex(where: { $0.kind == .section }) {
+                let next = section + 1
+                if next < doc.lines.count, doc.lines[next].kind == .blank { return doc.lines[next].range.lowerBound }
+                return doc.lines[section].range.upperBound
+            }
             return doc.units.count
         }
         let next = heading + 1
@@ -47,12 +53,15 @@ enum TemplateText {
     static func removingEmptyHeadings(from body: String, template templateBody: String) -> String {
         let template = MarkdownDocument(templateBody)
         var known = Set<String>()
+        var knownSections = Set<String>()
         for line in template.lines {
             if case .heading(let level) = line.kind {
                 known.insert(headingKey(level, template.string(line.content)))
+            } else if line.kind == .section {
+                knownSections.insert(template.string(line.content).trimmingCharacters(in: .whitespacesAndNewlines))
             }
         }
-        guard !known.isEmpty else { return body }
+        guard !known.isEmpty || !knownSections.isEmpty else { return body }
 
         let doc = MarkdownDocument(body)
         func isBlank(_ line: MDLine) -> Bool {
@@ -70,6 +79,8 @@ enum TemplateText {
             var empty = true
             while end < doc.lines.count {
                 let next = doc.lines[end]
+                // A section starts something new, so it ends the question above it.
+                if next.kind == .section { break }
                 if case .heading(let nextLevel) = next.kind {
                     if nextLevel <= level { break }
                     if !isTemplateHeading(next) { empty = false; break }
@@ -80,6 +91,16 @@ enum TemplateText {
                 end += 1
             }
             if empty { removed.formUnion(index..<end) }
+        }
+
+        // A section from the template goes too when nothing is left under it, up to the next section.
+        for (index, line) in doc.lines.enumerated() where line.kind == .section {
+            let title = doc.string(line.content).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard knownSections.contains(title) else { continue }
+            var end = index + 1
+            while end < doc.lines.count, doc.lines[end].kind != .section { end += 1 }
+            let hasContent = ((index + 1)..<end).contains { !removed.contains($0) && !isBlank(doc.lines[$0]) }
+            if !hasContent { removed.formUnion(index..<end) }
         }
         guard !removed.isEmpty else { return body }
 

@@ -15,7 +15,7 @@ struct SlashContext {
 /// "/today" inserts the date.
 enum SlashCommand: String, CaseIterable {
     case h1, h2, h3, h4, h5, h6
-    case todo, list, num, quote, line, code
+    case todo, list, num, quote, line, section, code
     case time, date, today, tomorrow, yesterday, now
     case todayFull = "today-full"
     case tomorrowFull = "tomorrow-full"
@@ -35,6 +35,7 @@ enum SlashCommand: String, CaseIterable {
         case .num: return "Numbered list"
         case .quote: return "Quote"
         case .line: return "Divider"
+        case .section: return "Section"
         case .code: return "Code block"
         case .time: return "Time"
         case .date, .today: return "Today's date"
@@ -51,7 +52,7 @@ enum SlashCommand: String, CaseIterable {
     /// Commands that change the whole line only work at the start of a line.
     var isBlockCommand: Bool {
         switch self {
-        case .h1, .h2, .h3, .h4, .h5, .h6, .todo, .list, .num, .quote, .line, .code: return true
+        case .h1, .h2, .h3, .h4, .h5, .h6, .todo, .list, .num, .quote, .line, .section, .code: return true
         default: return false
         }
     }
@@ -69,7 +70,7 @@ enum SlashCommand: String, CaseIterable {
     /// The "/word" that ends at the caret, if there is one. It has to start the line or follow a space.
     static func typedToken(in doc: MarkdownDocument, caret: Int) -> (range: Range<Int>, name: String)? {
         let line = doc.lines[doc.lineIndex(containing: caret)]
-        if line.kind == .divider || line.kind == .fence || line.kind == .code { return nil }
+        if line.kind == .divider || line.kind == .section || line.kind == .fence || line.kind == .code { return nil }
         var start = caret
         while start > line.range.lowerBound, doc.units[start - 1] != 0x20 { start -= 1 }
         guard start < caret, doc.units[start] == 0x2F else { return nil }
@@ -121,6 +122,7 @@ enum SlashCommand: String, CaseIterable {
         case .num: return block("1. ")
         case .quote: return block("> ")
         case .line: return block("---\n")
+        case .section: return block("---  ---", caretOffset: 4)
         case .code: return block("```\n\n```", caretOffset: 4)
         case .time: return insert(format(context, offsetDays: 0, date: .omitted, time: .shortened))
         case .date, .today: return insert(format(context, offsetDays: 0, date: .numeric, time: .omitted))

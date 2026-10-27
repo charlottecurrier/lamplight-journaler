@@ -34,7 +34,7 @@ enum EntryText {
         let lines = body
             .split(whereSeparator: { $0.isNewline })
             .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
+            .filter { !$0.isEmpty && !isSection($0) }
         guard !lines.isEmpty else { return EntrySummary(title: "", preview: "") }
 
         func isHeading(_ line: String) -> Bool { line.hasPrefix("#") }
@@ -55,6 +55,13 @@ enum EntryText {
             preview = String(preview.prefix(maxPreview)).trimmingCharacters(in: .whitespaces) + "…"
         }
         return EntrySummary(title: clean(lines[titleIndex]), preview: preview)
+    }
+
+    /// A line like "--- Evening ---". It divides an entry, so it is no use as a title or preview.
+    static func isSection(_ line: String) -> Bool {
+        guard line.hasPrefix("---") else { return false }
+        let doc = MarkdownDocument(line)
+        return doc.lines.count == 1 && doc.lines[0].kind == .section
     }
 
     /// Removes heading marks, bullets and quote marks from the start of a line.

@@ -369,3 +369,179 @@ final class SlashCommandTests: XCTestCase {
         }
     }
 }
+
+final class SectionTests: XCTestCase {
+    private func lines(_ text: String) -> [MDLine] { MarkdownDocument(text).lines }
+
+    // MARK: Recognising a section
+
+    func testASectionLineHasATitleAndHidesItsDashes() {
+        let line = lines("--- Evening ---")[0]
+        XCTAssertEqual(line.kind, .section)
+        XCTAssertEqual(line.marker, 0..<4)
+        XCTAssertEqual(line.content, 4..<11)
+        XCTAssertEqual(line.inlineMarkers, [11..<15])
+        XCTAssertTrue(line.markerHidesWhenInactive)
+        XCTAssertTrue(line.inlines.isEmpty)
+    }
+
+    func testLongerRunsOfDashesWork() {
+        let doc = MarkdownDocument("------ Morning ------")
+        XCTAssertEqual(doc.lines[0].kind, .section)
+        XCTAssertEqual(doc.string(doc.lines[0].content), "Morning")
+    }
+
+    func testATitleWithSeveralWordsAndExtraSpaces() {
+        let doc = MarkdownDocument("---   What went well today   ---")
+        XCTAssertEqual(doc.lines[0].kind, .section)
+        XCTAssertEqual(doc.string(doc.lines[0].content), "What went well today")
+    }
+
+    func testNotASection() {
+        XCTAssertEqual(lines("---")[0].kind, .divider)
+        XCTAssertEqual(lines("--- Evening")[0].kind, .paragraph)
+        XCTAssertEqual(lines("-- Evening --")[0].kind, .paragraph)
+        XCTAssertEqual(lines("---Evening---")[0].kind, .paragraph)
+        XCTAssertEqual(lines("---  ---")[0].kind, .paragraph)
+        XCTAssertEqual(lines("--- ---")[0].kind, .paragraph)
+    }
+
+    func testMarkdownInATitleIsNotInterpreted() {
+        let line = lines("--- **Evening** ---")[0]
+        XCTAssertEqual(line.kind, .section)
+        XCTAssertTrue(line.inlines.isEmpty)
+    }
+
+    func testASectionInsideACodeBlockIsCode() {
+        XCTAssertEqual(lines("```\n--- Evening ---\n```")[1].kind, .code)
+    }
+
+    // MARK: The format command
+
+    private func apply(_ text: String, caret: Int) -> TextEdit? {
+        MarkdownEditing.apply(.section, to: text, selection: caret..<caret)
+    }
+
+    func testOnABlankLineItMakesAnEmptySectionWithTheCaretForTheTitle() {
+        let edit = apply("", caret: 0)
+        XCTAssertEqual(edit?.replacement, "---  ---")
+        XCTAssertEqual(edit?.selection, 4..<4)
+    }
+
+    func testOnTextItWrapsTheText() {
+        let edit = apply("Evening", caret: 3)
+        XCTAssertEqual(edit?.applied(to: "Evening"), "--- Evening ---")
+        XCTAssertEqual(edit?.selection, 11..<11)
+    }
+
+    func testOnAHeadingItKeepsTheTitleOnly() {
+        let edit = apply("## Evening", caret: 5)
+        XCTAssertEqual(edit?.applied(to: "## Evening"), "--- Evening ---")
+    }
+
+    func testOnASectionItGivesTheTextBack() {
+        let edit = apply("--- Evening ---", caret: 6)
+        XCTAssertEqual(edit?.applied(to: "--- Evening ---"), "Evening")
+    }
+
+    func testOnlyTheCaretsLineChanges() {
+        let text = "One\nTwo\nThree"
+        XCTAssertEqual(apply(text, caret: 5)?.applied(to: text), "One\n--- Two ---\nThree")
+    }
+
+    func testNotInCodeOrOnADivider() {
+        XCTAssertNil(apply("---", caret: 1))
+        XCTAssertNil(apply("```\ncode\n```", caret: 5))
+    }
+
+    func testOtherFormatsLeaveASectionAlone() {
+        let text = "--- Evening ---"
+        XCTAssertNil(MarkdownEditing.apply(.heading(2), to: text, selection: 3..<3))
+        XCTAssertNil(MarkdownEditing.apply(.bullet, to: text, selection: 3..<3))
+    }
+
+    // MARK: The slash command
+
+    func testSlashSectionAtTheStartOfALine() {
+        let doc = MarkdownDocument("/section")
+        let token = SlashCommand.typedToken(in: doc, caret: 8)
+        XCTAssertEqual(token?.name, "section")
+        let edit = SlashCommand.section.edit(in: doc, token: token!.range)
+        XCTAssertEqual(edit?.replacement, "---  ---")
+        XCTAssertEqual(edit?.selection, 4..<4)
+    }
+
+    func testSlashSectionIsOfferedWhileTyping() {
+        XCTAssertTrue(SlashCommand.suggestions(in: "/sec", caret: 4).contains(.section))
+        XCTAssertFalse(SlashCommand.suggestions(in: "word /sec", caret: 9).contains(.section))
+    }
+
+    // MARK: Elsewhere
+
+    func testListPreviewsSkipSections() {
+        let summary = EntryText.summarize(body: "--- Morning ---\n\nSlept well.\n\n--- Evening ---\n\nLong walk.", answersFirst: false)
+        XCTAssertEqual(summary.title, "Slept well.")
+        XCTAssertEqual(summary.preview, "Long walk.")
+    }
+
+    func testHtmlDrawsASectionAsATitleWithARule() {
+        XCTAssertEqual(MarkdownHTML.render("--- Evening & night ---"),
+                       "<div class=\"section\"><span>Evening &amp; night</span></div>")
+    }
+
+    func testEditorTextLeavesSectionsAlone() {
+        XCTAssertEqual(EditorText.fromMarkdown("--- Evening ---"), "--- Evening ---")
+        XCTAssertEqual(EditorText.toMarkdown("--- Evening ---"), "--- Evening ---")
+    }
+
+    // MARK: Template cleanup
+
+    private let template = "--- Morning ---\n\n## Slept?\n\n--- Evening ---\n\n## What went well?\n\n## What was hard?\n\n"
+
+    func testAnEmptySectionIsRemovedWithItsEmptyQuestions() {
+        let body = "--- Morning ---\n\n## Slept?\n\nWell.\n\n--- Evening ---\n\n## What went well?\n\n## What was hard?\n\n"
+        XCTAssertEqual(TemplateText.removingEmptyHeadings(from: body, template: template),
+                       "--- Morning ---\n\n## Slept?\n\nWell.\n")
+    }
+
+    func testASectionStaysWhenAnythingIsWrittenUnderIt() {
+        let body = "--- Morning ---\n\n## Slept?\n\n--- Evening ---\n\n## What went well?\n\nDinner.\n\n## What was hard?\n\n"
+        XCTAssertEqual(TemplateText.removingEmptyHeadings(from: body, template: template),
+                       "--- Evening ---\n\n## What went well?\n\nDinner.\n")
+    }
+
+    func testNothingWrittenRemovesEverything() {
+        XCTAssertEqual(TemplateText.removingEmptyHeadings(from: template, template: template), "")
+    }
+
+    func testASectionThePersonAddedIsNeverRemoved() {
+        let body = "--- Notes ---\n\n## Slept?\n\n"
+        XCTAssertEqual(TemplateText.removingEmptyHeadings(from: body, template: template), "--- Notes ---\n")
+    }
+
+    // MARK: From the review
+
+    func testAnIndentedSectionHidesItsIndentToo() {
+        let line = lines("  --- A ---")[0]
+        XCTAssertEqual(line.kind, .section)
+        XCTAssertEqual(line.marker, 0..<6)
+    }
+
+    func testStylingMarksDoNotGoIntoASectionTitle() {
+        let text = "--- Evening ---"
+        for command in [FormatCommand.bold, .italic, .strike, .highlight, .code, .link] {
+            XCTAssertNil(MarkdownEditing.apply(command, to: text, selection: 6..<6))
+        }
+    }
+
+    func testWindowsLineEndingsSurviveTurningALineIntoASection() {
+        XCTAssertEqual(apply("Evening\r", caret: 3)?.applied(to: "Evening\r"), "--- Evening ---\r")
+        XCTAssertEqual(apply("--- Evening ---\r", caret: 6)?.applied(to: "--- Evening ---\r"), "Evening\r")
+    }
+
+    func testTheCaretStartsUnderTheFirstSectionWhenThereAreNoHeadings() {
+        let text = "--- Morning ---\n\n--- Evening ---\n\n"
+        XCTAssertEqual(TemplateText.initialCaret(inEditorText: text), "--- Morning ---\n".utf16.count)
+        XCTAssertEqual(TemplateText.initialCaret(inEditorText: "--- Morning ---"), "--- Morning ---".utf16.count)
+    }
+}
