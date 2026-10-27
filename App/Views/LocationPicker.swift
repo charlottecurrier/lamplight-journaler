@@ -99,7 +99,7 @@ struct LocationPickerView: View {
 
     private func row(title: String, subtitle: String? = nil, systemImage: String, selected: Bool) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: systemImage)
+            PaperIcon(systemImage)
                 .foregroundStyle(Theme.accent)
                 .frame(width: 24)
             VStack(alignment: .leading, spacing: 2) {
@@ -114,7 +114,7 @@ struct LocationPickerView: View {
             }
             Spacer()
             if selected {
-                Image(systemName: "checkmark")
+                PaperIcon("checkmark")
                     .foregroundStyle(Theme.accent)
             }
         }
@@ -151,7 +151,7 @@ struct HomeEditorView: View {
 
             Section {
                 if place?.latitude != nil {
-                    Label("Location saved", systemImage: "checkmark.circle")
+                    Label("Location saved", systemImage: "checkmark")
                         .foregroundStyle(Theme.sage)
                 }
                 TextField("Search for an address", text: $query)

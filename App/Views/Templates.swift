@@ -38,9 +38,7 @@ struct TemplatesScreen: View {
                     Button {
                         onStart(template)
                     } label: {
-                        Label("Write", systemImage: "square.and.pencil")
-                            .labelStyle(.iconOnly)
-                            .font(.title3)
+                        PaperIcon("square.and.pencil", size: .large)
                     }
                     .buttonStyle(.borderless)
                     .tint(Theme.accent)
@@ -66,8 +64,9 @@ struct TemplatesScreen: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button(action: createTemplate) {
-                    Label("New Template", systemImage: "plus")
+                    PaperIcon("plus")
                 }
+                .accessibilityLabel("New Template")
             }
         }
         .overlay {
@@ -249,15 +248,17 @@ private struct TemplatePage: View {
                             }
                         }
                     } label: {
-                        Label("Journal", systemImage: "book.closed")
+                        PaperIcon("book.closed")
                     }
+                    .accessibilityLabel("Journal")
                 }
                 Button {
                     save()
                     onStart(current)
                 } label: {
-                    Label("Write with This Template", systemImage: "square.and.pencil")
+                    PaperIcon("square.and.pencil")
                 }
+                .accessibilityLabel("Write with This Template")
                 Menu {
                     Button(role: .destructive) {
                         confirmDelete = true
@@ -265,8 +266,9 @@ private struct TemplatePage: View {
                         Label("Delete Template", systemImage: "trash")
                     }
                 } label: {
-                    Label("More", systemImage: "ellipsis.circle")
+                    PaperIcon("ellipsis")
                 }
+                .accessibilityLabel("More")
             }
         }
         // Every change goes to the model as it is made, so leaving the page at any moment can't lose the last of it.

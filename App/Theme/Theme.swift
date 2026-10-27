@@ -40,6 +40,58 @@ enum Theme {
     static func serif(size: CGFloat, weight: Font.Weight = .regular) -> Font {
         .system(size: size, weight: weight, design: .serif)
     }
+
+    /// The stroke weight of every icon you tap. Light, so they sit with the thin serif type. The large decorative
+    /// icons on empty and lock screens are lighter still. To make the icons heavier or lighter, change it here.
+    static let iconWeight = Font.Weight.light
+}
+
+/// An icon for a button or bar. One weight, in one of three sizes, so no screen picks its own.
+struct PaperIcon: View {
+    enum Size {
+        /// Beside text, such as a chevron next to a month.
+        case small
+        /// Toolbar and bar buttons.
+        case regular
+        /// The phone's bottom bar.
+        case large
+
+        var points: CGFloat {
+            switch self {
+            case .small: return 14
+            case .regular: return 17
+            case .large: return 20
+            }
+        }
+    }
+
+    let name: String
+    let size: Size
+
+    init(_ name: String, size: Size = .regular) {
+        self.name = name
+        self.size = size
+    }
+
+    var body: some View {
+        Image(systemName: name)
+            .font(.system(size: size.points, weight: Theme.iconWeight))
+    }
+}
+
+/// A small round button face for closing or removing, drawn as a thin cross on a paper chip.
+/// Used where an icon sits on top of a photo, so it needs a backing to be seen.
+struct PaperCloseChip: View {
+    var diameter: CGFloat = 26
+
+    var body: some View {
+        Image(systemName: "xmark")
+            .font(.system(size: diameter * 0.42, weight: .regular))
+            .foregroundStyle(Theme.ink)
+            .frame(width: diameter, height: diameter)
+            .background(Circle().fill(Theme.surface.opacity(0.92)))
+            .overlay(Circle().strokeBorder(Theme.line, lineWidth: 0.5))
+    }
 }
 
 // MARK: - Paper

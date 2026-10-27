@@ -63,6 +63,8 @@ Amber lenses cut blue light. Blues go dark and warm colors blur together, but br
 - **Swipe to delete has no confirmation.** It only moves the entry to Recently Deleted, where it stays 30 days.
 - **Working name: Lamplight.** Easy to change: `project.yml` (`CFBundleDisplayName`) and the text in `App/Views`.
 - **Minimum iOS 17.**
+- **Icons.** Everything you tap uses one light weight, set in one place (`Theme.iconWeight`), in three sizes (`PaperIcon`). The big decorative icons on empty and lock screens stay lighter. Close and remove buttons are a thin cross on a paper chip. Templates has one icon, `doc.text`, everywhere. The format bar uses the same weight and has taps about 44 points wide.
+- **Flat system bars.** The toolbar buttons stay flat, the way they were before iOS 26, so they sit on the paper without glass chips. This is `UIDesignRequiresCompatibility` in `project.yml`. Apple says the key will stop working in a later release. Delete the line to try the glass.
 
 ## Not built
 

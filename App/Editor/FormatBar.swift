@@ -38,6 +38,7 @@ final class FormatBar: UIInputView {
 
         var dismissConfiguration = UIButton.Configuration.plain()
         dismissConfiguration.image = UIImage(systemName: "keyboard.chevron.compact.down")
+        dismissConfiguration.preferredSymbolConfigurationForImage = Self.symbolConfiguration
         dismissConfiguration.baseForegroundColor = Palette.inkSecondary.uiColor
         let dismiss = UIButton(configuration: dismissConfiguration, primaryAction: UIAction { [weak self] _ in
             self?.onDismissKeyboard()
@@ -96,11 +97,16 @@ final class FormatBar: UIInputView {
 
     // MARK: Buttons
 
+    /// The light weight the rest of the app's icons use, so the bar sits with the serif type.
+    private static let symbolConfiguration = UIImage.SymbolConfiguration(pointSize: 17, weight: .light)
+
     private func symbolButton(_ symbol: String, _ label: String, _ command: FormatCommand) -> UIButton {
         var configuration = UIButton.Configuration.plain()
         configuration.image = UIImage(systemName: symbol)
+        configuration.preferredSymbolConfigurationForImage = Self.symbolConfiguration
         configuration.baseForegroundColor = Palette.ink.uiColor
-        configuration.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10)
+        // About 44 points each way, so a finger can find them.
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 13, leading: 13, bottom: 13, trailing: 13)
         let button = UIButton(configuration: configuration, primaryAction: UIAction { [weak self] _ in
             self?.onCommand(command)
         })
@@ -111,8 +117,9 @@ final class FormatBar: UIInputView {
     private func headingButton() -> UIButton {
         var configuration = UIButton.Configuration.plain()
         configuration.image = UIImage(systemName: "textformat.size")
+        configuration.preferredSymbolConfigurationForImage = Self.symbolConfiguration
         configuration.baseForegroundColor = Palette.ink.uiColor
-        configuration.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10)
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 13, leading: 13, bottom: 13, trailing: 13)
         let button = UIButton(configuration: configuration)
         let levels: [(Int, String)] = [(1, "Heading 1"), (2, "Heading 2"), (3, "Heading 3"), (0, "Body Text")]
         button.menu = UIMenu(children: levels.map { level, title in
