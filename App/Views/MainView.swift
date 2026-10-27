@@ -16,21 +16,23 @@ struct SidebarView: View {
     @EnvironmentObject private var prefs: AppPrefs
 
     @Binding var selection: SidebarItem?
+    /// Called on every tap on a row, including the row that is already highlighted, which `selection` doesn't report.
+    var onChoose: (SidebarItem) -> Void
     var onSettings: () -> Void
 
     var body: some View {
         List(selection: $selection) {
             Section {
                 Label("Today", systemImage: "sun.horizon")
-                    .tag(SidebarItem.today)
+                    .sidebarRow(.today, onChoose: onChoose)
                 Label("All Entries", systemImage: "book.closed")
-                    .tag(SidebarItem.all)
+                    .sidebarRow(.all, onChoose: onChoose)
                 Label("On This Day", systemImage: "clock.arrow.circlepath")
-                    .tag(SidebarItem.onThisDay)
+                    .sidebarRow(.onThisDay, onChoose: onChoose)
                 Label("Favorites", systemImage: "bookmark")
-                    .tag(SidebarItem.favorites)
+                    .sidebarRow(.favorites, onChoose: onChoose)
                 Label("Calendar", systemImage: "calendar")
-                    .tag(SidebarItem.calendar)
+                    .sidebarRow(.calendar, onChoose: onChoose)
             }
 
             if model.journals.count > 1 {
@@ -40,7 +42,7 @@ struct SidebarView: View {
                             JournalDot(colorKey: journal.colorKey, size: 10)
                             Text(journal.name)
                         }
-                        .tag(SidebarItem.journal(journal.id))
+                        .sidebarRow(.journal(journal.id), onChoose: onChoose)
                     }
                 } header: {
                     Text("Journals")
@@ -51,7 +53,7 @@ struct SidebarView: View {
 
             Section {
                 Label("Templates", systemImage: "list.bullet.rectangle")
-                    .tag(SidebarItem.templates)
+                    .sidebarRow(.templates, onChoose: onChoose)
             }
         }
         .font(Theme.serif(.body))
@@ -70,6 +72,14 @@ struct SidebarView: View {
         .safeAreaInset(edge: .bottom) {
             SidebarStreak(summary: model.streak(calendar: prefs.dayCalendar))
         }
+    }
+}
+
+private extension View {
+    /// A row of the sidebar. The tap gesture runs beside the list's own selection.
+    func sidebarRow(_ item: SidebarItem, onChoose: @escaping (SidebarItem) -> Void) -> some View {
+        simultaneousGesture(TapGesture().onEnded { onChoose(item) })
+            .tag(item)
     }
 }
 
@@ -120,6 +130,8 @@ struct MainView: View {
     @State private var selectedTemplateID: UUID?
     @State private var showSettings = false
     @State private var columns = NavigationSplitViewVisibility.automatic
+    /// What the columns were before a new entry took the whole screen, so they go back the way they were.
+    @State private var columnsBeforeWriting = NavigationSplitViewVisibility.automatic
     /// On a phone, which screen is in front. It starts on the list, not on the list of sections.
     @State private var compactColumn = NavigationSplitViewColumn.content
     /// True while a new entry has the whole screen on an iPad, so the sidebar and list can come back after.
@@ -132,7 +144,7 @@ struct MainView: View {
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columns, preferredCompactColumn: $compactColumn) {
-            SidebarView(selection: sidebarSelection) { showSettings = true }
+            SidebarView(selection: sidebarSelection, onChoose: show) { showSettings = true }
                 .navigationSplitViewColumnWidth(min: 230, ideal: 270, max: 320)
         } content: {
             contentColumn
@@ -148,11 +160,11 @@ struct MainView: View {
             }
         }
         .animation(.spring(response: 0.45, dampingFraction: 0.9), value: model.toast)
-        // When the entry is finished, the sidebar and list come back.
+        // When the entry is finished, the columns come back the way they were.
         .onChange(of: model.editingEntryID) {
             if model.editingEntryID == nil, writingFullWidth {
                 writingFullWidth = false
-                withAnimation(.easeInOut(duration: 0.3)) { columns = .automatic }
+                withAnimation(.easeInOut(duration: 0.3)) { columns = columnsBeforeWriting }
             }
         }
         .sheet(isPresented: $showSettings) {
@@ -254,15 +266,14 @@ struct MainView: View {
         )
     }
 
-    /// Goes to a section and makes sure its list can be seen: on a phone the list comes to the front, and on an
-    /// iPad the sidebar and list return if a new entry had the whole screen.
+    /// Goes to a section and makes sure its list can be seen. On a phone the list comes to the front. On an iPad the
+    /// sidebar steps aside, so the list and the page have the room, and the list returns if a new entry had the
+    /// whole screen. Templates is the same: the sidebar closes and the list of templates is what's showing.
     private func show(_ item: SidebarItem) {
         sidebar = item
         compactColumn = .content
-        if columns == .detailOnly {
-            writingFullWidth = false
-            withAnimation(.easeInOut(duration: 0.3)) { columns = .automatic }
-        }
+        writingFullWidth = false
+        withAnimation(.easeInOut(duration: 0.3)) { columns = .doubleColumn }
     }
 
     private func newTemplate() {
@@ -306,6 +317,7 @@ struct MainView: View {
         // On an iPad a new entry gets the whole screen: just the page, with nothing else beside it.
         if sizeClass != .compact {
             writingFullWidth = true
+            if columns != .detailOnly { columnsBeforeWriting = columns }
             withAnimation(.easeInOut(duration: 0.3)) { columns = .detailOnly }
         }
     }
