@@ -53,6 +53,8 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         NSFaceIDUsageDescription: Lamplight uses Face ID to keep your journal private.
+        # Needed to ask for access to the Photos library, which linking a video to Photos requires.
+        NSPhotoLibraryUsageDescription: Lamplight reads your Photos library to find and play the videos you link in an entry.
         # Lets you see the "on this device only" journal in the Files app.
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
