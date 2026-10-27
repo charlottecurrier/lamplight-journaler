@@ -187,6 +187,64 @@ final class MediaLineTests: XCTestCase {
         XCTAssertEqual(result.text, "\(pic)\nline one\nline two\nNext")
     }
 
+    func testAPicturePastedIntoALineGoesOnALineOfItsOwn() {
+        // The text has no picture in it yet, so this is the paste bringing one in.
+        let result = type("Hello", caret: 5, pic)
+        XCTAssertEqual(result.text, "Hello\n\(pic)")
+        XCTAssertEqual(result.caret, 5 + 1 + pic.utf16.count)
+    }
+
+    func testAPicturePastedInTheMiddleOfAWordSplitsAroundIt() {
+        let result = type("Hello", caret: 2, pic)
+        XCTAssertEqual(result.text, "He\n\(pic)\nllo")
+    }
+
+    func testAPicturePastedOnAnEmptyLineIsLeftAlone() {
+        XCTAssertNil(MarkdownEditing.intercept(text: "", range: 0..<0, replacement: pic))
+        XCTAssertNil(MarkdownEditing.intercept(text: "A\n\nB", range: 2..<2, replacement: pic))
+    }
+
+    func testTypingAfterAPicturesTrailingSpaceStillStartsANewLine() {
+        let text = "\(pic) "
+        let result = type(text, caret: text.utf16.count, "a")
+        XCTAssertEqual(result.text, "\(pic) \na")
+    }
+
+    // MARK: Putting right what got through
+
+    func testSeparatedSplitsAPictureThatSharesALine() {
+        let text = "Hello\(pic) there"
+        let edit = MediaLine.separated(text, caret: text.utf16.count)
+        XCTAssertEqual(edit?.applied(to: text), "Hello\n\(pic) \nthere")
+        XCTAssertEqual(edit?.selection.lowerBound, text.utf16.count + 2)
+    }
+
+    func testSeparatedLeavesCleanTextAlone() {
+        XCTAssertNil(MediaLine.separated("Hello\n\(pic)\nThere", caret: 3))
+        XCTAssertNil(MediaLine.separated("  \(pic)  \nThere", caret: 3))
+        XCTAssertNil(MediaLine.separated("no pictures", caret: 3))
+    }
+
+    func testSeparatedLeavesPicturesInCodeAlone() {
+        XCTAssertNil(MediaLine.separated("```\nlook: \(pic)\n```", caret: 0))
+        XCTAssertNil(MediaLine.separated("see `\(pic)` here", caret: 0))
+    }
+
+    func testSeparatedFixesSeveralInOnePass() {
+        let text = "a\(pic)b\(pic)c"
+        let result = MediaLine.separated(text, caret: 0)?.applied(to: text)
+        XCTAssertEqual(result, "a\n\(pic)\nb\n\(pic)\nc")
+    }
+
+    // MARK: Pictures that aren't here
+
+    func testPicturesForPhotosThisEntryDoesNotHaveAreDropped() {
+        let text = "Before\n\(pic)\n![](photos/other.jpg)\nAfter"
+        XCTAssertEqual(MediaLine.removingUnknown(from: text, known: ["a.jpg"]), "Before\n\(pic)\nAfter")
+        XCTAssertEqual(MediaLine.removingUnknown(from: text, known: ["a.jpg", "other.jpg"]), text)
+        XCTAssertEqual(MediaLine.removingUnknown(from: "plain", known: []), "plain")
+    }
+
     // MARK: Deleting
 
     func testBackspaceOnTheLineBelowAPictureDoesNotJoinThem() {
@@ -268,8 +326,10 @@ final class MediaLineTests: XCTestCase {
             "\(pic)",
             "A\n\n\(pic)\n\n\(pic)\nZ\n",
             "![](photos/b.jpg)\n\u{2022} one\n\u{2022} two\n\(pic)",
+            "Hello world",
+            "",
         ]
-        let pieces = ["a", " ", "\n", "xy", "\n\n", "é", "😀", ""]
+        let pieces = ["a", " ", "\n", "xy", "\n\n", "é", "😀", "", "![](photos/a.jpg)", "x ![](photos/b.jpg) y", "![](photos/a.jpg)\n"]
         var seed: UInt64 = 12345
         func next(_ limit: Int) -> Int {
             seed = seed &* 6364136223846793005 &+ 1442695040888963407
@@ -293,11 +353,16 @@ final class MediaLineTests: XCTestCase {
                 let token = MediaLine.markdown(fileName: name)
                 var search = result.startIndex..<result.endIndex
                 while let found = result.range(of: token, range: search) {
-                    if found.lowerBound > result.startIndex {
-                        XCTAssertEqual(result[result.index(before: found.lowerBound)], "\n", "before \(name): \(text.debugDescription) -> \(result.debugDescription) via \(edit)")
+                    // Spaces beside a picture on its line are fine. Anything else is not.
+                    var before = found.lowerBound
+                    while before > result.startIndex, result[result.index(before: before)] == " " { before = result.index(before: before) }
+                    if before > result.startIndex {
+                        XCTAssertEqual(result[result.index(before: before)], "\n", "before \(name): \(text.debugDescription) -> \(result.debugDescription) via \(edit)")
                     }
-                    if found.upperBound < result.endIndex {
-                        XCTAssertEqual(result[found.upperBound], "\n", "after \(name): \(text.debugDescription) -> \(result.debugDescription) via \(edit)")
+                    var after = found.upperBound
+                    while after < result.endIndex, result[after] == " " { after = result.index(after: after) }
+                    if after < result.endIndex {
+                        XCTAssertEqual(result[after], "\n", "after \(name): \(text.debugDescription) -> \(result.debugDescription) via \(edit)")
                     }
                     search = found.upperBound..<result.endIndex
                 }

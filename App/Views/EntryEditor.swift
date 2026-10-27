@@ -187,13 +187,18 @@ struct EntryEditorView: View {
     private func removeDeletedPhotos() {
         let placed = Set(draft.placedFileNames)
         for photo in draft.photos where placedThisVisit.contains(photo.fileName) && !placed.contains(photo.fileName) {
+            // If the text still names the file anywhere, such as in a line that didn't read as a picture, the photo
+            // is still wanted. Only a photo nothing mentions is removed.
+            if draft.body.contains("\(MediaLine.photosFolder)/\(photo.fileName)") { continue }
             draft.photos.removeAll { $0.id == photo.id }
             model.removePhotoFile(photo, from: draft.id)
         }
     }
 
     private func openPhoto(_ photo: PhotoRef) {
-        let photos = draft.orderedPhotos
+        // Photos taken out of the text this visit are waiting to be removed, so swiping doesn't go to them.
+        let placed = Set(draft.placedFileNames)
+        let photos = draft.orderedPhotos.filter { placed.contains($0.fileName) || !placedThisVisit.contains($0.fileName) }
         guard let index = photos.firstIndex(where: { $0.id == photo.id }) else { return }
         controller.dismissKeyboard()
         viewer = PhotoViewerItem(entryID: draft.id, photos: photos, index: index)

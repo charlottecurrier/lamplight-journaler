@@ -26,7 +26,12 @@ final class RuleLayoutManager: NSLayoutManager {
             else { return }
             let active = (storage.attribute(.mediaActive, at: characters.location, effectiveRange: nil) as? Bool) ?? false
 
-            let box = CGRect(x: origin.x + rect.minX, y: origin.y + rect.minY, width: rect.width, height: rect.height)
+            // The line is the photo and its padding.
+            let box = CGRect(
+                x: origin.x + rect.minX, y: origin.y + rect.minY + MediaLayout.padding,
+                width: rect.width, height: rect.height - 2 * MediaLayout.padding
+            )
+            guard box.height > 1 else { return }
             var frame = box
             let radius: CGFloat = 12
             if let image = self.mediaImage?(file), image.size.width > 0, image.size.height > 0 {
@@ -324,7 +329,9 @@ struct MarkdownEditor: UIViewRepresentable {
             }
             if let layout = view.layoutManager as? RuleLayoutManager {
                 layout.mediaImage = { [weak self] file in
-                    MainActor.assumeIsolated { self?.image(forFile: file) }
+                    // Text is drawn on the main thread. If it ever isn't, draw the quiet block rather than trap.
+                    guard Thread.isMainThread else { return nil }
+                    return MainActor.assumeIsolated { self?.image(forFile: file) }
                 }
             }
 
@@ -457,7 +464,7 @@ struct MarkdownEditor: UIViewRepresentable {
 
         /// The page's width changed, such as by turning the iPad. Photos are drawn as wide as the page.
         func noteWidth(_ width: CGFloat, restyleNow: Bool) {
-            guard parent.media != nil, width > 1, abs(width - mediaWidth) > 0.5 else { return }
+            guard parent.media != nil, width.isFinite, width > 1, abs(width - mediaWidth) > 0.5 else { return }
             mediaWidth = width
             if restyleNow {
                 restyle(force: true)
@@ -556,6 +563,12 @@ struct MarkdownEditor: UIViewRepresentable {
         func restyle(force: Bool = false) {
             guard let view = textView, view.markedTextRange == nil else { return }
             let text = view.text ?? ""
+            // A photo makes its line much taller than a line of text. Laying out only what is on screen guesses at
+            // those heights, so scrolling and typing below photos would jump. Text with photos is laid out whole.
+            let withPhotos = MediaLine.mayContain(text)
+            if view.layoutManager.allowsNonContiguousLayout == withPhotos {
+                view.layoutManager.allowsNonContiguousLayout = !withPhotos
+            }
             let document = analysis(for: text)
             let editing = parent.isEditable && view.isFirstResponder
             let selection = view.selectedRange
@@ -593,7 +606,9 @@ struct MarkdownEditor: UIViewRepresentable {
         }
 
         /// A paste lands in the middle of a line unless it starts one. Only lines after the first can be list items then.
-        private func editorForm(ofPasted text: String, at location: Int, in current: String) -> String {
+        private func editorForm(ofPasted original: String, at location: Int, in current: String) -> String {
+            // A photo copied from another entry has no file here, so its line would only be an empty block.
+            let text = parent.media == nil ? original : MediaLine.removingUnknown(from: original, known: Set(photosByFile.keys))
             let atLineStart = location == 0 || (current as NSString).character(at: location - 1) == 0x0A
             if atLineStart { return EditorText.fromMarkdown(text) }
             let scalars = text.unicodeScalars
@@ -623,6 +638,13 @@ struct MarkdownEditor: UIViewRepresentable {
 
         /// The text changed: save it, restyle it, and update the bar.
         private func changed(_ view: UITextView) {
+            // Anything that got past the editing rules, such as text typed through an input method, which the text
+            // view makes without asking, is put right here so a photo never shares its line with words.
+            if view.markedTextRange == nil, parent.media != nil,
+               let fix = MediaLine.separated(view.text, caret: view.selectedRange.location) {
+                apply(fix)
+                return
+            }
             let markdown = EditorText.toMarkdown(view.text)
             syncedText = markdown
             if markdown != parent.text {
@@ -643,7 +665,7 @@ struct MarkdownEditor: UIViewRepresentable {
             isApplyingEdit = true
             let range = NSRange(location: edit.range.lowerBound, length: edit.range.count)
             // An edit that changes nothing, such as a Backspace that is refused, only moves the caret.
-            if !(range.length == 0 && edit.replacement.isEmpty) {
+            if edit.applied(to: view.text) != view.text {
                 if let start = view.position(from: view.beginningOfDocument, offset: range.location),
                    let end = view.position(from: start, offset: range.length),
                    let textRange = view.textRange(from: start, to: end) {

@@ -4,7 +4,8 @@ import Foundation
 /// folder, so the same path works from the entry file in any Markdown app.
 ///
 /// The editor draws the picture where that line is and hides the line itself. The rule that keeps this safe is
-/// that a picture line is never mixed with other text, and `repaired` holds the editor to it.
+/// that a picture line is never mixed with other text. `repaired` holds every edit to it before it is made, and
+/// `separated` puts right anything that got through, such as text typed through an input method.
 enum MediaLine {
     static let photosFolder = "photos"
 
@@ -36,6 +37,20 @@ enum MediaLine {
         var result = kept.joined(separator: "\n")
         while result.contains("\n\n\n") { result = result.replacingOccurrences(of: "\n\n\n", with: "\n\n") }
         return result.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// The text without picture lines for photos this entry doesn't have, such as ones copied from another entry.
+    /// Their files aren't here, so the lines would only show as empty blocks.
+    static func removingUnknown(from text: String, known: Set<String>) -> String {
+        guard mayContain(text) else { return text }
+        let doc = MarkdownDocument(text)
+        let unknown = doc.lines.contains { $0.kind == .media && !known.contains(doc.string($0.content)) }
+        guard unknown else { return text }
+        var kept: [String] = []
+        for line in doc.lines where !(line.kind == .media && !known.contains(doc.string(line.content))) {
+            kept.append(doc.string(line.range))
+        }
+        return kept.joined(separator: "\n")
     }
 
     // MARK: Inserting
@@ -73,21 +88,89 @@ enum MediaLine {
         return edit(at..<at, "\n" + pictures + "\n", caretAt: length + 2)
     }
 
+    // MARK: Finding pictures anywhere in a line
+
+    /// Every `![](photos/NAME)` in the text, wherever it sits, as UTF-16 ranges.
+    private static func tokens(in u: [UInt16]) -> [Range<Int>] {
+        let prefix = Array("\(photosFolder)/".utf16)
+        var found: [Range<Int>] = []
+        var i = 0
+        while i + 1 < u.count {
+            guard u[i] == 0x21, u[i + 1] == 0x5B else {
+                i += 1
+                continue
+            }
+            var k = i + 2
+            while k < u.count, u[k] != 0x5D, u[k] != 0x5B, u[k] != 0x0A { k += 1 }
+            guard k + 1 < u.count, u[k] == 0x5D, u[k + 1] == 0x28 else {
+                i += 2
+                continue
+            }
+            let nameStart = k + 2 + prefix.count
+            guard nameStart <= u.count, Array(u[(k + 2)..<nameStart]) == prefix else {
+                i += 2
+                continue
+            }
+            var m = nameStart
+            var valid = true
+            while m < u.count, u[m] != 0x29 {
+                switch u[m] {
+                case 0x20, 0x2F, 0x28, 0x5B, 0x5D, 0x3C, 0x3E, 0x0A, 0x0D, 0x09: valid = false
+                default: break
+                }
+                if !valid { break }
+                m += 1
+            }
+            if valid, m < u.count, m > nameStart {
+                found.append(i..<(m + 1))
+                i = m + 1
+            } else {
+                i += 2
+            }
+        }
+        return found
+    }
+
+    /// Where a line break is needed so the picture has its line to itself: before it, and after it. Each is the
+    /// span of places it could go, from just beside the picture to past its own spaces. Spaces next to the picture
+    /// on its line don't count as text.
+    private static func breaks(
+        around token: Range<Int>, in u: [UInt16]
+    ) -> (before: ClosedRange<Int>?, after: ClosedRange<Int>?) {
+        // A picture written inside `code` is code.
+        if token.lowerBound > 0, u[token.lowerBound - 1] == 0x60, token.upperBound < u.count, u[token.upperBound] == 0x60 {
+            return (nil, nil)
+        }
+        var left = token.lowerBound
+        while left > 0, u[left - 1] == 0x20 { left -= 1 }
+        let aloneOnTheLeft = left == 0 || u[left - 1] == 0x0A
+
+        var right = token.upperBound
+        while right < u.count, u[right] == 0x20 || u[right] == 0x09 { right += 1 }
+        let aloneOnTheRight = right == u.count || u[right] == 0x0A
+            || (u[right] == 0x0D && (right + 1 == u.count || u[right + 1] == 0x0A))
+
+        return (
+            aloneOnTheLeft ? nil : left...token.lowerBound,
+            aloneOnTheRight ? nil : token.upperBound...right
+        )
+    }
+
     // MARK: Keeping pictures apart from text
 
     /// Takes the edit the text view is about to make and returns the edit to make instead, so a picture line stays on
     /// a line of its own:
-    /// - Typing next to a picture starts a new line for the words.
+    /// - Typing or pasting next to a picture starts a new line for the words. A picture pasted into a line goes on
+    ///   a line of its own.
     /// - Deleting a line break never joins words onto a picture, or a picture onto words.
     /// - Deleting one character of a picture line removes the whole picture, and a line break with it.
     /// - A change that starts or ends inside a picture line takes the whole line. A caret inside one moves to its end.
     ///
-    /// Without picture lines, or when nothing needs fixing, it returns the edit it was given.
+    /// Without pictures, or when nothing needs fixing, it returns the edit it was given.
     static func repaired(_ edit: TextEdit, in text: String) -> TextEdit {
-        guard mayContain(text) else { return edit }
+        guard mayContain(text) || mayContain(edit.replacement) else { return edit }
         let doc = MarkdownDocument(text)
         let pictures = doc.lines.filter { $0.kind == .media }.map(\.range)
-        guard !pictures.isEmpty else { return edit }
         let units = doc.units
 
         var range = edit.range
@@ -117,29 +200,30 @@ enum MediaLine {
             range = min(range.lowerBound, picture.lowerBound)..<max(range.upperBound, picture.upperBound)
         }
 
-        // Where, in the new text, a line break is needed so that no picture shares its line.
+        // Where, in the new text, a line break is needed. Only pictures at the edit are looked at: the ones it
+        // leaves beside other text, and any it brings in.
         var result = Array(units)
         result.replaceSubrange(range, with: Array(replacement.utf16))
-        let delta = replacementLength - range.count
-        var breaks = Set<Int>()
-        for picture in pictures {
-            let replaced = !picture.isEmpty && picture.lowerBound >= range.lowerBound && picture.upperBound <= range.upperBound
-            if replaced { continue }
-            let before = picture.upperBound <= range.lowerBound
-            let after = picture.lowerBound >= range.upperBound
-            guard before || after else { continue }
-            let start = before ? picture.lowerBound : picture.lowerBound + delta
-            let end = start + picture.count
-            if start > 0, result[start - 1] != 0x0A { breaks.insert(start) }
-            if end < result.count, result[end] != 0x0A { breaks.insert(end) }
+        let low = range.lowerBound
+        let high = range.lowerBound + replacementLength
+        var needed = Set<Int>()
+        for token in tokens(in: result) {
+            let around = breaks(around: token, in: result)
+            func inside(_ position: Int) -> Bool { position >= low && position <= high }
+            if let before = around.before, let place = [before.lowerBound, before.upperBound].first(where: inside) {
+                needed.insert(place)
+            }
+            if let after = around.after, let place = [after.upperBound, after.lowerBound].first(where: inside) {
+                needed.insert(place)
+            }
         }
 
-        if range == edit.range && breaks.isEmpty { return edit }
+        if range == edit.range && needed.isEmpty { return edit }
 
         // The breaks lie in or beside the replaced text, so they can be folded into the replacement.
         var fixed = Array(replacement.utf16)
-        for position in breaks.sorted(by: >) {
-            fixed.insert(0x0A, at: min(max(position - range.lowerBound, 0), fixed.count))
+        for position in needed.sorted(by: >) {
+            fixed.insert(0x0A, at: min(max(position - low, 0), fixed.count))
         }
 
         // The selection follows the text it was on: past the expanded range, then past each break before it.
@@ -148,7 +232,7 @@ enum MediaLine {
         let upperShift = range.count - edit.range.count
         func follow(_ offset: Int) -> Int {
             var moved = offset <= replacedEnd ? offset + lowerShift : offset - upperShift
-            moved += breaks.filter { $0 < moved }.count
+            moved += needed.filter { $0 < moved }.count
             return max(0, moved)
         }
         let selection = follow(edit.selection.lowerBound)..<max(follow(edit.selection.lowerBound), follow(edit.selection.upperBound))
@@ -157,11 +241,35 @@ enum MediaLine {
 
     /// The natural edit for a keystroke or paste, repaired. Nil when the text view can make it as it is.
     static func guarded(text: String, range: Range<Int>, replacement: String) -> TextEdit? {
-        guard mayContain(text) else { return nil }
+        guard mayContain(text) || mayContain(replacement) else { return nil }
         let caret = range.lowerBound + replacement.utf16.count
         let natural = TextEdit(range: range, replacement: replacement, selection: caret..<caret)
         let fixed = repaired(natural, in: text)
         return fixed == natural ? nil : fixed
+    }
+
+    /// The edit that puts right any picture that shares its line with text, wherever it is. This is for what got
+    /// past `repaired`, such as text typed through an input method, which the text view makes without asking.
+    /// Nil when every picture has its own line. `caret` is where the caret is now.
+    static func separated(_ text: String, caret: Int) -> TextEdit? {
+        guard mayContain(text) else { return nil }
+        let doc = MarkdownDocument(text)
+        let units = doc.units
+        var needed = Set<Int>()
+        for token in tokens(in: units) {
+            // A picture in a code block is code.
+            let kind = doc.lines[doc.lineIndex(containing: token.lowerBound)].kind
+            if kind == .code || kind == .fence { continue }
+            let around = breaks(around: token, in: units)
+            if let before = around.before { needed.insert(before.lowerBound) }
+            if let after = around.after { needed.insert(after.upperBound) }
+        }
+        guard let low = needed.min(), let high = needed.max() else { return nil }
+
+        var piece = Array(units[low..<high])
+        for position in needed.sorted(by: >) { piece.insert(0x0A, at: position - low) }
+        let moved = caret + needed.filter { $0 < caret }.count
+        return TextEdit(range: low..<high, replacement: String(decoding: piece, as: UTF16.self), selection: moved..<moved)
     }
 }
 

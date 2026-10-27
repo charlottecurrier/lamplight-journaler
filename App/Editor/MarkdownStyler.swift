@@ -11,13 +11,24 @@ extension NSAttributedString.Key {
 
 /// How tall photos placed in the text are drawn: the full width of the page, kept to a sensible height.
 struct MediaLayout: Equatable {
+    /// Space above and below a photo. It is part of the line's height, so the line is exactly as tall as it is drawn.
+    static let padding: CGFloat = 12
+
     var width: CGFloat
-    /// Width over height, by file name.
+    /// Width over height, by file name. A file that isn't here is not a photo this entry has.
     var aspect: [String: CGFloat]
 
+    func knows(_ file: String) -> Bool { aspect[file] != nil }
+
+    /// The photo itself.
     func height(forFile file: String) -> CGFloat {
         let ratio = min(max(aspect[file] ?? 1.5, 0.4), 4)
         return max(ceil(min(width / ratio, width * 1.2)), 80)
+    }
+
+    /// The whole line: the photo with its padding.
+    func lineHeight(forFile file: String) -> CGFloat {
+        height(forFile: file) + 2 * Self.padding
     }
 }
 
@@ -197,17 +208,16 @@ enum MarkdownStyler {
             ], range: whole)
 
         case .media:
-            // Without a place to draw it, the line stays as the plain text it is in the file.
-            guard let media else { break }
-            // The line's own text is hidden. It is given the height of the photo, and the layout manager draws the
-            // photo in that space. The line spacing is left out so the line is exactly the photo's height.
+            // Without a place to draw it, or without the photo it names, the line stays as the plain text it is in
+            // the file. That way a line for a photo that isn't here is never an invisible block.
             let file = document.string(line.content)
-            let height = media.height(forFile: file)
+            guard let media, media.knows(file) else { break }
+            // The line's own text is hidden. It is given the height of the photo and its padding, and the layout
+            // manager draws the photo in that space. No line or paragraph spacing, so the line is exactly that tall.
+            let height = media.lineHeight(forFile: file)
             let style = NSMutableParagraphStyle()
             style.minimumLineHeight = height
             style.maximumLineHeight = height
-            style.paragraphSpacingBefore = 12
-            style.paragraphSpacing = 12
             storage.addAttributes([
                 .font: hiddenFont,
                 .foregroundColor: UIColor.clear,
