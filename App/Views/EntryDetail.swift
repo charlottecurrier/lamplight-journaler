@@ -237,18 +237,17 @@ struct EntryDetailView: View {
                 Button {
                     model.toggleFavorite(entry.id)
                 } label: {
-                    Label(
-                        entry.isFavorite ? "Remove Favorite" : "Favorite",
-                        systemImage: entry.isFavorite ? "bookmark.fill" : "bookmark"
-                    )
+                    PaperIcon(entry.isFavorite ? "bookmark.fill" : "bookmark")
                 }
+                .accessibilityLabel(entry.isFavorite ? "Remove Favorite" : "Favorite")
 
                 Button {
                     tappedCaret = nil
                     model.editingEntryID = entry.id
                 } label: {
-                    Label("Edit", systemImage: "pencil")
+                    PaperIcon("pencil")
                 }
+                .accessibilityLabel("Edit")
                 .keyboardShortcut("e", modifiers: .command)
 
                 Menu {
@@ -285,8 +284,9 @@ struct EntryDetailView: View {
                         Label("Delete Entry", systemImage: "trash")
                     }
                 } label: {
-                    Label("More", systemImage: "ellipsis.circle")
+                    PaperIcon("ellipsis")
                 }
+                .accessibilityLabel("More")
             }
         }
         .confirmationDialog("Delete this entry?", isPresented: $confirmDelete, titleVisibility: .visible) {

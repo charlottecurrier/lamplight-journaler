@@ -57,6 +57,9 @@ targets:
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
         ITSAppUsesNonExemptEncryption: false
+        # Keeps the system's bars and buttons flat, the way they were before iOS 26, so they sit on the paper
+        # without glass. Apple says this key will stop working in a later release. Delete the line to try the glass.
+        UIDesignRequiresCompatibility: true
 
   LamplightTests:
     type: bundle.unit-test
