@@ -93,6 +93,11 @@ final class AppModel {
     @ObservationIgnored private var refreshRequested = false
     /// Counts every write. A folder read that started before a write finished is out of date and is thrown away.
     @ObservationIgnored private var writeGeneration = 0
+    /// Template edits taken in but not yet written to the folder.
+    @ObservationIgnored private var pendingTemplates: [UUID: EntryTemplate] = [:]
+    @ObservationIgnored private var templateFlushTask: Task<Void, Never>?
+    /// Templates deleted in this session.
+    @ObservationIgnored private var deletedTemplateIDs: Set<UUID> = []
 
     init() {
         thumbnails.totalCostLimit = 160 * 1024 * 1024
@@ -178,6 +183,8 @@ final class AppModel {
     private func apply(_ snapshot: LoadSnapshot) {
         journals = snapshot.journals.isEmpty ? [Journal.makeDefault()] : snapshot.journals
         templates = snapshot.templates
+        // Edits not written yet are newer than the folder.
+        for template in pendingTemplates.values { putTemplate(template) }
         settings = snapshot.settings
         persistedIDs = Set(snapshot.entries.map(\.id))
 
@@ -229,6 +236,7 @@ final class AppModel {
             guard let library else { return }
             attempts += 1
 
+            flushPendingWrites()
             var waited = 0
             while writesInFlight > 0 && waited < 30 {
                 try? await Task.sleep(nanoseconds: 100_000_000)
@@ -589,22 +597,52 @@ final class AppModel {
         return counts
     }
 
+    /// Keeps a template. The template page hands over the latest text as it is typed, so this takes it in memory at
+    /// once and writes the file a moment after typing stops. Nothing depends on the page still being on screen.
     func save(template: EntryTemplate) {
-        guard let library else { return }
+        guard library != nil, !deletedTemplateIDs.contains(template.id) else { return }
         var edited = template
         edited.modifiedAt = Date()
         let saved = edited
-        if let index = templates.firstIndex(where: { $0.id == saved.id }) {
-            templates[index] = saved
+        putTemplate(saved)
+        pendingTemplates[saved.id] = saved
+        // A folder read that began before this edit is out of date.
+        writeGeneration += 1
+        templateFlushTask?.cancel()
+        templateFlushTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            guard !Task.isCancelled else { return }
+            self?.flushPendingWrites()
+        }
+    }
+
+    private func putTemplate(_ template: EntryTemplate) {
+        if let index = templates.firstIndex(where: { $0.id == template.id }) {
+            templates[index] = template
         } else {
-            templates.append(saved)
+            templates.append(template)
         }
         templates.sort { ($0.sortOrder, $0.createdAt) < ($1.sortOrder, $1.createdAt) }
-        enqueueWrite { try library.save(saved) }
+    }
+
+    /// Writes the edits that are still waiting. Runs when typing stops, before the folder is read, and when the app
+    /// is no longer in front.
+    func flushPendingWrites() {
+        templateFlushTask?.cancel()
+        templateFlushTask = nil
+        guard let library, !pendingTemplates.isEmpty else { return }
+        let waiting = Array(pendingTemplates.values)
+        pendingTemplates = [:]
+        for template in waiting {
+            enqueueWrite { try library.save(template) }
+        }
     }
 
     func deleteTemplate(_ id: UUID) {
         guard let library else { return }
+        // A save from the page that was just closed must not bring it back.
+        deletedTemplateIDs.insert(id)
+        pendingTemplates[id] = nil
         templates.removeAll { $0.id == id }
         enqueueWrite { try library.deleteTemplate(id: id) }
     }

@@ -202,9 +202,10 @@ private struct TemplatePage: View {
         return updated
     }
 
+    /// Hands the page's latest text to the model. The model keeps it at once and writes the file shortly after typing
+    /// stops, and it ignores a template that was just deleted, so this is safe to call as often as needed.
     private func save() {
-        // A template deleted a moment ago must not come back from a late save.
-        guard model.template(template.id) != nil, snapshot != saved else { return }
+        guard snapshot != saved else { return }
         saved = snapshot
         model.save(template: current)
     }
@@ -268,12 +269,8 @@ private struct TemplatePage: View {
                 }
             }
         }
-        // Wait for a pause in typing before saving.
-        .task(id: snapshot) {
-            try? await Task.sleep(nanoseconds: 600_000_000)
-            guard !Task.isCancelled else { return }
-            save()
-        }
+        // Every change goes to the model as it is made, so leaving the page at any moment can't lose the last of it.
+        .onChange(of: snapshot) { save() }
         .onDisappear { save() }
         .onChange(of: scenePhase) {
             if scenePhase != .active { save() }
