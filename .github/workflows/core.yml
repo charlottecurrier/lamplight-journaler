@@ -1,0 +1,47 @@
+# Everything that doesn't need Xcode: the Core tests, the model and storage type-check, the palette
+# check and the Python tools. Runs on Linux, which is cheap. The app itself is built by app.yml.
+name: Core
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: core-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    name: Tests and checks
+    runs-on: ubuntu-24.04
+    container: swift:6.1-noble
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Python and its libraries
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends python3 python3-numpy python3-pil
+
+      # Writing a sample journal with the Python tool and loading it with the Swift reader proves they agree.
+      - name: Make a sample journal
+        run: python3 tools/make_sample_journal.py "$RUNNER_TEMP/sample"
+
+      - name: Core tests
+        env:
+          LAMPLIGHT_SAMPLE_DIR: ${{ runner.temp }}/sample
+        run: swift test
+
+      - name: Type-check the model and storage code
+        run: bash tools/typecheck_support.sh
+
+      - name: Palette contrast
+        run: python3 tools/check_palette.py
+
+      - name: Python tools parse
+        run: python3 -c 'import ast, sys; [ast.parse(open(f).read(), f) for f in sys.argv[1:]]' tools/*.py

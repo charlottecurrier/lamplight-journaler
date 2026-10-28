@@ -30,6 +30,13 @@ On Linux, a Swift toolchain can be downloaded from `download.swift.org` (Ubuntu 
 - Verified in CI-less environments: everything in `Sources/JournalCore` (274 tests, including the Markdown engine, every editing rule and the picture-line rules), the model and storage code in `App/Support` (type-checked against stand-ins by `tools/typecheck_support.sh`), the Python tools, the project structure. `ImageTools`, `PlaceSearcher`, `AppPrefs` and `Theme` are read-checked only.
 - **Not compilable on Linux:** all SwiftUI/UIKit code in `App/`. Review it by reading. Check every call against the declarations in Core and `AppModel` before assuming it compiles.
 
+## CI
+
+GitHub Actions runs two workflows on pull requests. After a push, look at the PR's checks before saying the work is done.
+
+- `.github/workflows/core.yml` (Linux, every PR and every push to `main`): `swift test` with the sample journal, `tools/typecheck_support.sh`, `tools/check_palette.py`, and a syntax check of the Python tools.
+- `.github/workflows/app.yml` (macOS, only PRs that change `App/`, `Sources/`, `Tests/`, `project.yml`, the Xcode project or `Package.swift`): builds the app and runs the tests in the iPad simulator. This is the only place the SwiftUI and UIKit code in `App/` is compiled outside Xcode, so it can find errors the Linux harness can't. The repo is private, so macOS minutes count ten times. Don't add triggers that run it on every push.
+
 ## Rules that matter
 
 - **Never lose the person's writing.** Entries autosave, deletes go to Recently Deleted, removed photos are kept, switching folders copies and never overwrites, conflicting edits keep both versions. Don't add a code path that discards text.
