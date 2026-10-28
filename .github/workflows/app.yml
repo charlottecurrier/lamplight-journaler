@@ -1,0 +1,61 @@
+# Builds the app and runs the tests in the iPad simulator. This is the only place the SwiftUI and UIKit code
+# in App/ gets compiled outside Xcode. macOS runners on a private repository use minutes at ten times the
+# Linux rate, so this only runs on pull requests that change code, and a newer push cancels the older run.
+# Run it by hand from the Actions tab with "Run workflow".
+name: App
+
+on:
+  pull_request:
+    paths:
+      - "App/**"
+      - "Sources/**"
+      - "Tests/**"
+      - "Package.swift"
+      - "project.yml"
+      - "Lamplight.xcodeproj/**"
+      - ".github/workflows/app.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: app-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  app:
+    name: Build and test
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Xcode version
+        run: xcodebuild -version
+
+      - name: Find an iPad simulator
+        id: simulator
+        run: |
+          udid=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          runtimes = json.load(sys.stdin)["devices"]
+          for runtime in sorted(runtimes, reverse=True):
+              for device in runtimes[runtime]:
+                  if device["name"].startswith("iPad"):
+                      print(device["udid"])
+                      sys.exit()
+          sys.exit("No iPad simulator found")
+          ')
+          [ -n "$udid" ] || { echo "No iPad simulator found"; exit 1; }
+          echo "Using simulator $udid"
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+
+      - name: Build and test
+        run: |
+          set -o pipefail
+          xcodebuild test -quiet \
+            -project Lamplight.xcodeproj \
+            -scheme Lamplight \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}" \
+            CODE_SIGNING_ALLOWED=NO
