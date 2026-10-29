@@ -111,6 +111,35 @@ final class MarkdownUITextView: UITextView {
         onLayout?()
     }
 
+    /// The text view draws the caret as tall as the whole line, which includes the space a heading or a section
+    /// title has above and below it. That left the caret hanging above the text it belonged to.
+    override func caretRect(for position: UITextPosition) -> CGRect {
+        var rect = super.caretRect(for: position)
+        let length = textStorage.length
+        let caret = offset(from: beginningOfDocument, to: position)
+        let text = textStorage.string as NSString
+        // An empty last line has no text to fit the caret to.
+        guard length > 0, caret >= 0, !(caret == length && text.character(at: length - 1) == 0x0A) else { return rect }
+        let index = min(caret, length - 1)
+        guard let style = textStorage.attribute(.paragraphStyle, at: index, effectiveRange: nil) as? NSParagraphStyle,
+              style.paragraphSpacingBefore > 0 || style.paragraphSpacing > 0
+        else { return rect }
+
+        let paragraph = text.paragraphRange(for: NSRange(location: index, length: 0))
+        var lineGlyphs = NSRange()
+        _ = layoutManager.lineFragmentRect(forGlyphAt: layoutManager.glyphIndexForCharacter(at: index), effectiveRange: &lineGlyphs)
+        let line = layoutManager.characterRange(forGlyphRange: lineGlyphs, actualGlyphRange: nil)
+        // Space before is left out of the first line of a paragraph, and space after is on its last line. The very
+        // first paragraph of the text has no space before it.
+        let before = (line.location == paragraph.location && paragraph.location > 0) ? style.paragraphSpacingBefore : 0
+        let after = NSMaxRange(line) >= NSMaxRange(paragraph) ? style.paragraphSpacing : 0
+        if before + after > 0, rect.height > before + after + 8 {
+            rect.origin.y += before
+            rect.size.height -= before + after
+        }
+        return rect
+    }
+
     private struct Shortcut {
         let id: String
         let title: String
@@ -693,7 +722,21 @@ struct MarkdownEditor: UIViewRepresentable {
                 view.layoutIfNeeded()
                 let caret = view.caretRect(for: range.end)
                 guard caret.minY.isFinite, caret.maxY.isFinite else { return }
-                view.scrollRectToVisible(caret.insetBy(dx: 0, dy: -12), animated: false)
+                // The target is worked out here, not by the scroll view, which holds back from content its size
+                // doesn't include yet. The text view's size can lag a moment behind the new line.
+                let inset = view.adjustedContentInset
+                let visibleTop = view.contentOffset.y + inset.top
+                let visibleBottom = view.contentOffset.y + view.bounds.height - inset.bottom
+                var offset = view.contentOffset.y
+                if caret.minY - 12 < visibleTop {
+                    offset = caret.minY - 12 - inset.top
+                } else if caret.maxY + 40 > visibleBottom {
+                    // Room for the space under the last line, as the text view leaves for a typed character.
+                    offset = caret.maxY + 40 - view.bounds.height + inset.bottom
+                }
+                offset = max(offset, -inset.top)
+                guard abs(offset - view.contentOffset.y) > 0.5 else { return }
+                view.setContentOffset(CGPoint(x: view.contentOffset.x, y: offset), animated: false)
             }
         }
 

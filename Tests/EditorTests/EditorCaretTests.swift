@@ -3,8 +3,9 @@ import UIKit
 import XCTest
 @testable import Lamplight
 
-/// Types into the real editor, in a real text view, and checks that the caret stays where the text is and stays on
-/// screen. These need UIKit, so they only run in Xcode and in the Mac job on GitHub, not in `swift test`.
+/// Types into the real editor, in a real text view, and checks that the caret stays on screen and stays level with
+/// the text it belongs to. These need UIKit, so they only run in Xcode and in the Mac job on GitHub, not in
+/// `swift test`.
 @MainActor
 final class EditorCaretTests: XCTestCase {
     private final class Box {
@@ -31,25 +32,6 @@ final class EditorCaretTests: XCTestCase {
         }
     }
 
-    private struct Run {
-        var label = ""
-        var readings: [Reading] = []
-        var drift: CGFloat = 0
-
-        /// The starting position isn't counted: an ordinary text view doesn't scroll to its caret before anything is typed.
-        var outOfView: [Reading] { readings.dropFirst().filter { !$0.isInView } }
-
-        var summary: String {
-            let bad = outOfView
-            var lines = ["\(label): \(bad.count) of \(readings.count - 1) readings had the caret out of view; "
-                + "the caret moved \(drift) when the whole page was laid out."]
-            if let first = readings.first { lines.append("  first: " + first.summary) }
-            lines += bad.prefix(4).map { "  out: " + $0.summary }
-            if let last = readings.last { lines.append("  last: " + last.summary) }
-            return lines.joined(separator: "\n")
-        }
-    }
-
     // MARK: Setup
 
     private static let size = CGSize(width: 820, height: 520) // about what an iPad leaves for the page with the keyboard up
@@ -61,6 +43,10 @@ final class EditorCaretTests: XCTestCase {
         }
         return nil
     }
+
+    private static let paragraph =
+        "The morning was quiet and the light came in slowly across the table, and I sat there for a long while "
+        + "with the first cup of coffee going cold beside me. Nothing needed doing yet, which was the point of it."
 
     /// A few screens of an entry with sections, a heading and a list, ending on a line break, the way a page looks
     /// when the person comes back to add to it.
@@ -81,33 +67,8 @@ final class EditorCaretTests: XCTestCase {
         return parts.joined(separator: "\n") + "\n"
     }
 
-    /// The same amount of writing as plain paragraphs.
-    private static func plainMarkdown() -> String {
-        Array(repeating: paragraph + "\n", count: 12).joined(separator: "\n") + "\n"
-    }
-
-    private static let paragraph =
-        "The morning was quiet and the light came in slowly across the table, and I sat there for a long while "
-        + "with the first cup of coffee going cold beside me. Nothing needed doing yet, which was the point of it."
-
     private func settle(_ seconds: TimeInterval = 0.04) {
         RunLoop.main.run(until: Date().addingTimeInterval(seconds))
-    }
-
-    private func show(_ controller: UIViewController) -> UIWindow {
-        let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: .zero)
-        window.frame = CGRect(origin: .zero, size: Self.size)
-        window.rootViewController = controller
-        window.makeKeyAndVisible()
-        addTeardownBlock {
-            window.isHidden = true
-            window.rootViewController = nil
-        }
-        controller.view.frame = window.bounds
-        controller.view.layoutIfNeeded()
-        settle(0.2)
-        return window
     }
 
     /// Lamplight's own editor, as the entry page builds it.
@@ -123,21 +84,19 @@ final class EditorCaretTests: XCTestCase {
                 .frame(width: Self.size.width, height: Self.size.height)
         )
         let host = UIHostingController(rootView: root)
-        _ = show(host)
+        let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: .zero)
+        window.frame = CGRect(origin: .zero, size: Self.size)
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        addTeardownBlock {
+            window.isHidden = true
+            window.rootViewController = nil
+        }
+        host.view.frame = window.bounds
+        host.view.layoutIfNeeded()
+        settle(0.2)
         return try XCTUnwrap(Self.findTextView(in: host.view), "The editor's text view wasn't found.")
-    }
-
-    /// An ordinary text view, for comparison.
-    private func stockTextView(markdown: String, textKit1: Bool) -> UITextView {
-        let view = UITextView(usingTextLayoutManager: !textKit1)
-        view.font = .systemFont(ofSize: 20)
-        view.textContainerInset = UIEdgeInsets(top: 8, left: 24, bottom: 40, right: 24)
-        view.text = markdown
-        let controller = UIViewController()
-        controller.view.addSubview(view)
-        view.frame = CGRect(origin: .zero, size: Self.size)
-        _ = show(controller)
-        return view
     }
 
     // MARK: Typing
@@ -161,48 +120,49 @@ final class EditorCaretTests: XCTestCase {
         )
     }
 
-    /// Goes to the end of the text and types several paragraphs, noting where the caret is after each step.
-    private func typeAtTheEnd(_ label: String, in view: UITextView) -> Run {
-        var run = Run()
-        run.label = label
+    // MARK: Tests
+
+    /// Return, and the other edits the editor makes itself, used to leave the new line below the visible page.
+    func testCaretStaysInViewWhileTypingAtTheEnd() throws {
+        let view = try editorTextView(markdown: Self.sectionedMarkdown())
         XCTAssertTrue(view.becomeFirstResponder(), "The text view wouldn't take focus.")
-        let length = (view.text as NSString).length
-        view.selectedRange = NSRange(location: length, length: 0)
+        view.selectedRange = NSRange(location: (view.text as NSString).length, length: 0)
         view.scrollRangeToVisible(view.selectedRange)
         settle(0.2)
-        run.readings.append(reading("at the end, before typing", of: view))
 
+        var readings: [Reading] = []
         let sentence = "Then the rain started, and I watched it run down the glass for a while. "
         for round in 1...6 {
             type(sentence, into: view)
             settle()
-            run.readings.append(reading("round \(round), after a sentence", of: view))
+            readings.append(reading("round \(round), after a sentence", of: view))
             type("\n", into: view)
             settle()
-            run.readings.append(reading("round \(round), after a line break", of: view))
+            readings.append(reading("round \(round), after a line break", of: view))
             type("\n", into: view)
             settle()
-            run.readings.append(reading("round \(round), after a second line break", of: view))
+            readings.append(reading("round \(round), after a second line break", of: view))
         }
-
-        // The caret as laid out so far, against the caret once the whole page is laid out.
-        let end = view.selectedTextRange?.end ?? view.endOfDocument
-        let before = view.caretRect(for: end)
-        view.layoutManager.ensureLayout(for: view.textContainer)
-        run.drift = view.caretRect(for: end).minY - before.minY
-        return run
+        let bad = readings.filter { !$0.isInView }
+        XCTAssertTrue(
+            bad.isEmpty,
+            "\(bad.count) of \(readings.count) readings had the caret out of view.\n" + bad.prefix(4).map(\.summary).joined(separator: "\n")
+        )
     }
 
-    /// For each kind of line, where the caret is drawn against the last letter before it.
-    private func caretAgainstText(in view: UITextView) -> [String] {
+    /// The text view draws a caret as tall as the whole line, which includes the space a heading or a section title
+    /// has above it. The caret hung above the text.
+    func testCaretIsLevelWithTheTextOnEveryKindOfLine() throws {
+        let view = try editorTextView(markdown: Self.sectionedMarkdown())
+        XCTAssertTrue(view.becomeFirstResponder(), "The text view wouldn't take focus.")
         let text = view.text as NSString
-        var report: [String] = []
+        var problems: [String] = []
         for (name, marker) in [
-            ("section title", "Part 1"), ("heading", "Things I noticed"),
+            ("first section title", "Part 1"), ("later section title", "Part 3"), ("heading", "Things I noticed"),
             ("list item", "the neighbour's radio"), ("paragraph", "the point of it."),
         ] {
             let found = text.range(of: marker)
-            guard found.location != NSNotFound else { report.append("\(name): text not found"); continue }
+            XCTAssertNotEqual(found.location, NSNotFound, "\(marker) isn't in the sample text.")
             let end = found.location + found.length
             view.selectedRange = NSRange(location: end, length: 0)
             settle(0.1)
@@ -212,38 +172,13 @@ final class EditorCaretTests: XCTestCase {
             else { continue }
             let caret = view.caretRect(for: endPosition)
             let letter = view.firstRect(for: letterRange)
-            report.append(String(
-                format: "%@: caret %.0f to %.0f, last letter %.0f to %.0f, caret centre is %.0f from the letter's",
-                name, caret.minY, caret.maxY, letter.minY, letter.maxY, caret.midY - letter.midY
-            ))
+            if caret.minY < letter.minY - 3 || caret.maxY > letter.maxY + 3 {
+                problems.append(String(
+                    format: "%@: caret %.0f to %.0f, the last letter %.0f to %.0f",
+                    name, caret.minY, caret.maxY, letter.minY, letter.maxY
+                ))
+            }
         }
-        return report
-    }
-
-    // MARK: Tests
-
-    func testEditorKeepsTheCaretInViewWhileTyping() throws {
-        let run = typeAtTheEnd("editor, sections", in: try editorTextView(markdown: Self.sectionedMarkdown()))
-        XCTAssertTrue(run.outOfView.isEmpty, run.summary)
-    }
-
-    func testAnOrdinaryTextViewKeepsTheCaretInView() {
-        let run = typeAtTheEnd("stock TextKit 1", in: stockTextView(markdown: Self.plainMarkdown(), textKit1: true))
-        XCTAssertTrue(run.outOfView.isEmpty, run.summary)
-    }
-
-    /// Temporary: always fails, to print how every setup behaves. Removed once the cause is found.
-    func testInvestigation() throws {
-        var report: [String] = []
-        report.append(typeAtTheEnd("editor, sections", in: try editorTextView(markdown: Self.sectionedMarkdown())).summary)
-        report.append(typeAtTheEnd("editor, plain", in: try editorTextView(markdown: Self.plainMarkdown())).summary)
-        report.append(typeAtTheEnd("stock TextKit 1, plain", in: stockTextView(markdown: Self.plainMarkdown(), textKit1: true)).summary)
-        let editor = try editorTextView(markdown: Self.sectionedMarkdown())
-        editor.layoutManager.allowsNonContiguousLayout = false
-        report.append(typeAtTheEnd("editor, sections, whole page laid out", in: editor).summary)
-        let lines = try editorTextView(markdown: Self.sectionedMarkdown())
-        XCTAssertTrue(lines.becomeFirstResponder())
-        report.append("caret against text, editor:\n  " + caretAgainstText(in: lines).joined(separator: "\n  "))
-        XCTFail("\n" + report.joined(separator: "\n"))
+        XCTAssertTrue(problems.isEmpty, problems.joined(separator: "\n"))
     }
 }
