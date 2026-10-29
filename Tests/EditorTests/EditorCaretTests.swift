@@ -36,11 +36,12 @@ final class EditorCaretTests: XCTestCase {
         var readings: [Reading] = []
         var drift: CGFloat = 0
 
-        var outOfView: [Reading] { readings.filter { !$0.isInView } }
+        /// The starting position isn't counted: an ordinary text view doesn't scroll to its caret before anything is typed.
+        var outOfView: [Reading] { readings.dropFirst().filter { !$0.isInView } }
 
         var summary: String {
             let bad = outOfView
-            var lines = ["\(label): \(bad.count) of \(readings.count) readings had the caret out of view; "
+            var lines = ["\(label): \(bad.count) of \(readings.count - 1) readings had the caret out of view; "
                 + "the caret moved \(drift) when the whole page was laid out."]
             if let first = readings.first { lines.append("  first: " + first.summary) }
             lines += bad.prefix(4).map { "  out: " + $0.summary }
@@ -192,6 +193,33 @@ final class EditorCaretTests: XCTestCase {
         return run
     }
 
+    /// For each kind of line, where the caret is drawn against the last letter before it.
+    private func caretAgainstText(in view: UITextView) -> [String] {
+        let text = view.text as NSString
+        var report: [String] = []
+        for (name, marker) in [
+            ("section title", "Part 1"), ("heading", "Things I noticed"),
+            ("list item", "the neighbour's radio"), ("paragraph", "the point of it."),
+        ] {
+            let found = text.range(of: marker)
+            guard found.location != NSNotFound else { report.append("\(name): text not found"); continue }
+            let end = found.location + found.length
+            view.selectedRange = NSRange(location: end, length: 0)
+            settle(0.1)
+            guard let endPosition = view.position(from: view.beginningOfDocument, offset: end),
+                  let startPosition = view.position(from: view.beginningOfDocument, offset: end - 1),
+                  let letterRange = view.textRange(from: startPosition, to: endPosition)
+            else { continue }
+            let caret = view.caretRect(for: endPosition)
+            let letter = view.firstRect(for: letterRange)
+            report.append(String(
+                format: "%@: caret %.0f to %.0f, last letter %.0f to %.0f, caret centre is %.0f from the letter's",
+                name, caret.minY, caret.maxY, letter.minY, letter.maxY, caret.midY - letter.midY
+            ))
+        }
+        return report
+    }
+
     // MARK: Tests
 
     func testEditorKeepsTheCaretInViewWhileTyping() throws {
@@ -213,6 +241,9 @@ final class EditorCaretTests: XCTestCase {
         let editor = try editorTextView(markdown: Self.sectionedMarkdown())
         editor.layoutManager.allowsNonContiguousLayout = false
         report.append(typeAtTheEnd("editor, sections, whole page laid out", in: editor).summary)
+        let lines = try editorTextView(markdown: Self.sectionedMarkdown())
+        XCTAssertTrue(lines.becomeFirstResponder())
+        report.append("caret against text, editor:\n  " + caretAgainstText(in: lines).joined(separator: "\n  "))
         XCTFail("\n" + report.joined(separator: "\n"))
     }
 }

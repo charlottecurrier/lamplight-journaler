@@ -618,6 +618,8 @@ struct MarkdownEditor: UIViewRepresentable {
 
         func textViewDidChange(_ textView: UITextView) {
             changed(textView)
+            // The text view scrolls to typed characters itself, but the restyle above can make lines taller.
+            if !isApplyingEdit { keepCaretInView(textView) }
         }
 
         func textViewDidChangeSelection(_ textView: UITextView) {
@@ -678,6 +680,21 @@ struct MarkdownEditor: UIViewRepresentable {
             lastCaret = view.selectedRange.location
             isApplyingEdit = false
             changed(view)
+            keepCaretInView(view)
+        }
+
+        /// Scrolls just far enough that the caret is on screen. An edit made here, such as Return, takes the place of
+        /// the text view's own typing, so the text view doesn't scroll to it. Focus mode places the caret itself.
+        private func keepCaretInView(_ view: UITextView) {
+            guard view.isScrollEnabled, !parent.isFocusMode else { return }
+            // Next turn of the run loop, once the text view has laid out the new line and sized itself to it.
+            DispatchQueue.main.async { [weak view] in
+                guard let view, view.isScrollEnabled, let range = view.selectedTextRange else { return }
+                view.layoutIfNeeded()
+                let caret = view.caretRect(for: range.end)
+                guard caret.minY.isFinite, caret.maxY.isFinite else { return }
+                view.scrollRectToVisible(caret.insetBy(dx: 0, dy: -12), animated: false)
+            }
         }
 
         func apply(_ command: FormatCommand) {
