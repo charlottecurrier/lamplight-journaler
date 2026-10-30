@@ -169,6 +169,7 @@ struct OnboardingView: View {
 /// while iCloud brings the entries down.
 struct LoadingView: View {
     @Environment(AppModel.self) private var model
+    @State private var takingAWhile = false
 
     var body: some View {
         ZStack {
@@ -179,13 +180,32 @@ struct LoadingView: View {
                 Text("Opening your journal…")
                     .font(Theme.serif(.title3))
                     .foregroundStyle(Theme.inkSecondary)
+                if !model.loadingStep.isEmpty {
+                    Text(model.loadingStep)
+                        .font(Theme.serif(.footnote))
+                        .foregroundStyle(Theme.inkTertiary)
+                }
                 if model.totalCount > 0 {
                     Text("\(model.loadedCount) of \(model.totalCount) entries")
                         .font(Theme.serif(.footnote))
                         .foregroundStyle(Theme.inkTertiary)
                         .contentTransition(.numericText())
                 }
+                if takingAWhile {
+                    Text("This is taking longer than usual. iCloud may still be syncing this folder. Nothing has been deleted.")
+                        .font(Theme.serif(.footnote))
+                        .foregroundStyle(Theme.inkSecondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 360)
+                        .padding(.top, 8)
+                }
             }
+            .padding(32)
+        }
+        .task {
+            try? await Task.sleep(nanoseconds: 12_000_000_000)
+            guard !Task.isCancelled else { return }
+            takingAWhile = true
         }
     }
 }

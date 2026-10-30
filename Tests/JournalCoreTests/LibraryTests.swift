@@ -53,19 +53,41 @@ final class LibraryTests: XCTestCase {
     func testLocatorMakesAFolderInsideAPlainPick() throws {
         let picked = dir.appendingPathComponent("Documents", isDirectory: true)
         try FileManager.default.createDirectory(at: picked, withIntermediateDirectories: true)
-        let root = LibraryLocator.resolveRoot(picked: picked, files: PlainFileAccess())
+        let root = try LibraryLocator.resolveRoot(picked: picked, files: PlainFileAccess())
         XCTAssertEqual(root.lastPathComponent, "Lamplight")
         XCTAssertEqual(root.deletingLastPathComponent().lastPathComponent, "Documents")
     }
 
-    func testLocatorFindsAnExistingLibraryInsideThePick() {
-        let root = LibraryLocator.resolveRoot(picked: dir, files: PlainFileAccess())
+    func testLocatorFindsAnExistingLibraryInsideThePick() throws {
+        let root = try LibraryLocator.resolveRoot(picked: dir, files: PlainFileAccess())
         XCTAssertEqual(root.standardizedFileURL.path, library.layout.root.standardizedFileURL.path)
     }
 
-    func testLocatorUsesAPickThatIsAlreadyALibrary() {
-        let root = LibraryLocator.resolveRoot(picked: library.layout.root, files: PlainFileAccess())
+    func testLocatorUsesAPickThatIsAlreadyALibrary() throws {
+        let root = try LibraryLocator.resolveRoot(picked: library.layout.root, files: PlainFileAccess())
         XCTAssertEqual(root.standardizedFileURL.path, library.layout.root.standardizedFileURL.path)
+    }
+
+    func testLocatorDoesNotGuessWhenThePickCantBeListed() {
+        let files = ListFails(failing: dir)
+        XCTAssertThrowsError(try LibraryLocator.resolveRoot(picked: dir, files: files))
+    }
+
+    func testPrepareLeavesAJournalItCannotReadAlone() throws {
+        // A journal that is there but can't be read yet must not be replaced by a new default one.
+        let file = library.layout.journalFile(Journal.defaultID)
+        try Data("{not finished".utf8).write(to: file)
+        try library.prepare()
+        XCTAssertEqual(try String(contentsOf: file, encoding: .utf8), "{not finished")
+    }
+
+    func testPrepareDoesNotMakeAJournalWhenTheJournalsCantBeListed() throws {
+        let other = dir.appendingPathComponent("Other", isDirectory: true)
+        let files = ListFails(failing: other.appendingPathComponent("Journals", isDirectory: true))
+        let broken = Library(root: other, files: files)
+        XCTAssertThrowsError(try broken.prepare())
+        let journalFile = broken.layout.journalFile(Journal.defaultID)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: journalFile.path))
     }
 
     func testPlaceholderNames() {
@@ -272,4 +294,21 @@ final class LibraryTests: XCTestCase {
         let entry = T.entry("2026-10-17T21:14:03Z")
         XCTAssertTrue(library.resolveConflicts(for: entry).isEmpty)
     }
+}
+
+/// A file system where listing one folder fails, as it does when iCloud holds the folder up.
+struct ListFails: FileAccess {
+    let failing: URL
+    private let plain = PlainFileAccess()
+
+    func read(_ url: URL) throws -> Data { try plain.read(url) }
+    func write(_ data: Data, to url: URL) throws { try plain.write(data, to: url) }
+    func createDirectory(_ url: URL) throws { try plain.createDirectory(url) }
+    func list(_ url: URL) throws -> [DirectoryItem] {
+        if url.standardizedFileURL == failing.standardizedFileURL { throw FileWaitError.timedOut }
+        return try plain.list(url)
+    }
+    func exists(_ url: URL) -> Bool { plain.exists(url) }
+    func move(from: URL, to: URL) throws { try plain.move(from: from, to: to) }
+    func remove(_ url: URL) throws { try plain.remove(url) }
 }

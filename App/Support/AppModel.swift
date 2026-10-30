@@ -59,6 +59,8 @@ final class AppModel {
     var toast: Toast?
     var loadedCount = 0
     var totalCount = 0
+    /// What opening the journal is doing right now, shown on the loading page.
+    var loadingStep = ""
     /// Entries that exist in the folder but haven't finished downloading from iCloud yet.
     var stillDownloading = 0
     var saveProblem = false
@@ -143,9 +145,17 @@ final class AppModel {
         phase = .loading
         loadedCount = 0
         totalCount = 0
+        loadingStep = "Finding the journal folder"
         let files = self.files
         Task {
-            let root = await IO.run { LibraryLocator.resolveRoot(picked: picked, files: files) }
+            let root: URL
+            do {
+                root = try await IO.runThrowing { try LibraryLocator.resolveRoot(picked: picked, files: files) }
+            } catch {
+                // Not guessed at: a wrong guess would start a second, empty journal beside the real one.
+                phase = .problem("Lamplight couldn't read the journal folder. \(error.localizedDescription)")
+                return
+            }
             let newLibrary = Library(root: root, files: files)
             if let previous, previous.layout.root.standardizedFileURL != root.standardizedFileURL {
                 // Moving to a new folder: bring everything along. The old folder is left as it is.
@@ -162,12 +172,14 @@ final class AppModel {
     }
 
     private func load(_ library: Library, initial: Bool) async {
+        loadingStep = "Checking the journal folder"
         do {
             try await IO.runThrowing { try library.prepare() }
         } catch {
             phase = .problem("Lamplight couldn't open the journal folder. \(error.localizedDescription)")
             return
         }
+        loadingStep = "Reading your entries"
         let snapshot = await Self.readEverything(library) { [weak self] done, total in
             Task { @MainActor in
                 self?.loadedCount = done
@@ -263,6 +275,8 @@ final class AppModel {
         let (journals, templates, settings, ids) = await IO.run {
             (library.loadJournals(), library.loadTemplates(), library.loadSettings(), (try? library.entryIDs()) ?? [])
         }
+        // The count shows from the start, so a page that stops partway says where.
+        progress(0, ids.count)
 
         var entries: [Entry] = []
         var failed = 0
@@ -281,7 +295,7 @@ final class AppModel {
                 if let entry = item.entry { entries.append(entry) } else { failed += 1 }
                 entries.append(contentsOf: item.copies)
                 copies += item.copies.count
-                if done % 8 == 0 || done == ids.count { progress(done, ids.count) }
+                if done == 1 || done % 4 == 0 || done == ids.count { progress(done, ids.count) }
                 if cursor < ids.count {
                     let id = ids[cursor]
                     cursor += 1

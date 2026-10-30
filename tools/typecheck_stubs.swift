@@ -20,6 +20,7 @@ final class NSFileCoordinator {
         static let forMoving = WritingOptions(rawValue: 2)
         static let forDeleting = WritingOptions(rawValue: 4) }
     init(filePresenter: AnyObject?) {}
+    func cancel() {}
     func coordinate(readingItemAt url: URL, options: ReadingOptions = [], error outError: UnsafeMutablePointer<NSError?>?, byAccessor reader: (URL) -> Void) { reader(url) }
     func coordinate(writingItemAt url: URL, options: WritingOptions = [], error outError: UnsafeMutablePointer<NSError?>?, byAccessor writer: (URL) -> Void) { writer(url) }
     func coordinate(writingItemAt url1: URL, options options1: WritingOptions = [], writingItemAt url2: URL, options options2: WritingOptions = [], error outError: UnsafeMutablePointer<NSError?>?, byAccessor writer: (URL, URL) -> Void) { writer(url1, url2) }

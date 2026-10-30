@@ -16,7 +16,7 @@ final class SampleFolderTests: XCTestCase {
             throw XCTSkip("Set LAMPLIGHT_SAMPLE_DIR to run this.")
         }
         let picked = URL(fileURLWithPath: path, isDirectory: true)
-        let root = LibraryLocator.resolveRoot(picked: picked, files: PlainFileAccess())
+        let root = try LibraryLocator.resolveRoot(picked: picked, files: PlainFileAccess())
         XCTAssertEqual(root.lastPathComponent, "Lamplight")
 
         let library = Library(root: root)

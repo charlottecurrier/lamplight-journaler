@@ -63,8 +63,11 @@ enum LibraryLocator {
     /// - A "Lamplight" folder inside the pick is used (this is the second device finding the first one's data).
     /// - A pick that is already a library (named Lamplight, or holding an Entries folder) is used as is.
     /// - Otherwise a "Lamplight" folder is made inside the pick, so we never scatter folders in iCloud Drive's root.
-    static func resolveRoot(picked: URL, files: FileAccess) -> URL {
-        let items = (try? files.list(picked)) ?? []
+    ///
+    /// A folder that can't be listed is an error, not an empty folder. Guessing would start a second, empty library
+    /// beside the real one.
+    static func resolveRoot(picked: URL, files: FileAccess) throws -> URL {
+        let items = try files.list(picked)
         if let existing = items.first(where: { $0.isDirectory && $0.name == LibraryLayout.folderName }) {
             return existing.url
         }
@@ -109,7 +112,11 @@ final class Library {
         for dir in [layout.root, layout.journalsDir, layout.templatesDir, layout.entriesDir, layout.trashDir] {
             try files.createDirectory(dir)
         }
-        if loadJournals().isEmpty {
+        // The first journal is made only for a folder that was listed and holds no journal file at all. A journal that
+        // is there but can't be read yet, such as one iCloud hasn't finished bringing down, is left alone: writing a
+        // new default over it would replace its name and color.
+        let items = try files.list(layout.journalsDir)
+        if !items.contains(where: { !$0.isDirectory && $0.name.hasSuffix(".json") }) {
             try save(Journal.makeDefault())
         }
     }
