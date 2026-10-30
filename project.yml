@@ -66,6 +66,8 @@ targets:
     platform: iOS
     sources:
       - path: Tests/JournalCoreTests
+      # Needs UIKit, so these only run in Xcode and in the Mac job, not in `swift test`.
+      - path: Tests/EditorTests
     dependencies:
       - target: Lamplight
     settings:

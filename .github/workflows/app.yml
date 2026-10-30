@@ -62,13 +62,18 @@ jobs:
             CODE_SIGNING_ALLOWED=NO
 
       # -quiet prints nothing when everything passes, so say how many tests ran. Zero tests would be a silent pass.
-      - name: Test count
+      # When tests fail, show why: -quiet leaves the failure text out of the log.
+      - name: Test results
+        if: ${{ !cancelled() }}
         run: |
-          xcrun xcresulttool get test-results summary --path "$RUNNER_TEMP/Lamplight.xcresult" > "$RUNNER_TEMP/summary.json"
+          bundle="$RUNNER_TEMP/Lamplight.xcresult"
+          [ -d "$bundle" ] || { echo "No test results. The build failed before the tests ran."; exit 0; }
+          xcrun xcresulttool get test-results summary --path "$bundle" > "$RUNNER_TEMP/summary.json"
           python3 - "$RUNNER_TEMP/summary.json" <<'PY'
           import json, sys
           summary = json.load(open(sys.argv[1]))
-          print(json.dumps(summary, indent=2))
+          for failure in summary.get("testFailures", []):
+              print(f"FAILED {failure.get('testName')}:\n{failure.get('failureText')}\n")
           total = summary.get("totalTestCount")
           print(f"Tests: {total} total, {summary.get('passedTests')} passed, {summary.get('failedTests')} failed, {summary.get('skippedTests')} skipped")
           if not total:
