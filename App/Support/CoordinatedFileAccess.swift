@@ -4,6 +4,15 @@ import Foundation
 /// It makes sure a file isn't read while it is being synced, and asks iCloud to download files
 /// that are only stored online.
 struct CoordinatedFileAccess: FileAccess {
+    /// Reads and listings give up waiting on iCloud after these many seconds, so opening the journal never sits on
+    /// one file that won't come down. The entry is tried again later. Writes are never given up on: a half-finished
+    /// save is worse than a slow one.
+    var textTimeout: TimeInterval = 12
+    var listTimeout: TimeInterval = 15
+    var photoTimeout: TimeInterval = 60
+    /// Shared by every copy of this value. After a few waits in a row run out, reads stop being started for a while.
+    private let wait = BoundedWait()
+
     private func coordinator() -> NSFileCoordinator {
         NSFileCoordinator(filePresenter: nil)
     }
@@ -32,13 +41,17 @@ struct CoordinatedFileAccess: FileAccess {
 
     func read(_ url: URL) throws -> Data {
         try prepareForRead(url)
-        var outcome: Result<Data, Error> = .failure(CocoaError(.fileReadUnknown))
-        var coordinationError: NSError?
-        coordinator().coordinate(readingItemAt: url, options: [], error: &coordinationError) { readURL in
-            outcome = Result { try Data(contentsOf: readURL) }
+        let coordinator = coordinator()
+        let timeout = url.pathExtension.lowercased() == "jpg" ? photoTimeout : textTimeout
+        return try wait.run(timeout: timeout, cancel: { coordinator.cancel() }) {
+            var outcome: Result<Data, Error> = .failure(CocoaError(.fileReadUnknown))
+            var coordinationError: NSError?
+            coordinator.coordinate(readingItemAt: url, options: [], error: &coordinationError) { readURL in
+                outcome = Result { try Data(contentsOf: readURL) }
+            }
+            if let coordinationError { throw coordinationError }
+            return try outcome.get()
         }
-        if let coordinationError { throw coordinationError }
-        return try outcome.get()
     }
 
     func write(_ data: Data, to url: URL) throws {
@@ -66,13 +79,16 @@ struct CoordinatedFileAccess: FileAccess {
     }
 
     func list(_ url: URL) throws -> [DirectoryItem] {
-        var outcome: Result<[DirectoryItem], Error> = .success([])
-        var coordinationError: NSError?
-        coordinator().coordinate(readingItemAt: url, options: [], error: &coordinationError) { readURL in
-            outcome = Result { try PlainFileAccess().list(readURL) }
+        let coordinator = coordinator()
+        return try wait.run(timeout: listTimeout, cancel: { coordinator.cancel() }) {
+            var outcome: Result<[DirectoryItem], Error> = .success([])
+            var coordinationError: NSError?
+            coordinator.coordinate(readingItemAt: url, options: [], error: &coordinationError) { readURL in
+                outcome = Result { try PlainFileAccess().list(readURL) }
+            }
+            if let coordinationError { throw coordinationError }
+            return try outcome.get()
         }
-        if let coordinationError { throw coordinationError }
-        return try outcome.get()
     }
 
     func exists(_ url: URL) -> Bool {

@@ -41,6 +41,7 @@ GitHub Actions runs two workflows on pull requests. After a push, look at the PR
 ## Rules that matter
 
 - **Never lose the person's writing.** Entries autosave, deletes go to Recently Deleted, removed photos are kept, switching folders copies and never overwrites, conflicting edits keep both versions. Don't add a code path that discards text.
+- **A read or listing that failed is not an empty one.** `CoordinatedFileAccess` gives up on reads and listings after a time (`BoundedWait`) instead of waiting on iCloud for ever, so they can fail, and after a few in a row it stops starting new ones for a while. `LibraryLocator.resolveRoot` and `Library.prepare` throw when they can't list a folder. They never guess a folder, and never write a first journal over one that couldn't be read. Don't write a default over something you failed to read. Writes are never given up on.
 - **One file per entry/journal/template.** Don't add shared files that two devices will both rewrite. `settings.json` is the single exception and is tiny.
 - **File access goes through `FileAccess`.** The app uses `CoordinatedFileAccess` (NSFileCoordinator, needed for iCloud Drive). Tests use `PlainFileAccess`. Never call `FileManager` directly on journal files from the app.
 - **Colors only from `Palette.swift`**, as `Pair(light:dark:)` lines in that exact shape (the Python tools parse them). The person reads through amber blue-blocking lenses. Differences must be in brightness, not hue. No blues or purples. Re-run `tools/check_palette.py` after any change.
