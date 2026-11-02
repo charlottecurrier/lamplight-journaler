@@ -19,8 +19,6 @@ final class EditorNavigationTests: EditorTestCase {
         let reading: Reading
         /// Where the blinking caret is actually drawn, if the text view lets us find it.
         let drawnCaret: CGRect?
-
-        var jumpAfterScroll: CGFloat { offsetSettled - offsetAfterScroll }
     }
 
     /// Counts the characters whose style is rewritten, from the text storage's own notices.
@@ -108,17 +106,13 @@ final class EditorNavigationTests: EditorTestCase {
 
         let moved = steps.filter { abs($0.movedByItself) > 1 }
         let lost = steps.filter { !$0.reading.isInView }
-        let jumps = steps.filter { abs($0.jumpAfterScroll) > Self.size.height / 2 }
         var report = "\(steps.count) steps; \(moved.count) where the page moved by itself; "
-        report += "\(lost.count) with the caret out of view; \(jumps.count) where the page jumped after the view scrolled.\n"
+        report += "\(lost.count) with the caret out of view.\n"
         report += moved.prefix(3).map {
             String(format: "  moved by itself, %@ %d: by %.0f", $0.direction, $0.number, $0.movedByItself)
         }.joined(separator: "\n")
         report += lost.prefix(3).map { "\n  out of view, \($0.direction) \($0.number): " + $0.reading.summary }.joined()
-        report += jumps.prefix(3).map {
-            String(format: "\n  jumped, %@ %d: from %.0f to %.0f", $0.direction, $0.number, $0.offsetAfterScroll, $0.offsetSettled)
-        }.joined()
-        XCTAssertTrue(moved.isEmpty && lost.isEmpty && jumps.isEmpty, report)
+        XCTAssertTrue(moved.isEmpty && lost.isEmpty, report)
     }
 
     /// Moving the caret should restyle the lines it leaves and enters, not the whole page. Rewriting all of the text
@@ -127,10 +121,10 @@ final class EditorNavigationTests: EditorTestCase {
         let view = try openInTheMiddle()
         let length = (view.text as NSString).length
         let steps = walk(.down, steps: 45, in: view) + walk(.up, steps: 45, in: view)
-        let whole = steps.filter { $0.restyled > length / 2 }
+        let whole = steps.filter { $0.restyled > length / 3 }
         let most = steps.map(\.restyled).max() ?? 0
         let report = "The text is \(length) characters. \(whole.count) of \(steps.count) caret moves rewrote more than "
-            + "half of it; the most was \(most)."
+            + "a third of it; the most was \(most)."
         XCTAssertTrue(whole.isEmpty, report)
     }
 

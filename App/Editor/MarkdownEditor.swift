@@ -606,10 +606,21 @@ struct MarkdownEditor: UIViewRepresentable {
             let media = mediaLayout()
             let signature = StyleSignature(text: text, activeLines: active, editing: editing, media: media)
             if force || signature != styledSignature {
+                let previous = styledSignature
                 styledSignature = signature
-                MarkdownStyler.apply(
-                    to: view.textStorage, document: document, selection: editing ? selection : nil, media: media
-                )
+                if !force, let previous, previous.text == signature.text, previous.media == signature.media {
+                    // Only the caret moved. Style the lines it left and the lines it came to, and leave the rest of
+                    // the page alone. Styling all of the text again for every key press threw away the layout of the
+                    // whole page, which moved the page by itself.
+                    let changed = Set(previous.activeLines).symmetricDifference(active).sorted()
+                    MarkdownStyler.restyle(
+                        lines: changed, in: view.textStorage, document: document, active: Set(active), media: media
+                    )
+                } else {
+                    MarkdownStyler.apply(
+                        to: view.textStorage, document: document, selection: editing ? selection : nil, media: media
+                    )
+                }
             }
             view.typingAttributes = MarkdownStyler.typingAttributes(document: document, caret: selection.location)
         }
@@ -657,6 +668,9 @@ struct MarkdownEditor: UIViewRepresentable {
             restyle()
             updateSlashSuggestions(textView)
             if parent.isFocusMode { centerCaret(textView) }
+            // Moving with the arrow keys: the text view scrolls to the caret itself, but it can stop short when the
+            // page it has laid out is not as tall as the page will be.
+            keepCaretInView(textView, below: 8)
         }
 
         func textViewDidBeginEditing(_ textView: UITextView) {
@@ -714,7 +728,7 @@ struct MarkdownEditor: UIViewRepresentable {
 
         /// Scrolls just far enough that the caret is on screen. An edit made here, such as Return, takes the place of
         /// the text view's own typing, so the text view doesn't scroll to it. Focus mode places the caret itself.
-        private func keepCaretInView(_ view: UITextView) {
+        private func keepCaretInView(_ view: UITextView, below room: CGFloat = 40) {
             guard view.isScrollEnabled, !parent.isFocusMode else { return }
             // Next turn of the run loop, once the text view has laid out the new line and sized itself to it.
             DispatchQueue.main.async { [weak view] in
@@ -730,9 +744,9 @@ struct MarkdownEditor: UIViewRepresentable {
                 var offset = view.contentOffset.y
                 if caret.minY - 12 < visibleTop {
                     offset = caret.minY - 12 - inset.top
-                } else if caret.maxY + 40 > visibleBottom {
-                    // Room for the space under the last line, as the text view leaves for a typed character.
-                    offset = caret.maxY + 40 - view.bounds.height + inset.bottom
+                } else if caret.maxY + room > visibleBottom {
+                    // After typing, room for the space under the last line, as the text view leaves for a typed character.
+                    offset = caret.maxY + room - view.bounds.height + inset.bottom
                 }
                 offset = max(offset, -inset.top)
                 guard abs(offset - view.contentOffset.y) > 0.5 else { return }
