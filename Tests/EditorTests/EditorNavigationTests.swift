@@ -9,25 +9,54 @@ final class EditorNavigationTests: EditorTestCase {
     private struct Step {
         let number: Int
         let direction: String
-        /// Where the page was scrolled to right after the caret moved and the view followed it.
-        let offsetAfterMove: CGFloat
-        /// Where it was once everything had settled.
+        /// How far the page moved by itself when only the caret moved, before anything scrolled to it.
+        let movedByItself: CGFloat
+        /// Where the page was after the view scrolled to the caret, and once everything had settled.
+        let offsetAfterScroll: CGFloat
         let offsetSettled: CGFloat
+        /// How many characters of the text had their style rewritten by moving the caret.
+        let restyled: Int
         let reading: Reading
         /// Where the blinking caret is actually drawn, if the text view lets us find it.
         let drawnCaret: CGRect?
 
-        var jump: CGFloat { offsetSettled - offsetAfterMove }
+        var jumpAfterScroll: CGFloat { offsetSettled - offsetAfterScroll }
     }
 
-    /// One press of an arrow key, the way the text view takes it: the caret moves, then the view scrolls to it.
-    private func arrow(_ direction: UITextLayoutDirection, in view: UITextView) -> Bool {
+    /// Counts the characters whose style is rewritten, from the text storage's own notices.
+    private final class StyleEdits {
+        private(set) var characters = 0
+        private var token: NSObjectProtocol?
+
+        init(_ storage: NSTextStorage) {
+            token = NotificationCenter.default.addObserver(
+                forName: NSTextStorage.didProcessEditingNotification, object: storage, queue: nil
+            ) { [weak self] note in
+                guard let storage = note.object as? NSTextStorage else { return }
+                self?.characters += storage.editedRange.length
+            }
+        }
+
+        func take() -> Int {
+            defer { characters = 0 }
+            return characters
+        }
+
+        deinit { if let token { NotificationCenter.default.removeObserver(token) } }
+    }
+
+    /// One press of an arrow key. The caret moves, and then the view scrolls to it, as the text view does.
+    private func arrow(_ direction: UITextLayoutDirection, in view: UITextView, edits: StyleEdits) -> (moved: CGFloat, restyled: Int)? {
         guard let current = view.selectedTextRange?.end,
               let next = view.position(from: current, in: direction, offset: 1),
-              let range = view.textRange(from: next, to: next) else { return false }
+              let range = view.textRange(from: next, to: next) else { return nil }
+        let before = view.contentOffset.y
+        _ = edits.take()
         view.selectedTextRange = range
+        let moved = view.contentOffset.y - before
+        let restyled = edits.take()
         view.scrollRectToVisible(view.caretRect(for: next).insetBy(dx: 0, dy: -8), animated: false)
-        return true
+        return (moved, restyled)
     }
 
     private func drawnCaret(in view: UITextView) -> CGRect? {
@@ -37,16 +66,19 @@ final class EditorNavigationTests: EditorTestCase {
     }
 
     private func walk(_ direction: UITextLayoutDirection, steps: Int, in view: UITextView) -> [Step] {
+        let edits = StyleEdits(view.textStorage)
         var taken: [Step] = []
         for number in 1...steps {
-            guard arrow(direction, in: view) else { break }
-            let afterMove = view.contentOffset.y
+            guard let result = arrow(direction, in: view, edits: edits) else { break }
+            let afterScroll = view.contentOffset.y
             settle(0.06)
             taken.append(Step(
                 number: number,
                 direction: direction == .down ? "down" : "up",
-                offsetAfterMove: afterMove,
+                movedByItself: result.moved,
+                offsetAfterScroll: afterScroll,
                 offsetSettled: view.contentOffset.y,
+                restyled: result.restyled,
                 reading: reading("step \(number)", of: view),
                 drawnCaret: drawnCaret(in: view)
             ))
@@ -60,27 +92,46 @@ final class EditorNavigationTests: EditorTestCase {
         XCTAssertTrue(view.becomeFirstResponder(), "The text view wouldn't take focus.")
         let title = (view.text as NSString).range(of: "Part 2")
         view.selectedRange = NSRange(location: title.location + title.length, length: 0)
-        view.scrollRangeToVisible(view.selectedRange)
+        // The text view lays out only what it needs, so the page isn't as tall as it will be until the caret is found.
+        view.layoutManager.ensureLayout(for: view.textContainer)
+        view.layoutIfNeeded()
+        let caret = view.caretRect(for: view.selectedTextRange?.end ?? view.endOfDocument)
+        view.setContentOffset(CGPoint(x: 0, y: max(0, caret.minY - 150)), animated: false)
         settle(0.3)
         return view
     }
 
-    func testArrowsKeepThePageWhereTheCaretIs() throws {
+    func testArrowingDoesNotMoveThePageOnItsOwn() throws {
         let view = try openInTheMiddle()
-        let startingOffset = view.contentOffset.y
+        XCTAssertGreaterThan(view.contentOffset.y, 100, "The page didn't start part way down.")
         let steps = walk(.down, steps: 45, in: view) + walk(.up, steps: 45, in: view)
-        XCTAssertGreaterThan(startingOffset, 100, "The page didn't start part way down.")
 
+        let moved = steps.filter { abs($0.movedByItself) > 1 }
         let lost = steps.filter { !$0.reading.isInView }
-        let jumps = steps.filter { abs($0.jump) > Self.size.height / 2 }
-        var report = "started at \(Int(startingOffset)); \(steps.count) steps; "
-        report += "\(lost.count) with the caret out of view; \(jumps.count) where the page jumped on its own.\n"
-        report += lost.prefix(3).map { "  out of view, \($0.direction) \($0.number): " + $0.reading.summary }.joined(separator: "\n")
-        report += "\n"
-        report += jumps.prefix(3).map {
-            String(format: "  jumped, %@ %d: from %.0f to %.0f", $0.direction, $0.number, $0.offsetAfterMove, $0.offsetSettled)
+        let jumps = steps.filter { abs($0.jumpAfterScroll) > Self.size.height / 2 }
+        var report = "\(steps.count) steps; \(moved.count) where the page moved by itself; "
+        report += "\(lost.count) with the caret out of view; \(jumps.count) where the page jumped after the view scrolled.\n"
+        report += moved.prefix(3).map {
+            String(format: "  moved by itself, %@ %d: by %.0f", $0.direction, $0.number, $0.movedByItself)
         }.joined(separator: "\n")
-        XCTAssertTrue(lost.isEmpty && jumps.isEmpty, report)
+        report += lost.prefix(3).map { "\n  out of view, \($0.direction) \($0.number): " + $0.reading.summary }.joined()
+        report += jumps.prefix(3).map {
+            String(format: "\n  jumped, %@ %d: from %.0f to %.0f", $0.direction, $0.number, $0.offsetAfterScroll, $0.offsetSettled)
+        }.joined()
+        XCTAssertTrue(moved.isEmpty && lost.isEmpty && jumps.isEmpty, report)
+    }
+
+    /// Moving the caret should restyle the lines it leaves and enters, not the whole page. Rewriting all of the text
+    /// throws away the text view's layout for every line each time.
+    func testArrowingRestylesOnlyTheLinesItTouches() throws {
+        let view = try openInTheMiddle()
+        let length = (view.text as NSString).length
+        let steps = walk(.down, steps: 45, in: view) + walk(.up, steps: 45, in: view)
+        let whole = steps.filter { $0.restyled > length / 2 }
+        let most = steps.map(\.restyled).max() ?? 0
+        let report = "The text is \(length) characters. \(whole.count) of \(steps.count) caret moves rewrote more than "
+            + "half of it; the most was \(most)."
+        XCTAssertTrue(whole.isEmpty, report)
     }
 
     func testTheDrawnCaretStaysOnItsLineWhileArrowing() throws {
