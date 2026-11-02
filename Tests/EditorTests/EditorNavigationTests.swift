@@ -71,7 +71,7 @@ final class EditorNavigationTests: EditorTestCase {
         for number in 1...steps {
             guard let result = arrow(direction, in: view, edits: edits) else { break }
             let afterScroll = view.contentOffset.y
-            settle(0.06)
+            settle(0.1)
             taken.append(Step(
                 number: number,
                 direction: direction == .down ? "down" : "up",

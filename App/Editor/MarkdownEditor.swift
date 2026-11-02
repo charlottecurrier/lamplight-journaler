@@ -622,7 +622,15 @@ struct MarkdownEditor: UIViewRepresentable {
                     )
                 }
             }
-            view.typingAttributes = MarkdownStyler.typingAttributes(document: document, caret: selection.location)
+            // Typed text takes the style of the line the caret is on, not of the character before it, which could be
+            // bold, or a hidden marker with no size. Setting this makes the text view scroll, to somewhere it isn't
+            // going, and it did that on every move of the caret, so put the page back where it was.
+            let typing = MarkdownStyler.typingAttributes(document: document, caret: selection.location)
+            let offset = view.contentOffset
+            view.typingAttributes = typing
+            if view.isScrollEnabled, abs(view.contentOffset.y - offset.y) > 0.5 {
+                view.setContentOffset(offset, animated: false)
+            }
         }
 
         // MARK: Delegate
