@@ -107,19 +107,22 @@ final class EditorNavigationTests: EditorTestCase {
         XCTAssertGreaterThan(view.contentOffset.y, 100, "The page didn't start part way down.")
         let steps = walk(.down, steps: 45, in: view) + walk(.up, steps: 45, in: view)
 
-        // Moving down may scroll the page down and never up. Moving up is the other way round.
+        // Moving down may scroll the page down and never up. Moving up is the other way round. And nothing moves the
+        // page before the view scrolls to the caret, not even for a moment.
         let wrongWay = steps.filter { step in
             let change = step.offsetSettled - step.offsetBefore
             return step.direction == "down" ? change < -1 : change > 1
         }
+        let atOnce = steps.filter { abs($0.movedByItself) > 1 }
         let lost = steps.filter { !$0.reading.isInView }
         var report = "\(steps.count) steps; \(wrongWay.count) where the page went the wrong way; "
+        report += "\(atOnce.count) where it moved at once on its own (first by \(Int(atOnce.first?.movedByItself ?? 0))); "
         report += "\(lost.count) with the caret out of view.\n"
         report += wrongWay.prefix(3).map {
             String(format: "  wrong way, %@ %d: from %.0f to %.0f", $0.direction, $0.number, $0.offsetBefore, $0.offsetSettled)
         }.joined(separator: "\n")
         report += lost.prefix(3).map { "\n  out of view, \($0.direction) \($0.number): " + $0.reading.summary }.joined()
-        XCTAssertTrue(wrongWay.isEmpty && lost.isEmpty, report)
+        XCTAssertTrue(wrongWay.isEmpty && atOnce.isEmpty && lost.isEmpty, report)
     }
 
     /// Moving the caret should restyle the lines it leaves and enters, not the whole page. Rewriting all of the text
@@ -133,50 +136,6 @@ final class EditorNavigationTests: EditorTestCase {
         let report = "The text is \(length) characters. \(whole.count) of \(steps.count) caret moves rewrote more than "
             + "a third of it; the most was \(most)."
         XCTAssertTrue(whole.isEmpty, report)
-    }
-
-    /// Temporary: always fails, to print which single step moves the page. Removed once the cause is found.
-    func testProbeWhatMovesThePage() throws {
-        let view = try openInTheMiddle()
-        let base = view.contentOffset.y
-        var lines: [String] = ["starting at \(Int(base))"]
-
-        func nextDown() -> UITextRange? {
-            guard let current = view.selectedTextRange?.end,
-                  let next = view.position(from: current, in: .down, offset: 1) else { return nil }
-            return view.textRange(from: next, to: next)
-        }
-        func probe(_ name: String, _ action: () -> Void) {
-            view.setContentOffset(CGPoint(x: 0, y: base), animated: false)
-            settle(0.15)
-            let before = view.contentOffset.y
-            action()
-            let right = view.contentOffset.y - before
-            settle(0.15)
-            let later = view.contentOffset.y - before
-            lines.append(String(format: "%@: right away %.0f, after settling %.0f", name, right, later))
-        }
-
-        probe("the text view's own selection change, without our delegate") {
-            let delegate = view.delegate
-            view.delegate = nil
-            if let range = nextDown() { view.selectedTextRange = range }
-            view.delegate = delegate
-        }
-        probe("setting the typing style again") {
-            view.typingAttributes = view.typingAttributes
-        }
-        probe("styling one line again with the style it already has") {
-            let text = view.text as NSString
-            let line = text.lineRange(for: view.selectedRange)
-            view.textStorage.beginEditing()
-            view.textStorage.setAttributes(view.textStorage.attributes(at: line.location, effectiveRange: nil), range: line)
-            view.textStorage.endEditing()
-        }
-        probe("the whole path: caret move with our delegate") {
-            if let range = nextDown() { view.selectedTextRange = range }
-        }
-        XCTFail("\n" + lines.joined(separator: "\n"))
     }
 
     func testTheDrawnCaretStaysOnItsLineWhileArrowing() throws {

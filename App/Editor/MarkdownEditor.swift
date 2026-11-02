@@ -622,21 +622,55 @@ struct MarkdownEditor: UIViewRepresentable {
                     )
                 }
             }
-            // Typed text takes the style of the line the caret is on, not of the character before it, which could be
-            // bold, or a hidden marker with no size. Setting this makes the text view scroll, to somewhere it isn't
-            // going, and it did that on every move of the caret, so put the page back where it was.
-            let typing = MarkdownStyler.typingAttributes(document: document, caret: selection.location)
-            let offset = view.contentOffset
-            view.typingAttributes = typing
-            if view.isScrollEnabled, abs(view.contentOffset.y - offset.y) > 0.5 {
-                view.setContentOffset(offset, animated: false)
+        }
+
+        /// Typed text takes the style of the line the caret is on, not of the character before it, which could be
+        /// bold, or a hidden marker with no size. This is set when something is about to be typed, and only if the
+        /// text view's own choice would differ. It isn't set when the caret moves: setting it makes the text view
+        /// scroll to somewhere it isn't going and back, which threw the page off on every arrow press.
+        private func setTypingStyle(for view: UITextView, at caret: Int) {
+            let wanted = MarkdownStyler.typingAttributes(document: analysis(for: view.text), caret: caret)
+            guard !Self.sameTypingStyle(view.typingAttributes, wanted, traits: view.traitCollection) else { return }
+            view.typingAttributes = wanted
+        }
+
+        /// Whether two sets of typing attributes look the same to someone reading: size, weight and slant, color, and
+        /// the marks that stand out (highlight, strike, underline, link, spacing between letters).
+        private static func sameTypingStyle(
+            _ a: [NSAttributedString.Key: Any], _ b: [NSAttributedString.Key: Any], traits: UITraitCollection
+        ) -> Bool {
+            if let fa = a[.font] as? UIFont, let fb = b[.font] as? UIFont {
+                guard abs(fa.pointSize - fb.pointSize) < 0.01,
+                      fa.fontDescriptor.symbolicTraits == fb.fontDescriptor.symbolicTraits,
+                      fa.familyName == fb.familyName else { return false }
+            } else if (a[.font] == nil) != (b[.font] == nil) {
+                return false
             }
+            func components(_ color: Any?) -> [CGFloat]? {
+                guard let color = color as? UIColor else { return nil }
+                var (red, green, blue, alpha): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
+                color.resolvedColor(with: traits).getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+                return [red, green, blue, alpha]
+            }
+            for key in [NSAttributedString.Key.foregroundColor, .backgroundColor] {
+                switch (components(a[key]), components(b[key])) {
+                case (nil, nil): continue
+                case let (x?, y?): if zip(x, y).contains(where: { abs($0 - $1) > 0.01 }) { return false }
+                default: return false
+                }
+            }
+            for key in [NSAttributedString.Key.strikethroughStyle, .underlineStyle, .kern, .link] {
+                if (a[key] == nil) != (b[key] == nil) { return false }
+                if let x = a[key] as? NSNumber, let y = b[key] as? NSNumber, x != y { return false }
+            }
+            return true
         }
 
         // MARK: Delegate
 
         func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
             guard parent.isEditable, !isApplyingEdit, textView.markedTextRange == nil else { return true }
+            setTypingStyle(for: textView, at: range.location)
 
             let replaced = range.location..<(range.location + range.length)
             // Pasted or dictated text can be Markdown, such as "- [ ] milk". Turn it into editor form as it goes in.
