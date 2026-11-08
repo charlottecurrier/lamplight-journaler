@@ -51,22 +51,38 @@ jobs:
           echo "Using simulator $udid"
           echo "udid=$udid" >> "$GITHUB_OUTPUT"
 
-      # The photo picker tests look in a real Photos library, so the app has to be allowed to read it.
-      - name: Let the app read Photos
+      - name: Build
         run: |
-          xcrun simctl bootstatus "${{ steps.simulator.outputs.udid }}" -b
-          xcrun simctl privacy "${{ steps.simulator.outputs.udid }}" grant photos com.forageandjump.lamplight
+          set -o pipefail
+          xcodebuild build-for-testing -quiet \
+            -project Lamplight.xcodeproj \
+            -scheme Lamplight \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO
 
-      - name: Build and test
+      # The photo picker tests look in a real Photos library, so the app has to be allowed to read it. Running the
+      # tests puts a fresh copy of the app on the simulator, which clears what was granted to the old one, so the
+      # grant is made again, over and over, while they run.
+      - name: Test
         env:
           # The test runner hands this on to the tests as REQUIRE_PHOTOS.
           TEST_RUNNER_REQUIRE_PHOTOS: "1"
         run: |
           set -o pipefail
-          xcodebuild test -quiet \
+          udid="${{ steps.simulator.outputs.udid }}"
+          xcrun simctl bootstatus "$udid" -b
+          xcrun simctl install "$udid" "$RUNNER_TEMP/DerivedData/Build/Products/Debug-iphonesimulator/Lamplight.app"
+          grant() { xcrun simctl privacy "$udid" grant photos com.forageandjump.lamplight; }
+          grant
+          ( while true; do grant > /dev/null 2>&1; sleep 1; done ) &
+          granter=$!
+          trap 'kill $granter 2> /dev/null' EXIT
+          xcodebuild test-without-building -quiet \
             -project Lamplight.xcodeproj \
             -scheme Lamplight \
-            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}" \
+            -destination "platform=iOS Simulator,id=$udid" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             -resultBundlePath "$RUNNER_TEMP/Lamplight.xcresult" \
             CODE_SIGNING_ALLOWED=NO
 
