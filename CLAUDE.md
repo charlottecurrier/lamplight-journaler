@@ -18,6 +18,8 @@ LAMPLIGHT_SAMPLE_DIR=<dir> swift test --filter SampleFolderTests   # checks tool
 xcodegen                                     # regenerate Lamplight.xcodeproj (set USER=anyname on Linux)
 tools/typecheck_support.sh                   # type-checks App/Support (model, storage) against iOS stand-ins on Linux
 python3 tools/check_palette.py               # contrast checks, writes docs/palette-preview.png
+python3 tools/check_privacy_manifest.py      # fails if the code uses an API Apple wants a reason for that App/PrivacyInfo.xcprivacy doesn't list
+python3 tools/bump_build.py                  # raises the build number (project.yml and the Xcode project) before a TestFlight upload
 python3 tools/make_assets.py                 # redraws the first texture, icon and color sets
 python3 tools/make_textures.py --preview <dir>   # contact sheets of every texture; --write redraws their tiles
 python3 tools/make_sample_journal.py <dir>   # sample data for trying the app
@@ -35,7 +37,7 @@ On Linux, a Swift toolchain can be downloaded from `download.swift.org` (Ubuntu 
 
 GitHub Actions runs two workflows on pull requests. After a push, look at the PR's checks before saying the work is done.
 
-- `.github/workflows/core.yml` (Linux, every PR and every push to `main`): `swift test` with the sample journal, `tools/typecheck_support.sh`, `tools/check_palette.py`, and a syntax check of the Python tools.
+- `.github/workflows/core.yml` (Linux, every PR and every push to `main`): `swift test` with the sample journal, `tools/typecheck_support.sh`, `tools/check_palette.py`, `tools/check_privacy_manifest.py`, and a syntax check of the Python tools.
 - `.github/workflows/app.yml` (macOS, only PRs that change `App/`, `Sources/`, `Tests/`, `project.yml`, the Xcode project or `Package.swift`): builds the app and runs the tests in the iPad simulator. This is the only place the SwiftUI and UIKit code in `App/` is compiled outside Xcode, so it can find errors the Linux harness can't. The repo is private, so macOS minutes count ten times. Don't add triggers that run it on every push.
 
 ## Rules that matter
@@ -51,5 +53,6 @@ GitHub Actions runs two workflows on pull requests. After a push, look at the PR
 - **A photo in the text is a line of its own: `![](photos/NAME.jpg)`.** `MediaLine` (Core) keeps it that way. `MarkdownEditing.intercept` and `Coordinator.apply` send every edit through `MediaLine.repaired`, and `Coordinator.changed` runs `MediaLine.separated` after each change. The editor hides that line's text and draws the photo in its place (`RuleLayoutManager`). Don't add an edit path that skips them. The header's `photos` list stays the registry of an entry's photos, so a photo not named in the text still shows above it.
 - **The editor makes some edits itself.** Return, Backspace, Tab and format commands go through `Coordinator.apply`, in place of the text view's own typing, so the text view doesn't scroll to them. `keepCaretInView` does that after each one, and `MarkdownUITextView.caretRect` trims the caret to the text, because a heading or section title has space above it that the text view counts as part of the line. Don't add an edit path that skips either. `EditorCaretTests` covers both. Moving the caret restyles only the lines it leaves and enters (`MarkdownStyler.restyle(lines:)`), never the whole text: styling all of the text again throws away the text view's layout and moves the page by itself. `EditorNavigationTests` covers that.
 - **The photo picker needs Photos access, and must work without it.** `DayPhotoPicker` lists photos by day from the library, so it needs `NSPhotoLibraryUsageDescription` and the person's permission. With no access, or limited access, it must still offer the system's `PhotosPicker`, which needs none. Which photos belong to a day is `PhotoDays` and `PhotoDayGrouper` in Core, tested on Linux. Don't read the library on launch: it is read only when the sheet is open.
+- **The privacy manifest lists what the app uses.** `App/PrivacyInfo.xcprivacy` gives Apple a reason for each "required reason" API: UserDefaults, file dates, time since boot, free disk space, active keyboards. Using a new one without adding its reason gets an upload flagged. `tools/check_privacy_manifest.py` catches it in CI, but it can't pick the reason. Lamplight collects nothing and doesn't track, and the manifest says so. Sharing steps are in `docs/TESTFLIGHT.md`.
 - **Editor text is not file text.** The editor shows `•`, `☐` and `☑` for list markers. `EditorText.fromMarkdown` and `toMarkdown` convert at the load and save boundary. Never write editor text to disk or read file text into the editor without converting.
 - The `EntryFile` header values are JSON. Splitting text on `"\n"` must be done on bytes (Swift treats `\r\n` as one character).
