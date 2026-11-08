@@ -59,7 +59,7 @@ jobs:
             -scheme Lamplight \
             -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}" \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO
 
       # The photo picker tests look in a real Photos library, so the app has to be allowed to read it. Changing what an
       # app may read kills it if it is running, and a fresh install clears it, so: one small run first, to have the app
@@ -78,13 +78,15 @@ jobs:
             sqlite3 "$tcc" "select service, client, auth_value from access where client like '%lamplight%'" || true
             xcrun simctl get_app_container "$udid" "$bundle" data || true
           }
+          echo "-- how the app is signed"
+          codesign -dvv "$RUNNER_TEMP/DerivedData/Build/Products/Debug-iphonesimulator/Lamplight.app" 2>&1 | grep -E "Identifier|Signature|Authority|TeamIdentifier" || true
           run_tests() {
             xcodebuild test-without-building -quiet \
               -project Lamplight.xcodeproj \
               -scheme Lamplight \
               -destination "platform=iOS Simulator,id=$udid" \
               -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-              CODE_SIGNING_ALLOWED=NO "$@"
+              CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO "$@"
           }
           xcrun simctl bootstatus "$udid" -b
           run_tests -only-testing:LamplightTests/BoundedWaitTests/testReturnsWhatTheWorkReturns
