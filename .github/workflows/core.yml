@@ -43,5 +43,8 @@ jobs:
       - name: Palette contrast
         run: python3 tools/check_palette.py
 
+      - name: Privacy manifest covers what the code uses
+        run: python3 tools/check_privacy_manifest.py
+
       - name: Python tools parse
         run: python3 -c 'import ast, sys; [ast.parse(open(f).read(), f) for f in sys.argv[1:]]' tools/*.py

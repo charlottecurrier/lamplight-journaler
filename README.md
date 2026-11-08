@@ -38,6 +38,8 @@ You need a Mac with Xcode 16 or newer, and your Apple ID. A free Apple account i
 
 **Free account catch:** apps installed with a free account stop opening after 7 days. Press Run in Xcode again to renew. Your entries are not affected, because they live in your iCloud Drive folder and not inside the app.
 
+To give the app to friends, or to stop the 7-day renewals, use the paid Apple Developer Program and TestFlight. The steps are in `docs/TESTFLIGHT.md`.
+
 ## Try it with sample data
 
 On day one there's nothing to show in On This Day and the streak is empty. To see them working, make a sample journal on your Mac:
