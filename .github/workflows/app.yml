@@ -58,6 +58,9 @@ jobs:
           xcrun simctl privacy "${{ steps.simulator.outputs.udid }}" grant photos com.forageandjump.lamplight
 
       - name: Build and test
+        env:
+          # The test runner hands this on to the tests as REQUIRE_PHOTOS.
+          TEST_RUNNER_REQUIRE_PHOTOS: "1"
         run: |
           set -o pipefail
           xcodebuild test -quiet \

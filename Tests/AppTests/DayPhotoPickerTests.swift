@@ -12,9 +12,17 @@ final class DayPhotoPickerTests: XCTestCase {
 
     private func date(_ iso: String) -> Date { T.date(iso) }
 
+    /// Skips when the app can't read Photos, unless the run says it must: the Mac job sets REQUIRE_PHOTOS, because a
+    /// skipped test looks like a passing one and these are the tests that look in a real library.
     private func requireAccess() throws {
         guard PhotoAccess.current == .full else {
-            throw XCTSkip("Photos access isn't granted to the app, so there is no library to look in.")
+            let status = PHPhotoLibrary.authorizationStatus(for: .readWrite).rawValue
+            let note = "Photos access isn't granted to \(Bundle.main.bundleIdentifier ?? "the app") (status \(status)), "
+                + "so there is no library to look in."
+            if ProcessInfo.processInfo.environment["REQUIRE_PHOTOS"] == "1" {
+                XCTFail(note)
+            }
+            throw XCTSkip(note)
         }
     }
 
