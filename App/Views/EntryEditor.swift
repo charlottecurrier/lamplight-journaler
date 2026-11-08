@@ -24,6 +24,11 @@ struct EntryEditorView: View {
 
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var isImporting = false
+    /// "Add Photos" is a sheet that lists the photos by day. The system's picker is the way out if the person doesn't
+    /// allow it to read the library.
+    @State private var showDayPicker = false
+    @State private var showSystemPicker = false
+    @State private var openSystemPickerAfter = false
     /// File names of photos that have been in the text during this visit. One taken out of the text is kept until
     /// the entry is finished, so deleting it can still be undone.
     @State private var placedThisVisit: Set<String>
@@ -71,6 +76,23 @@ struct EntryEditorView: View {
         .sheet(isPresented: $showDate) {
             DateSheet(date: $draft.createdAt)
         }
+        .sheet(isPresented: $showDayPicker, onDismiss: {
+            // The system's picker can't be shown while this sheet is still going away.
+            if openSystemPickerAfter {
+                openSystemPickerAfter = false
+                showSystemPicker = true
+            }
+        }) {
+            DayPhotoPicker(
+                entryDate: draft.createdAt, timeZone: draft.timeZone, calendar: prefs.dayCalendar,
+                onAdd: { importAssets($0) },
+                onUseSystemPicker: { openSystemPickerAfter = true }
+            )
+        }
+        .photosPicker(
+            isPresented: $showSystemPicker, selection: $pickerItems, maxSelectionCount: DayPhotoPickerModel.limit,
+            matching: .images
+        )
         .sheet(isPresented: $showPlace) {
             LocationPickerView(current: draft.location, home: model.settings.home) { place in
                 draft.location = place
@@ -379,7 +401,9 @@ struct EntryEditorView: View {
     @ToolbarContentBuilder
     private var toolbarItems: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
-            PhotosPicker(selection: $pickerItems, maxSelectionCount: 12, matching: .images) {
+            Button {
+                showDayPicker = true
+            } label: {
                 PaperIcon("photo.on.rectangle")
             }
             .accessibilityLabel("Add Photos")
@@ -455,6 +479,7 @@ struct EntryEditorView: View {
 
     // MARK: Photos
 
+    /// Photos chosen in the system's picker.
     private func importPicked() {
         let items = pickerItems
         pickerItems = []
@@ -467,14 +492,32 @@ struct EntryEditorView: View {
                     images.append(data)
                 }
             }
-            let added = await model.addPhotos(images, to: draft.id)
-            draft.photos.append(contentsOf: added)
-            // Each photo goes into the text at the caret, on a line of its own.
-            controller.insertPhotos(added)
-            isImporting = false
-            saveTask?.cancel()
-            commit()
+            if images.count < items.count { model.show("Some photos couldn't be added.") }
+            await finishImport(images)
         }
+    }
+
+    /// Photos chosen in the day-by-day sheet, as identifiers in the Photos library.
+    private func importAssets(_ ids: [String]) {
+        guard !ids.isEmpty else { return }
+        Task { @MainActor in
+            isImporting = true
+            let images = await DayPhotoPickerModel.imageData(for: ids)
+            if images.count < ids.count {
+                model.show("Some photos couldn't be added. They may still be coming down from iCloud.")
+            }
+            await finishImport(images)
+        }
+    }
+
+    private func finishImport(_ images: [Data]) async {
+        let added = await model.addPhotos(images, to: draft.id)
+        draft.photos.append(contentsOf: added)
+        // Each photo goes into the text at the caret, on a line of its own.
+        controller.insertPhotos(added)
+        isImporting = false
+        saveTask?.cancel()
+        commit()
     }
 
     private func removePhoto(_ photo: PhotoRef) {

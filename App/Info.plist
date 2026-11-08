@@ -26,6 +26,8 @@
 	<true/>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Lamplight uses Face ID to keep your journal private.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Lamplight shows your photos by day, with the day of an entry first, so you can add them. The photos you add are copied into your journal.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

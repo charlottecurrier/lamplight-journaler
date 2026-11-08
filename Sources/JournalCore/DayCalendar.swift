@@ -37,10 +37,15 @@ struct DayCalendar: Equatable {
     }
 
     func stamp(for date: Date, timeZone: TimeZone) -> DayStamp {
-        let shifted = date.addingTimeInterval(-Double(rolloverHour) * 3600)
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = timeZone
-        let c = cal.dateComponents([.year, .month, .day], from: shifted)
+        return stamp(for: date, using: cal)
+    }
+
+    /// The same, for a caller that has many dates to stamp and keeps one Gregorian calendar for them.
+    func stamp(for date: Date, using calendar: Calendar) -> DayStamp {
+        let shifted = date.addingTimeInterval(-Double(rolloverHour) * 3600)
+        let c = calendar.dateComponents([.year, .month, .day], from: shifted)
         return DayStamp(year: c.year ?? 1970, month: c.month ?? 1, day: c.day ?? 1)
     }
 }
