@@ -61,9 +61,8 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             CODE_SIGNING_ALLOWED=NO
 
-      # The photo picker tests look in a real Photos library, so the app has to be allowed to read it. Running the
-      # tests puts a fresh copy of the app on the simulator, which clears what was granted to the old one, so the
-      # grant is made again, over and over, while they run.
+      # The photo picker tests look in a real Photos library, so the app has to be allowed to read it. It is installed
+      # first and granted once, before the tests start it: changing what an app may read kills it if it is running.
       - name: Test
         env:
           # The test runner hands this on to the tests as REQUIRE_PHOTOS.
@@ -73,11 +72,7 @@ jobs:
           udid="${{ steps.simulator.outputs.udid }}"
           xcrun simctl bootstatus "$udid" -b
           xcrun simctl install "$udid" "$RUNNER_TEMP/DerivedData/Build/Products/Debug-iphonesimulator/Lamplight.app"
-          grant() { xcrun simctl privacy "$udid" grant photos com.forageandjump.lamplight; }
-          grant
-          ( while true; do grant > /dev/null 2>&1; sleep 1; done ) &
-          granter=$!
-          trap 'kill $granter 2> /dev/null' EXIT
+          xcrun simctl privacy "$udid" grant photos com.forageandjump.lamplight
           xcodebuild test-without-building -quiet \
             -project Lamplight.xcodeproj \
             -scheme Lamplight \
