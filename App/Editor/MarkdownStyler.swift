@@ -150,6 +150,27 @@ enum MarkdownStyler {
         storage.endEditing()
     }
 
+    /// Styles again only the lines given, for when the caret moved and nothing else changed. Every other line keeps the
+    /// style it has, so the text view doesn't throw away and redo the layout of the whole page for a key press.
+    /// `active` is every line the caret touches now.
+    static func restyle(
+        lines indices: [Int], in storage: NSTextStorage, document: MarkdownDocument, active: Set<Int>,
+        media: MediaLayout? = nil
+    ) {
+        guard storage.length == document.units.count else { return }
+        let lines = indices.filter { document.lines.indices.contains($0) }
+        guard !lines.isEmpty else { return }
+
+        storage.beginEditing()
+        for index in lines {
+            let line = document.lines[index]
+            // The same two steps as `apply`, for this one line.
+            storage.setAttributes(baseAttributes(), range: nsRange(line.range))
+            style(line, active: active.contains(index), document: document, storage: storage, media: media)
+        }
+        storage.endEditing()
+    }
+
     private static func nsRange(_ range: Range<Int>) -> NSRange {
         NSRange(location: range.lowerBound, length: range.count)
     }

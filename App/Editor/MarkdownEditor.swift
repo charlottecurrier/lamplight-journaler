@@ -606,18 +606,71 @@ struct MarkdownEditor: UIViewRepresentable {
             let media = mediaLayout()
             let signature = StyleSignature(text: text, activeLines: active, editing: editing, media: media)
             if force || signature != styledSignature {
+                let previous = styledSignature
                 styledSignature = signature
-                MarkdownStyler.apply(
-                    to: view.textStorage, document: document, selection: editing ? selection : nil, media: media
-                )
+                if !force, let previous, previous.text == signature.text, previous.media == signature.media {
+                    // Only the caret moved. Style the lines it left and the lines it came to, and leave the rest of
+                    // the page alone. Styling all of the text again for every key press threw away the layout of the
+                    // whole page, which moved the page by itself.
+                    let changed = Set(previous.activeLines).symmetricDifference(active).sorted()
+                    MarkdownStyler.restyle(
+                        lines: changed, in: view.textStorage, document: document, active: Set(active), media: media
+                    )
+                } else {
+                    MarkdownStyler.apply(
+                        to: view.textStorage, document: document, selection: editing ? selection : nil, media: media
+                    )
+                }
             }
-            view.typingAttributes = MarkdownStyler.typingAttributes(document: document, caret: selection.location)
+        }
+
+        /// Typed text takes the style of the line the caret is on, not of the character before it, which could be
+        /// bold, or a hidden marker with no size. This is set when something is about to be typed, and only if the
+        /// text view's own choice would differ. It isn't set when the caret moves: setting it makes the text view
+        /// scroll to somewhere it isn't going and back, which threw the page off on every arrow press.
+        private func setTypingStyle(for view: UITextView, at caret: Int) {
+            let wanted = MarkdownStyler.typingAttributes(document: analysis(for: view.text), caret: caret)
+            guard !Self.sameTypingStyle(view.typingAttributes, wanted, traits: view.traitCollection) else { return }
+            view.typingAttributes = wanted
+        }
+
+        /// Whether two sets of typing attributes look the same to someone reading: size, weight and slant, color, and
+        /// the marks that stand out (highlight, strike, underline, link, spacing between letters).
+        private static func sameTypingStyle(
+            _ a: [NSAttributedString.Key: Any], _ b: [NSAttributedString.Key: Any], traits: UITraitCollection
+        ) -> Bool {
+            if let fa = a[.font] as? UIFont, let fb = b[.font] as? UIFont {
+                guard abs(fa.pointSize - fb.pointSize) < 0.01,
+                      fa.fontDescriptor.symbolicTraits == fb.fontDescriptor.symbolicTraits,
+                      fa.familyName == fb.familyName else { return false }
+            } else if (a[.font] == nil) != (b[.font] == nil) {
+                return false
+            }
+            func components(_ color: Any?) -> [CGFloat]? {
+                guard let color = color as? UIColor else { return nil }
+                var (red, green, blue, alpha): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
+                color.resolvedColor(with: traits).getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+                return [red, green, blue, alpha]
+            }
+            for key in [NSAttributedString.Key.foregroundColor, .backgroundColor] {
+                switch (components(a[key]), components(b[key])) {
+                case (nil, nil): continue
+                case let (x?, y?): if zip(x, y).contains(where: { abs($0 - $1) > 0.01 }) { return false }
+                default: return false
+                }
+            }
+            for key in [NSAttributedString.Key.strikethroughStyle, .underlineStyle, .kern, .link] {
+                if (a[key] == nil) != (b[key] == nil) { return false }
+                if let x = a[key] as? NSNumber, let y = b[key] as? NSNumber, x != y { return false }
+            }
+            return true
         }
 
         // MARK: Delegate
 
         func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
             guard parent.isEditable, !isApplyingEdit, textView.markedTextRange == nil else { return true }
+            setTypingStyle(for: textView, at: range.location)
 
             let replaced = range.location..<(range.location + range.length)
             // Pasted or dictated text can be Markdown, such as "- [ ] milk". Turn it into editor form as it goes in.
@@ -657,6 +710,9 @@ struct MarkdownEditor: UIViewRepresentable {
             restyle()
             updateSlashSuggestions(textView)
             if parent.isFocusMode { centerCaret(textView) }
+            // Moving with the arrow keys: the text view scrolls to the caret itself, but it can stop short when the
+            // page it has laid out is not as tall as the page will be.
+            keepCaretInView(textView, below: 8)
         }
 
         func textViewDidBeginEditing(_ textView: UITextView) {
@@ -714,7 +770,7 @@ struct MarkdownEditor: UIViewRepresentable {
 
         /// Scrolls just far enough that the caret is on screen. An edit made here, such as Return, takes the place of
         /// the text view's own typing, so the text view doesn't scroll to it. Focus mode places the caret itself.
-        private func keepCaretInView(_ view: UITextView) {
+        private func keepCaretInView(_ view: UITextView, below room: CGFloat = 40) {
             guard view.isScrollEnabled, !parent.isFocusMode else { return }
             // Next turn of the run loop, once the text view has laid out the new line and sized itself to it.
             DispatchQueue.main.async { [weak view] in
@@ -730,9 +786,9 @@ struct MarkdownEditor: UIViewRepresentable {
                 var offset = view.contentOffset.y
                 if caret.minY - 12 < visibleTop {
                     offset = caret.minY - 12 - inset.top
-                } else if caret.maxY + 40 > visibleBottom {
-                    // Room for the space under the last line, as the text view leaves for a typed character.
-                    offset = caret.maxY + 40 - view.bounds.height + inset.bottom
+                } else if caret.maxY + room > visibleBottom {
+                    // After typing, room for the space under the last line, as the text view leaves for a typed character.
+                    offset = caret.maxY + room - view.bounds.height + inset.bottom
                 }
                 offset = max(offset, -inset.top)
                 guard abs(offset - view.contentOffset.y) > 0.5 else { return }
