@@ -51,6 +51,12 @@ jobs:
           echo "Using simulator $udid"
           echo "udid=$udid" >> "$GITHUB_OUTPUT"
 
+      # The photo picker tests look in a real Photos library, so the app has to be allowed to read it.
+      - name: Let the app read Photos
+        run: |
+          xcrun simctl bootstatus "${{ steps.simulator.outputs.udid }}" -b
+          xcrun simctl privacy "${{ steps.simulator.outputs.udid }}" grant photos com.forageandjump.lamplight
+
       - name: Build and test
         run: |
           set -o pipefail

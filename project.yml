@@ -53,6 +53,8 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         NSFaceIDUsageDescription: Lamplight uses Face ID to keep your journal private.
+        # Needed to list your photos by day when you add photos to an entry. Without it the system's picker is used.
+        NSPhotoLibraryUsageDescription: Lamplight shows your photos by day, with the day of an entry first, so you can add them. The photos you add are copied into your journal.
         # Lets you see the "on this device only" journal in the Files app.
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
@@ -66,8 +68,9 @@ targets:
     platform: iOS
     sources:
       - path: Tests/JournalCoreTests
-      # Needs UIKit, so these only run in Xcode and in the Mac job, not in `swift test`.
+      # Need UIKit, so these only run in Xcode and in the Mac job, not in `swift test`.
       - path: Tests/EditorTests
+      - path: Tests/AppTests
     dependencies:
       - target: Lamplight
     settings:

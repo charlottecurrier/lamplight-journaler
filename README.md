@@ -23,7 +23,7 @@ A calm journal for writing at the end of the day. Made for iPad first, works on 
 - **Calendar.** A month view with a dot on days you wrote.
 - **Multiple journals.**
 - **Places.** Pick Home, or search for a place. No GPS, no location permission.
-- **Photos.** Add several per entry. Tap for full screen, pinch to zoom.
+- **Photos.** Add several per entry. The picker lists your photos by day, with the photos from the day of the entry first, then every other day, newest first. That needs your permission to read your Photos library. If you would rather not, or only share some photos, the system's Photos picker is offered instead. Tap a photo for full screen, pinch to zoom.
 - **Recently Deleted.** Swipe an entry left to delete it. Deleted entries stay for 30 days.
 
 ## Open it on your iPad
