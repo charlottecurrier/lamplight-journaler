@@ -96,6 +96,13 @@ struct SettingsView: View {
                 .listRowBackground(Theme.surface)
 
                 Section {
+                    NavigationLink("Video link test") { VideoLinkLab() }
+                } footer: {
+                    Text("A page for trying out video links on this device. It changes nothing in your journal.")
+                }
+                .listRowBackground(Theme.surface)
+
+                Section {
                     LabeledContent("Journal location", value: model.storageName)
                     Button("Choose a Different Folder…") { showFolderPicker = true }
                     Button("Refresh Now") {
