@@ -11,7 +11,7 @@ A calm journal for writing at the end of the day. Made for iPad first, works on 
 - Timeline of entries with photo thumbnails, grouped by month. Search. Tap the text of an entry to edit it where you tapped.
 - **On This Day.** A strip at the top of the journal, and its own screen.
 - **Streak.** Days in a row, longest streak, and the last seven days. A "new day starts at" setting keeps a 12:30 AM entry in yesterday's streak.
-- **Today.** The home page: a New Entry button with your templates, the streak and tonight's moon, what you wrote today, and what you wrote on this date in earlier years.
+- **Today.** A page with a New Entry button with your templates, the streak and tonight's moon, what you wrote today, and what you wrote on this date in earlier years.
 - **Favorites.** Tap the ribbon on an entry, or swipe it to the right, to keep it. Favorites has its own screen.
 - **Share.** From an entry's menu, share it as text, a Markdown file (a zip with a photos folder when it has photos), or a PDF.
 - **Little touches.** The lamp comes on when you open the journal: the page eases up out of the dark. Done closes the page and takes you back to the list. After you save the first entry of a day, the message can show a few lines you wrote on this date in an earlier year. Swipe an entry left or right to turn to the next or previous one. The calendar draws each day as the moon that evening, bright on days you wrote, and entries show the moon phase beside the time.

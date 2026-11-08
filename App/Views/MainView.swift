@@ -23,10 +23,10 @@ struct SidebarView: View {
     var body: some View {
         List(selection: $selection) {
             Section {
-                Label("Today", systemImage: "sun.horizon")
-                    .sidebarRow(.today, onChoose: onChoose)
                 Label("All Entries", systemImage: "book.closed")
                     .sidebarRow(.all, onChoose: onChoose)
+                Label("Today", systemImage: "sun.horizon")
+                    .sidebarRow(.today, onChoose: onChoose)
                 Label("On This Day", systemImage: "clock.arrow.circlepath")
                     .sidebarRow(.onThisDay, onChoose: onChoose)
                 Label("Favorites", systemImage: "bookmark")
@@ -126,7 +126,7 @@ struct MainView: View {
     @EnvironmentObject private var prefs: AppPrefs
     @Environment(\.horizontalSizeClass) private var sizeClass
 
-    @State private var sidebar: SidebarItem? = .today
+    @State private var sidebar: SidebarItem? = .all
     @State private var selectedEntryID: UUID?
     @State private var selectedTemplateID: UUID?
     @State private var showSettings = false
@@ -201,7 +201,7 @@ struct MainView: View {
 
     @ViewBuilder
     private var screen: some View {
-        switch sidebar ?? .today {
+        switch sidebar ?? .all {
         case .today:
             TodayScreen(
                 selection: $selectedEntryID,
@@ -310,7 +310,7 @@ struct MainView: View {
             }
         }
         // The editor opens in the detail column, so leave the Templates screen first.
-        if sidebar == .templates { sidebar = .today }
+        if sidebar == .templates { sidebar = .all }
         if let template { model.recordTemplateUse(template.id) }
         let id = model.beginNewEntry(journalID: journalID, templateID: template?.id, body: template?.body ?? "")
         if !keyboard { model.quietStartID = id }
@@ -328,7 +328,7 @@ struct MainView: View {
     private func neighbor(of id: UUID, step: Int) -> UUID? {
         // Turn through the list on screen, newest first. On This Day, Calendar and Templates are left out.
         let list: [Entry]
-        switch sidebar ?? .today {
+        switch sidebar ?? .all {
         case .all, .journal:
             list = model.entries(in: scope)
         case .favorites:
@@ -360,7 +360,7 @@ struct MainView: View {
         model.didOpenToNewEntry = true
         guard prefs.openToNewEntry, model.editingEntryID == nil, model.stillDownloading == 0 else { return }
         guard !model.streak(calendar: prefs.dayCalendar).wroteToday else { return }
-        sidebar = .today
+        sidebar = .all
         // The page opens quietly: the keyboard waits until the person taps it.
         begin(.standard, keyboard: false)
     }
@@ -372,7 +372,7 @@ private struct CompactBar: View {
     @Binding var selection: SidebarItem?
     var onNewEntry: () -> Void
 
-    private var current: SidebarItem { selection ?? .today }
+    private var current: SidebarItem { selection ?? .all }
 
     private func isSelected(_ item: SidebarItem) -> Bool {
         if item == .all, case .journal = current { return true }
@@ -434,8 +434,8 @@ private struct CompactBar: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            tab("Today", "sun.horizon", .today)
             tab("Journal", "book.closed", .all)
+            tab("Today", "sun.horizon", .today)
             Button(action: onNewEntry) {
                 Image(systemName: "plus")
                     .font(.system(size: 22, weight: .regular))
