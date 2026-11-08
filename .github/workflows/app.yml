@@ -61,8 +61,9 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             CODE_SIGNING_ALLOWED=NO
 
-      # The photo picker tests look in a real Photos library, so the app has to be allowed to read it. It is installed
-      # first and granted once, before the tests start it: changing what an app may read kills it if it is running.
+      # The photo picker tests look in a real Photos library, so the app has to be allowed to read it. Changing what an
+      # app may read kills it if it is running, and a fresh install clears it, so: one small run first, to have the app
+      # installed the way the tests install it; then the grant, while nothing is running; then the whole run.
       - name: Test
         env:
           # The test runner hands this on to the tests as REQUIRE_PHOTOS.
@@ -70,16 +71,31 @@ jobs:
         run: |
           set -o pipefail
           udid="${{ steps.simulator.outputs.udid }}"
+          bundle=com.forageandjump.lamplight
+          tcc="$HOME/Library/Developer/CoreSimulator/Devices/$udid/data/Library/TCC/TCC.db"
+          show() {
+            echo "-- $1"
+            sqlite3 "$tcc" "select service, client, auth_value from access where client like '%lamplight%'" || true
+            xcrun simctl get_app_container "$udid" "$bundle" data || true
+          }
+          run_tests() {
+            xcodebuild test-without-building -quiet \
+              -project Lamplight.xcodeproj \
+              -scheme Lamplight \
+              -destination "platform=iOS Simulator,id=$udid" \
+              -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+              CODE_SIGNING_ALLOWED=NO "$@"
+          }
           xcrun simctl bootstatus "$udid" -b
-          xcrun simctl install "$udid" "$RUNNER_TEMP/DerivedData/Build/Products/Debug-iphonesimulator/Lamplight.app"
-          xcrun simctl privacy "$udid" grant photos com.forageandjump.lamplight
-          xcodebuild test-without-building -quiet \
-            -project Lamplight.xcodeproj \
-            -scheme Lamplight \
-            -destination "platform=iOS Simulator,id=$udid" \
-            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-            -resultBundlePath "$RUNNER_TEMP/Lamplight.xcresult" \
-            CODE_SIGNING_ALLOWED=NO
+          run_tests -only-testing:LamplightTests/BoundedWaitTests/testReturnsWhatTheWorkReturns
+          show "after the small run"
+          xcrun simctl privacy "$udid" grant photos "$bundle"
+          show "after the grant"
+          set +e
+          run_tests -resultBundlePath "$RUNNER_TEMP/Lamplight.xcresult"
+          status=$?
+          show "after the whole run"
+          exit $status
 
       # -quiet prints nothing when everything passes, so say how many tests ran. Zero tests would be a silent pass.
       # When tests fail, show why: -quiet leaves the failure text out of the log.
