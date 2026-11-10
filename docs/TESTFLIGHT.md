@@ -7,7 +7,7 @@ Apple's pages: [TestFlight](https://developer.apple.com/testflight/), [invite te
 ## Once
 
 1. Enroll in the Apple Developer Program as an individual. Copy your **Team ID** from developer.apple.com/account, under Membership details.
-2. Put the Team ID in `project.yml` as `DEVELOPMENT_TEAM`, run `xcodegen`, and build to your iPad once to check that signing works. (Or send the Team ID and ask for it to be done.)
+2. The Team ID is in `project.yml` as `DEVELOPMENT_TEAM`. Build to your iPad once with it, to check that signing works and to register the app ID.
 3. In App Store Connect, go to Apps, then New App. Platform iOS, bundle ID `com.forageandjump.lamplight`. The App Store name has to be unique across the store, so "Lamplight" may be taken. If it is, pick another. The name under the icon on your home screen is separate (`CFBundleDisplayName`).
 
 ## Each upload
