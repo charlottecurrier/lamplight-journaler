@@ -17,7 +17,7 @@ settings:
     CURRENT_PROJECT_VERSION: "1"
     CODE_SIGN_STYLE: Automatic
     TARGETED_DEVICE_FAMILY: "1,2" # iPhone and iPad
-    DEVELOPMENT_TEAM: "" # Pick your team in Xcode > Signing & Capabilities
+    DEVELOPMENT_TEAM: "U8LGQ38JST" # The Apple Developer Program team. A Team ID is not a secret. Set here, not in Xcode, so it survives xcodegen.
 
 targets:
   Lamplight:

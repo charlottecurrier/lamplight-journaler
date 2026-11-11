@@ -32,7 +32,7 @@ You need a Mac with Xcode 16 or newer, and your Apple ID. A free Apple account i
 
 1. Open `Lamplight.xcodeproj`.
 2. Click the **Lamplight** project, then the **Lamplight** target, then **Signing & Capabilities**.
-3. Pick your **Team** (your Apple ID). If Xcode says the bundle identifier is taken, change `com.forageandjump.lamplight` to something unique to you.
+3. The **Team** is already set in `project.yml` (the paid Apple Developer Program team). If you are building with a different Apple ID, change `DEVELOPMENT_TEAM` there, not in Xcode, because regenerating the project overwrites Xcode's choice. If Xcode says the bundle identifier is taken, change `com.forageandjump.lamplight` to something unique to you.
 4. Plug in your iPad and choose it at the top of Xcode. Press **Run**.
 5. First time only: on the iPad turn on **Settings → Privacy & Security → Developer Mode**. After the first install, trust your Apple ID in **Settings → General → VPN & Device Management**.
 
