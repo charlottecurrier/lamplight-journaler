@@ -121,6 +121,10 @@ struct EntryEditorView: View {
         }
         .onChange(of: showDate) { if !showDate { controller.focus() } }
         .onChange(of: showPlace) { if !showPlace { controller.focus() } }
+        .onAppear {
+            NavTrace.note("editor of \(NavTrace.short(draft.id)) is on screen")
+            model.editorAppeared(draft.id)
+        }
         .onDisappear {
             NavTrace.note("editor of \(NavTrace.short(draft.id)) went away, closing \(closing), still editing \(model.editingEntryID == draft.id)")
             saveTask?.cancel()
@@ -131,8 +135,22 @@ struct EntryEditorView: View {
             }
             commit()
             guard viewer == nil else { return }
+            model.editorDisappeared(draft.id)
             // If Done was tapped a moment ago, the message is still owed.
-            model.finishEditing(draft.id, announce: closing, calendar: prefs.dayCalendar)
+            let id = draft.id
+            let announce = closing
+            let calendar = prefs.dayCalendar
+            // The system can tear this page down and build it again at once, as it did for the second new entry on a
+            // phone. Finishing straight away threw away the new entry, so the rebuilt page found nothing to show and
+            // closed. Wait a moment: if the page has come back, the person never left it.
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 120_000_000)
+                if model.isShowingEditor(id) {
+                    NavTrace.note("editor of \(NavTrace.short(id)) came back, so the entry stays")
+                    return
+                }
+                model.finishEditing(id, announce: announce, calendar: calendar)
+            }
         }
     }
 
