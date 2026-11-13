@@ -268,6 +268,19 @@ final class NewEntryNavigationTests: EditorTestCase {
         try await checkAnEntryAfterSwipingBack(Options(compact: true, template: true), writing: true)
     }
 
+    // MARK: Ways of showing the page (temporary)
+
+    private func tryVariant(_ variant: Int, template: Bool = false) async throws {
+        NavExperiment.variant = variant
+        addTeardownBlock { NavExperiment.variant = 0 }
+        try await checkASecondEntryStaysOpen(Options(compact: true, template: template))
+    }
+
+    func testVariant1SelectionOnly() async throws { try await tryVariant(1) }
+    func testVariant2ColumnThenSelection() async throws { try await tryVariant(2) }
+    func testVariant3ColumnAfterSelection() async throws { try await tryVariant(3) }
+    func testVariant4SelectionAfterColumn() async throws { try await tryVariant(4) }
+
     // MARK: Phone
 
     func testANewEntryStaysOpenInThePhonesLayout() async throws {

@@ -336,8 +336,23 @@ struct MainView: View {
         let id = model.beginNewEntry(journalID: journalID, templateID: template?.id, body: template?.body ?? "")
         NavTrace.note("begin \(NavTrace.short(id)), selected \(NavTrace.short(selectedEntryID)), phone column \(compactColumn)")
         if !keyboard { model.quietStartID = id }
-        selectedEntryID = id
-        compactColumn = .detail
+        // EXPERIMENT: ways of showing the new page on a phone. Variant 0 is what the app did.
+        switch NavExperiment.variant {
+        case 1:
+            selectedEntryID = id
+        case 2:
+            compactColumn = .detail
+            selectedEntryID = id
+        case 3:
+            selectedEntryID = id
+            Task { @MainActor in compactColumn = .detail }
+        case 4:
+            compactColumn = .detail
+            Task { @MainActor in selectedEntryID = id }
+        default:
+            selectedEntryID = id
+            compactColumn = .detail
+        }
         // On an iPad a new entry gets the whole screen: just the page, with nothing else beside it.
         if sizeClass != .compact {
             writingFullWidth = true
