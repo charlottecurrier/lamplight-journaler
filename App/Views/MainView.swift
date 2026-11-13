@@ -142,6 +142,8 @@ struct MainView: View {
     @State private var compactColumn = NavigationSplitViewColumn.content
     /// True while a new entry has the whole screen on an iPad, so the sidebar and list can come back after.
     @State private var writingFullWidth = false
+    /// On a phone, the entry whose page is on its way to the front. See `open`.
+    @State private var pageOnItsWay: UUID?
 
     private var scope: EntryScope {
         if case .journal(let id) = sidebar { return .journal(id) }
@@ -183,14 +185,12 @@ struct MainView: View {
         .onReceive(NotificationCenter.default.publisher(for: .lamplightNewEntry)) { _ in
             if !lock.isLocked { create(.standard) }
         }
+        // For the tests' step log. Nothing is recorded in a release build.
         .onChange(of: selectedEntryID) { old, new in
             NavTrace.note("selection \(NavTrace.short(old)) -> \(NavTrace.short(new))")
         }
-        .onChange(of: columns) { old, new in
-            NavTrace.note("columns \(old) -> \(new)")
-        }
         .onChange(of: compactColumn) { old, new in
-            NavTrace.note("phone column \(old) -> \(new)")
+            NavTrace.note("phone column \(old == .detail ? "page" : "list") -> \(new == .detail ? "page" : "list")")
         }
     }
 
@@ -267,13 +267,13 @@ struct MainView: View {
                 onCompose: create,
                 onClose: {
                     NavTrace.note("close asked, selected \(NavTrace.short(selectedEntryID)), page of \(NavTrace.short(entryID))")
+                    pageOnItsWay = nil
                     selectedEntryID = nil
                     compactColumn = .content
                 }
             )
         } else {
             DetailPlaceholder(onCompose: create)
-                .onAppear { NavTrace.note("empty detail page on screen") }
         }
     }
 
@@ -294,6 +294,7 @@ struct MainView: View {
     /// whole screen. Templates is the same: the sidebar closes and the list of templates is what's showing.
     private func show(_ item: SidebarItem) {
         sidebar = item
+        pageOnItsWay = nil
         compactColumn = .content
         writingFullWidth = false
         withAnimation(.easeInOut(duration: 0.3)) { columns = .doubleColumn }
@@ -333,26 +334,16 @@ struct MainView: View {
         // The editor opens in the detail column, so leave the Templates screen first.
         if sidebar == .templates { sidebar = .all }
         if let template { model.recordTemplateUse(template.id) }
-        let id = model.beginNewEntry(journalID: journalID, templateID: template?.id, body: template?.body ?? "")
-        NavTrace.note("begin \(NavTrace.short(id)), selected \(NavTrace.short(selectedEntryID)), phone column \(compactColumn)")
-        if !keyboard { model.quietStartID = id }
-        // EXPERIMENT: ways of showing the new page on a phone. Variant 0 is what the app did.
-        switch NavExperiment.variant {
-        case 1:
-            selectedEntryID = id
-        case 2:
-            compactColumn = .detail
-            selectedEntryID = id
-        case 3:
-            selectedEntryID = id
-            Task { @MainActor in compactColumn = .detail }
-        case 4:
-            compactColumn = .detail
-            Task { @MainActor in selectedEntryID = id }
-        default:
-            selectedEntryID = id
-            compactColumn = .detail
+        // An entry started a moment ago whose page hasn't opened yet has no editor to finish it. Nothing could have
+        // been typed in it, so it is finished here, which drops it.
+        if let waiting = pageOnItsWay, waiting == model.editingEntryID {
+            pageOnItsWay = nil
+            model.finishEditing(waiting, announce: false, calendar: prefs.dayCalendar)
         }
+        let id = model.beginNewEntry(journalID: journalID, templateID: template?.id, body: template?.body ?? "")
+        NavTrace.note("begin \(NavTrace.short(id)), selected \(NavTrace.short(selectedEntryID))")
+        if !keyboard { model.quietStartID = id }
+        open(id)
         // On an iPad a new entry gets the whole screen: just the page, with nothing else beside it.
         if sizeClass != .compact {
             writingFullWidth = true
@@ -382,12 +373,33 @@ struct MainView: View {
         return list.indices.contains(target) ? list[target].id : nil
     }
 
+    /// Brings an entry's page to the front.
+    ///
+    /// On a phone the page comes forward first and the entry is chosen a moment after. Doing both at once worked
+    /// for the first new entry after the app started and for none after it: the editor was built, taken away at
+    /// once, and the unwritten entry was dropped with it, so the page closed. `NewEntryNavigationTests` covers it.
+    /// An iPad shows the page beside the list and never had the trouble, so there both still happen together.
+    private func open(_ id: UUID) {
+        guard sizeClass == .compact else {
+            selectedEntryID = id
+            compactColumn = .detail
+            return
+        }
+        compactColumn = .detail
+        pageOnItsWay = id
+        Task { @MainActor in
+            // A later choice, or going somewhere else in the meantime, takes its place.
+            guard pageOnItsWay == id else { return }
+            pageOnItsWay = nil
+            selectedEntryID = id
+        }
+    }
+
     /// Opens the entry from an earlier year that was shown after saving.
     private func openLookBack(_ id: UUID) {
         model.toast = nil
         sidebar = .all
-        selectedEntryID = id
-        compactColumn = .detail
+        open(id)
     }
 
     /// Opening the app begins tonight's entry, if the person turned that on and hasn't written yet today.

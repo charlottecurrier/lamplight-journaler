@@ -19,6 +19,8 @@ final class NewEntryNavigationTests: EditorTestCase {
         let layout: String
     }
 
+    private struct NoFirstEntry: Error {}
+
     private struct Options {
         var compact: Bool
         /// The journal starts new entries with a page of sections, as the person's does.
@@ -184,6 +186,24 @@ final class NewEntryNavigationTests: EditorTestCase {
         )
     }
 
+    /// Waits for the first entry's editor, then lets the page settle. The page has four seconds to open. On a phone
+    /// simulator it was once not there after 1.5, and the step log is printed so a slow page can be told from one
+    /// that never came.
+    private func waitForFirstEntry(_ screen: Screen) async throws {
+        var waited = 0.0
+        while !snapshot("", screen).ok && waited < 4 {
+            await pause(0.1)
+            waited += 0.1
+        }
+        let first = snapshot("first entry, after \(String(format: "%.1f", waited)) s", screen)
+        if !first.ok {
+            XCTFail("The first entry didn't open.\n" + first.line + "\nWhat happened, in order:\n" + NavTrace.events.joined(separator: "\n"))
+            throw NoFirstEntry()
+        }
+        // The fixed wait this replaces was 1.5 s, and the steps after it were written for a page at rest.
+        await pause(max(1.5 - waited, 0.5))
+    }
+
     private func checkNewEntryStaysOpen(_ options: Options) async throws {
         let screen = try await openMainScreen(options)
         XCTAssertNil(screen.model.editingEntryID, "Nothing should be being written yet.")
@@ -204,9 +224,7 @@ final class NewEntryNavigationTests: EditorTestCase {
     private func checkASecondEntryStaysOpen(_ options: Options) async throws {
         let screen = try await openMainScreen(options)
         NotificationCenter.default.post(name: .lamplightNewEntry, object: nil)
-        await pause(1.5)
-        let first = snapshot("first entry, after 1.5 s", screen)
-        XCTAssertTrue(first.ok, "The first entry didn't open.\n" + first.line)
+        try await waitForFirstEntry(screen)
         let editor = try XCTUnwrap(Self.findTextView(in: screen.host.view), "The first entry has no editor.")
         _ = editor.becomeFirstResponder()
         editor.insertText("Something written in the first entry.")
@@ -237,9 +255,7 @@ final class NewEntryNavigationTests: EditorTestCase {
     private func checkAnEntryAfterSwipingBack(_ options: Options, writing: Bool) async throws {
         let screen = try await openMainScreen(options)
         NotificationCenter.default.post(name: .lamplightNewEntry, object: nil)
-        await pause(1.5)
-        let first = snapshot("first entry, after 1.5 s", screen)
-        XCTAssertTrue(first.ok, "The first entry didn't open.\n" + first.line)
+        try await waitForFirstEntry(screen)
         if writing {
             let editor = try XCTUnwrap(Self.findTextView(in: screen.host.view), "The first entry has no editor.")
             _ = editor.becomeFirstResponder()
@@ -268,19 +284,6 @@ final class NewEntryNavigationTests: EditorTestCase {
         try await checkAnEntryAfterSwipingBack(Options(compact: true, template: true), writing: true)
     }
 
-    // MARK: Ways of showing the page (temporary)
-
-    private func tryVariant(_ variant: Int, template: Bool = false) async throws {
-        NavExperiment.variant = variant
-        addTeardownBlock { NavExperiment.variant = 0 }
-        try await checkASecondEntryStaysOpen(Options(compact: true, template: template))
-    }
-
-    func testVariant1SelectionOnly() async throws { try await tryVariant(1) }
-    func testVariant2ColumnThenSelection() async throws { try await tryVariant(2) }
-    func testVariant3ColumnAfterSelection() async throws { try await tryVariant(3) }
-    func testVariant4SelectionAfterColumn() async throws { try await tryVariant(4) }
-
     // MARK: Phone
 
     func testANewEntryStaysOpenInThePhonesLayout() async throws {
@@ -293,6 +296,19 @@ final class NewEntryNavigationTests: EditorTestCase {
 
     func testTheEntryTheAppOpensToStaysOpenInThePhonesLayout() async throws {
         try await checkLaunchEntryStaysOpen(Options(compact: true, template: true))
+    }
+
+    /// New Entry twice with nothing in between, as two very quick taps might be. One page opens, and the entry that
+    /// never got a page isn't left in the journal.
+    func testTwoNewEntriesAtOnceLeaveOneOpenInThePhonesLayout() async throws {
+        let screen = try await openMainScreen(Options(compact: true))
+        NotificationCenter.default.post(name: .lamplightNewEntry, object: nil)
+        NotificationCenter.default.post(name: .lamplightNewEntry, object: nil)
+        await watch(screen, what: "The second of two entries started at once", compact: true)
+        XCTAssertEqual(
+            screen.model.entries(in: .all).count, 4,
+            "The journal should hold its three entries and the one being written.\n" + NavTrace.events.joined(separator: "\n")
+        )
     }
 
     // MARK: iPad

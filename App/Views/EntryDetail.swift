@@ -41,7 +41,6 @@ struct EntryDetailView: View {
 
     var body: some View {
         Group {
-            let _ = NavTrace.note("detail page of \(NavTrace.short(entryID)): in the journal \(model.entry(entryID) != nil), editing \(NavTrace.short(model.editingEntryID))")
             if let entry = model.entry(entryID) {
                 if model.editingEntryID == entryID {
                     EntryEditorView(
@@ -50,7 +49,6 @@ struct EntryDetailView: View {
                         startQuietly: model.quietStartID == entryID,
                         onDone: { wasNew in
                             // A new entry goes back to the list when it is finished.
-                            NavTrace.note("done on \(NavTrace.short(entryID)), new \(wasNew)")
                             if wasNew { onClose() }
                         }
                     )
