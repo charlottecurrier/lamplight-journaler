@@ -17,6 +17,11 @@ final class NewEntryNavigationTests: EditorTestCase {
         let host: UIHostingController<AnyView>
     }
 
+    /// Waits by suspending, so the work the model started can run. Spinning the run loop in place doesn't let it.
+    private func pause(_ seconds: Double) async {
+        try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+    }
+
     private var phone: CGSize { CGSize(width: 390, height: 844) }
     private var pad: CGSize { CGSize(width: 1024, height: 768) }
 
@@ -42,10 +47,13 @@ final class NewEntryNavigationTests: EditorTestCase {
         model.useFolder(folder)
         var waited = 0.0
         while model.phase != .ready && waited < 20 {
-            settle(0.1)
+            await pause(0.1)
             waited += 0.1
         }
-        _ = try XCTUnwrap(model.phase == .ready ? model : nil, "The journal didn't open: \(model.phase)")
+        _ = try XCTUnwrap(
+            model.phase == .ready ? model : nil,
+            "The journal didn't open: \(model.phase), \(model.loadingStep), \(model.loadedCount) of \(model.totalCount)"
+        )
 
         let journal = model.defaultJournalID(for: .all)
         for number in 1...max(entries, 1) where entries > 0 {
@@ -75,7 +83,7 @@ final class NewEntryNavigationTests: EditorTestCase {
         }
         host.view.frame = window.bounds
         host.view.layoutIfNeeded()
-        settle(1.0)
+        await pause(1.0)
         return Screen(model: model, window: window, host: host)
     }
 
@@ -99,7 +107,7 @@ final class NewEntryNavigationTests: EditorTestCase {
         var lines: [String] = []
         var allOK = true
         for (step, wait) in [("after 0.1 s", 0.1), ("after 0.6 s", 0.5), ("after 1.6 s", 1.0), ("after 3.6 s", 2.0)] {
-            settle(wait)
+            await pause(wait)
             let result = snapshot(step, screen)
             lines.append(result.line)
             allOK = allOK && result.ok
