@@ -55,6 +55,25 @@ final class NewEntryNavigationTests: EditorTestCase {
         return found
     }
 
+    private func navigationControllers(in controller: UIViewController) -> [UINavigationController] {
+        var found: [UINavigationController] = []
+        if let navigation = controller as? UINavigationController { found.append(navigation) }
+        for child in controller.children { found += navigationControllers(in: child) }
+        if let presented = controller.presentedViewController { found += navigationControllers(in: presented) }
+        return found
+    }
+
+    /// Goes back one screen, as the back button and the swipe from the edge do. Fails if there is nothing to go back
+    /// from.
+    private func goBack(_ screen: Screen) {
+        let stacks = navigationControllers(in: screen.host).filter { $0.viewControllers.count > 1 }
+        guard let stack = stacks.last else {
+            XCTFail("There is no screen to go back from. Navigation stacks: \(navigationControllers(in: screen.host).map { $0.viewControllers.count })")
+            return
+        }
+        stack.popViewController(animated: true)
+    }
+
     /// The main screen over a journal in a temporary folder, with a few entries in it.
     private func openMainScreen(_ options: Options, entries: Int = 3) async throws -> Screen {
         let defaults = UserDefaults.standard
@@ -209,6 +228,41 @@ final class NewEntryNavigationTests: EditorTestCase {
 
     func testASecondEntryStaysOpenInTheIPadsLayout() async throws {
         try await checkASecondEntryStaysOpen(Options(compact: false))
+    }
+
+    /// The person leaves the page by swiping back instead of tapping Done, then starts another entry.
+    private func checkAnEntryAfterSwipingBack(_ options: Options, writing: Bool) async throws {
+        let screen = try await openMainScreen(options)
+        NotificationCenter.default.post(name: .lamplightNewEntry, object: nil)
+        await pause(1.5)
+        let first = snapshot("first entry, after 1.5 s", screen)
+        XCTAssertTrue(first.ok, "The first entry didn't open.\n" + first.line)
+        if writing {
+            let editor = try XCTUnwrap(Self.findTextView(in: screen.host.view), "The first entry has no editor.")
+            _ = editor.becomeFirstResponder()
+            editor.insertText("Something written in the first entry.")
+            await pause(0.5)
+        }
+
+        goBack(screen)
+        await pause(1.5)
+        XCTAssertNil(screen.model.editingEntryID, "The first entry wasn't finished by going back.")
+        XCTAssertEqual(screen.model.entries(in: .all).count, writing ? 4 : 3)
+
+        NotificationCenter.default.post(name: .lamplightNewEntry, object: nil)
+        await watch(screen, what: "The entry after going back", compact: options.compact)
+    }
+
+    func testAnEntryAfterSwipingBackFromAWrittenOneInThePhonesLayout() async throws {
+        try await checkAnEntryAfterSwipingBack(Options(compact: true), writing: true)
+    }
+
+    func testAnEntryAfterSwipingBackFromABlankOneInThePhonesLayout() async throws {
+        try await checkAnEntryAfterSwipingBack(Options(compact: true), writing: false)
+    }
+
+    func testAnEntryAfterSwipingBackFromATemplateOneInThePhonesLayout() async throws {
+        try await checkAnEntryAfterSwipingBack(Options(compact: true, template: true), writing: true)
     }
 
     // MARK: Phone
