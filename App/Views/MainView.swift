@@ -180,7 +180,9 @@ struct MainView: View {
         .task(id: lock.isLocked) { openToNewEntryOnLaunch() }
         // The same as tapping New Entry. The tests start entries this way, since a SwiftUI button can't be tapped
         // from a unit test.
-        .onReceive(NotificationCenter.default.publisher(for: .lamplightNewEntry)) { _ in create(.standard) }
+        .onReceive(NotificationCenter.default.publisher(for: .lamplightNewEntry)) { _ in
+            if !lock.isLocked { create(.standard) }
+        }
     }
 
     // MARK: Columns

@@ -42,6 +42,8 @@ GitHub Actions runs two workflows on pull requests. After a push, look at the PR
 
 ## Rules that matter
 
+- **Review screen changes before calling a PR ready.** A PR that changes `App/Views`, `App/Editor` or navigation gets an independent review (the `code-review` skill) before the person is told it is ready. Fix what is real, and say in the PR what was found and what was left. CI passing is not enough: it doesn't tap through the screens.
+
 - **Never lose the person's writing.** Entries autosave, deletes go to Recently Deleted, removed photos are kept, switching folders copies and never overwrites, conflicting edits keep both versions. Don't add a code path that discards text.
 - **A read or listing that failed is not an empty one.** `CoordinatedFileAccess` gives up on reads and listings after a time (`BoundedWait`) instead of waiting on iCloud for ever, so they can fail, and after a few in a row it stops starting new ones for a while. `LibraryLocator.resolveRoot` and `Library.prepare` throw when they can't list a folder. They never guess a folder, and never write a first journal over one that couldn't be read. Don't write a default over something you failed to read. Writes are never given up on.
 - **One file per entry/journal/template.** Don't add shared files that two devices will both rewrite. `settings.json` is the single exception and is tiny.
