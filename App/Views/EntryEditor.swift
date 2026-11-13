@@ -1,6 +1,11 @@
 import SwiftUI
 import PhotosUI
 
+extension Notification.Name {
+    /// Posted to finish the entry being written, as if Done had been tapped.
+    static let lamplightFinishEntry = Notification.Name("lamplight.finishEntry")
+}
+
 /// The writing screen. Everything you type is saved as you go, so there is no Save button to forget.
 struct EntryEditorView: View {
     @Environment(AppModel.self) private var model
@@ -105,6 +110,11 @@ struct EntryEditorView: View {
         .onChange(of: draft.body) { notePlacedPhotos() }
         .onChange(of: draft.createdAt) { draft.timeZoneID = TimeZone.current.identifier }
         .onChange(of: pickerItems) { importPicked() }
+        #if DEBUG
+        // The same as tapping Done, for the tests: a SwiftUI button can't be tapped from a unit test. Left out of a
+        // release build.
+        .onReceive(NotificationCenter.default.publisher(for: .lamplightFinishEntry)) { _ in finish() }
+        #endif
         .onChange(of: scenePhase) {
             if scenePhase != .active {
                 saveTask?.cancel()
@@ -114,6 +124,7 @@ struct EntryEditorView: View {
         .onChange(of: showDate) { if !showDate { controller.focus() } }
         .onChange(of: showPlace) { if !showPlace { controller.focus() } }
         .onDisappear {
+            NavTrace.note("editor of \(NavTrace.short(draft.id)) went away, closing \(closing), still editing \(model.editingEntryID == draft.id)")
             saveTask?.cancel()
             // A full-screen photo covers this screen without leaving it.
             if viewer == nil {

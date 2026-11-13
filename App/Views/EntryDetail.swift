@@ -61,7 +61,10 @@ struct EntryDetailView: View {
             } else {
                 // The entry is gone (an empty new entry, or deleted elsewhere). Leave this screen.
                 DetailPlaceholder(onCompose: onCompose)
-                    .onAppear { onClose() }
+                    .onAppear {
+                        NavTrace.note("page for \(NavTrace.short(entryID)) has no entry, so it closes")
+                        onClose()
+                    }
             }
         }
         .animation(.easeInOut(duration: 0.25), value: model.editingEntryID == entryID)

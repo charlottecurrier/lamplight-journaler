@@ -419,6 +419,7 @@ final class AppModel {
     /// Ends an editing session. An entry with nothing in it is dropped instead of saved.
     func finishEditing(_ id: UUID, announce: Bool, calendar: DayCalendar) {
         let wasEditing = editingEntryID == id
+        NavTrace.note("finish \(NavTrace.short(id)), was editing \(wasEditing), in the journal \(entry(id) != nil), unwritten \(entry(id).map(isUnwritten) ?? false)")
         let wasNew = freshEntryIDs.contains(id)
         if quietStartID == id { quietStartID = nil }
         if wasEditing {
