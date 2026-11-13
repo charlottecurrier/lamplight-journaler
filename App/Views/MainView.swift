@@ -178,20 +178,21 @@ struct MainView: View {
         .sheet(isPresented: $showSettings) {
             SettingsView()
         }
-        // Once the journal is unlocked, open to a new entry if nothing is written yet today.
-        .task(id: lock.isLocked) { openToNewEntryOnLaunch() }
-        // The same as tapping New Entry. The tests start entries this way, since a SwiftUI button can't be tapped
-        // from a unit test.
+        #if DEBUG
+        // For the tests, and left out of a release build. The first is the same as tapping New Entry: a SwiftUI
+        // button can't be tapped from a unit test. The other two write the tests' step log.
         .onReceive(NotificationCenter.default.publisher(for: .lamplightNewEntry)) { _ in
             if !lock.isLocked { create(.standard) }
         }
-        // For the tests' step log. Nothing is recorded in a release build.
         .onChange(of: selectedEntryID) { old, new in
             NavTrace.note("selection \(NavTrace.short(old)) -> \(NavTrace.short(new))")
         }
         .onChange(of: compactColumn) { old, new in
             NavTrace.note("phone column \(old == .detail ? "page" : "list") -> \(new == .detail ? "page" : "list")")
         }
+        #endif
+        // Once the journal is unlocked, open to a new entry if nothing is written yet today.
+        .task(id: lock.isLocked) { openToNewEntryOnLaunch() }
     }
 
     // MARK: Columns
@@ -267,11 +268,13 @@ struct MainView: View {
                 onCompose: create,
                 onClose: {
                     NavTrace.note("close asked, selected \(NavTrace.short(selectedEntryID)), page of \(NavTrace.short(entryID))")
-                    pageOnItsWay = nil
                     selectedEntryID = nil
                     compactColumn = .content
                 }
             )
+        } else if pageOnItsWay != nil {
+            // The page is in front and its entry is chosen next turn. Bare paper until then, not "Choose an entry".
+            Color.clear.background(PaperBackground())
         } else {
             DetailPlaceholder(onCompose: create)
         }
@@ -294,7 +297,7 @@ struct MainView: View {
     /// whole screen. Templates is the same: the sidebar closes and the list of templates is what's showing.
     private func show(_ item: SidebarItem) {
         sidebar = item
-        pageOnItsWay = nil
+        forgetPageOnItsWay()
         compactColumn = .content
         writingFullWidth = false
         withAnimation(.easeInOut(duration: 0.3)) { columns = .doubleColumn }
@@ -334,12 +337,7 @@ struct MainView: View {
         // The editor opens in the detail column, so leave the Templates screen first.
         if sidebar == .templates { sidebar = .all }
         if let template { model.recordTemplateUse(template.id) }
-        // An entry started a moment ago whose page hasn't opened yet has no editor to finish it. Nothing could have
-        // been typed in it, so it is finished here, which drops it.
-        if let waiting = pageOnItsWay, waiting == model.editingEntryID {
-            pageOnItsWay = nil
-            model.finishEditing(waiting, announce: false, calendar: prefs.dayCalendar)
-        }
+        forgetPageOnItsWay()
         let id = model.beginNewEntry(journalID: journalID, templateID: template?.id, body: template?.body ?? "")
         NavTrace.note("begin \(NavTrace.short(id)), selected \(NavTrace.short(selectedEntryID))")
         if !keyboard { model.quietStartID = id }
@@ -395,9 +393,21 @@ struct MainView: View {
         }
     }
 
+    /// Gives up on a page that hasn't opened yet, because the person has gone somewhere else in the meantime. If it
+    /// was for a new entry, that entry has no editor to finish it, and nothing could have been typed in it, so it
+    /// is finished here, which drops it.
+    private func forgetPageOnItsWay() {
+        guard let waiting = pageOnItsWay else { return }
+        pageOnItsWay = nil
+        if waiting == model.editingEntryID {
+            model.finishEditing(waiting, announce: false, calendar: prefs.dayCalendar)
+        }
+    }
+
     /// Opens the entry from an earlier year that was shown after saving.
     private func openLookBack(_ id: UUID) {
         model.toast = nil
+        forgetPageOnItsWay()
         sidebar = .all
         open(id)
     }

@@ -110,9 +110,11 @@ struct EntryEditorView: View {
         .onChange(of: draft.body) { notePlacedPhotos() }
         .onChange(of: draft.createdAt) { draft.timeZoneID = TimeZone.current.identifier }
         .onChange(of: pickerItems) { importPicked() }
-        // The same as tapping Done. The tests finish entries this way, since a SwiftUI button can't be tapped from a
-        // unit test.
+        #if DEBUG
+        // The same as tapping Done, for the tests: a SwiftUI button can't be tapped from a unit test. Left out of a
+        // release build.
         .onReceive(NotificationCenter.default.publisher(for: .lamplightFinishEntry)) { _ in finish() }
+        #endif
         .onChange(of: scenePhase) {
             if scenePhase != .active {
                 saveTask?.cancel()

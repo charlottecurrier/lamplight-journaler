@@ -78,6 +78,10 @@ final class NewEntryNavigationTests: EditorTestCase {
 
     /// The main screen over a journal in a temporary folder, with a few entries in it.
     private func openMainScreen(_ options: Options, entries: Int = 3) async throws -> Screen {
+        // The Mac job runs these tests again on a phone. A wide window on a phone is not an iPad.
+        if !options.compact, UIDevice.current.userInterfaceIdiom == .phone {
+            throw XCTSkip("An iPad's layout needs an iPad.")
+        }
         let defaults = UserDefaults.standard
         let storageKeys = ["storage.mode", "storage.bookmark", "storage.name"]
         let saved = storageKeys.map { ($0, defaults.object(forKey: $0)) }
@@ -152,7 +156,8 @@ final class NewEntryNavigationTests: EditorTestCase {
         let layout = splits.isEmpty
             ? "no split view found"
             : splits.map { "split view \($0.isCollapsed ? "collapsed" : "open")" }.joined(separator: ", ")
-        if options.compact, !splits.isEmpty {
+        if options.compact {
+            XCTAssertFalse(splits.isEmpty, "No split view was found, so the layout can't be checked.")
             XCTAssertTrue(splits.allSatisfy(\.isCollapsed), "The phone layout isn't collapsed, so this isn't a phone's screen.")
         }
         return Screen(model: model, window: window, host: host, layout: layout)
