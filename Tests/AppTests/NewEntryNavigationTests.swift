@@ -164,13 +164,14 @@ final class NewEntryNavigationTests: EditorTestCase {
     }
 
     /// What there is to see a moment after the entry was started.
-    private func snapshot(_ step: String, _ screen: Screen) -> (ok: Bool, line: String) {
+    private func snapshot(_ step: String, _ screen: Screen) -> (ok: Bool, open: Bool, line: String) {
         let model = screen.model
         let editing = model.editingEntryID
         let found = editing.flatMap { model.entry($0) } != nil
         let editor = Self.findTextView(in: screen.host.view) != nil
         return (
             editing != nil && found && editor,
+            editing != nil && found,
             "\(step): editing \(editing != nil), entry in the journal \(found), editor on screen \(editor)"
         )
     }
@@ -178,11 +179,17 @@ final class NewEntryNavigationTests: EditorTestCase {
     private func watch(_ screen: Screen, what: String, compact: Bool) async {
         var lines: [String] = ["layout: \(screen.layout)"]
         var allOK = true
-        for (step, wait) in [("after 0.1 s", 0.1), ("after 0.6 s", 0.5), ("after 1.6 s", 1.0), ("after 3.6 s", 2.0)] {
+        // The entry has to be there at every look. Its editor can take a moment to be built (on a phone simulator a
+        // page of sections wasn't there yet at 0.1 s), so it has to be there by the end, and stay once it is seen.
+        var editorSeen = false
+        let looks = [("after 0.1 s", 0.1), ("after 0.6 s", 0.5), ("after 1.6 s", 1.0), ("after 3.6 s", 2.0)]
+        for (index, (step, wait)) in looks.enumerated() {
             await pause(wait)
             let result = snapshot(step, screen)
             lines.append(result.line)
-            allOK = allOK && result.ok
+            let editorDue = editorSeen || index == looks.count - 1
+            allOK = allOK && result.open && (result.ok || !editorDue)
+            editorSeen = editorSeen || result.ok
         }
         XCTAssertTrue(
             allOK,
