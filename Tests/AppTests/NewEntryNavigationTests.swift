@@ -92,6 +92,7 @@ final class NewEntryNavigationTests: EditorTestCase {
             try? FileManager.default.removeItem(at: folder)
         }
 
+        NavTrace.events = []
         let model = AppModel()
         model.useFolder(folder)
         var waited = 0.0
@@ -177,7 +178,9 @@ final class NewEntryNavigationTests: EditorTestCase {
             allOK = allOK && result.ok
         }
         XCTAssertTrue(
-            allOK, "\(what) didn't stay open in the \(compact ? "phone" : "iPad") layout.\n" + lines.joined(separator: "\n")
+            allOK,
+            "\(what) didn't stay open in the \(compact ? "phone" : "iPad") layout.\n" + lines.joined(separator: "\n")
+                + "\nWhat happened, in order:\n" + NavTrace.events.joined(separator: "\n")
         )
     }
 

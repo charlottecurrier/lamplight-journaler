@@ -49,6 +49,7 @@ struct EntryDetailView: View {
                         startQuietly: model.quietStartID == entryID,
                         onDone: { wasNew in
                             // A new entry goes back to the list when it is finished.
+                            NavTrace.note("done on \(NavTrace.short(entryID)), new \(wasNew)")
                             if wasNew { onClose() }
                         }
                     )
@@ -61,7 +62,10 @@ struct EntryDetailView: View {
             } else {
                 // The entry is gone (an empty new entry, or deleted elsewhere). Leave this screen.
                 DetailPlaceholder(onCompose: onCompose)
-                    .onAppear { onClose() }
+                    .onAppear {
+                        NavTrace.note("page for \(NavTrace.short(entryID)) has no entry, so it closes")
+                        onClose()
+                    }
             }
         }
         .animation(.easeInOut(duration: 0.25), value: model.editingEntryID == entryID)

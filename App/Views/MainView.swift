@@ -10,6 +10,20 @@ enum SidebarItem: Hashable {
     case journal(UUID)
 }
 
+/// A note of each step in opening and closing an entry's page, so a test can print what happened when one goes wrong.
+/// It only records in a debug build, which is what the tests use.
+enum NavTrace {
+    static var events: [String] = []
+
+    static func note(_ text: @autoclosure () -> String) {
+        #if DEBUG
+        events.append(text())
+        #endif
+    }
+
+    static func short(_ id: UUID?) -> String { id.map { String($0.uuidString.prefix(4)) } ?? "none" }
+}
+
 extension Notification.Name {
     /// Posted to start a new entry, as if New Entry had been tapped.
     static let lamplightNewEntry = Notification.Name("lamplight.newEntry")
@@ -183,6 +197,12 @@ struct MainView: View {
         .onReceive(NotificationCenter.default.publisher(for: .lamplightNewEntry)) { _ in
             if !lock.isLocked { create(.standard) }
         }
+        .onChange(of: selectedEntryID) { old, new in
+            NavTrace.note("selection \(NavTrace.short(old)) -> \(NavTrace.short(new))")
+        }
+        .onChange(of: compactColumn) { old, new in
+            NavTrace.note("phone column \(old) -> \(new)")
+        }
     }
 
     // MARK: Columns
@@ -257,6 +277,7 @@ struct MainView: View {
                 onTurn: { selectedEntryID = $0 },
                 onCompose: create,
                 onClose: {
+                    NavTrace.note("close asked, selected \(NavTrace.short(selectedEntryID)), page of \(NavTrace.short(entryID))")
                     selectedEntryID = nil
                     compactColumn = .content
                 }
@@ -323,6 +344,7 @@ struct MainView: View {
         if sidebar == .templates { sidebar = .all }
         if let template { model.recordTemplateUse(template.id) }
         let id = model.beginNewEntry(journalID: journalID, templateID: template?.id, body: template?.body ?? "")
+        NavTrace.note("begin \(NavTrace.short(id)), selected \(NavTrace.short(selectedEntryID)), phone column \(compactColumn)")
         if !keyboard { model.quietStartID = id }
         selectedEntryID = id
         compactColumn = .detail

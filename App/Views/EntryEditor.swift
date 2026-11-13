@@ -122,6 +122,7 @@ struct EntryEditorView: View {
         .onChange(of: showDate) { if !showDate { controller.focus() } }
         .onChange(of: showPlace) { if !showPlace { controller.focus() } }
         .onDisappear {
+            NavTrace.note("editor of \(NavTrace.short(draft.id)) went away, closing \(closing), still editing \(model.editingEntryID == draft.id)")
             saveTask?.cancel()
             // A full-screen photo covers this screen without leaving it.
             if viewer == nil {
