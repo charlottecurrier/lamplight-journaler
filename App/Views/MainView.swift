@@ -10,6 +10,11 @@ enum SidebarItem: Hashable {
     case journal(UUID)
 }
 
+extension Notification.Name {
+    /// Posted to start a new entry, as if New Entry had been tapped.
+    static let lamplightNewEntry = Notification.Name("lamplight.newEntry")
+}
+
 /// The sidebar: where to look. On a phone it is the first screen, on an iPad it sits at the left.
 struct SidebarView: View {
     @Environment(AppModel.self) private var model
@@ -173,6 +178,9 @@ struct MainView: View {
         }
         // Once the journal is unlocked, open to a new entry if nothing is written yet today.
         .task(id: lock.isLocked) { openToNewEntryOnLaunch() }
+        // The same as tapping New Entry. The tests start entries this way, since a SwiftUI button can't be tapped
+        // from a unit test.
+        .onReceive(NotificationCenter.default.publisher(for: .lamplightNewEntry)) { _ in create(.standard) }
     }
 
     // MARK: Columns
