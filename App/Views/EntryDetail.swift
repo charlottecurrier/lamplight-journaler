@@ -41,6 +41,7 @@ struct EntryDetailView: View {
 
     var body: some View {
         Group {
+            let _ = NavTrace.note("detail page of \(NavTrace.short(entryID)): in the journal \(model.entry(entryID) != nil), editing \(NavTrace.short(model.editingEntryID))")
             if let entry = model.entry(entryID) {
                 if model.editingEntryID == entryID {
                     EntryEditorView(

@@ -193,6 +193,7 @@ final class AppModel {
     }
 
     private func apply(_ snapshot: LoadSnapshot) {
+        NavTrace.note("journal read again: \(snapshot.entries.count) entries, editing \(NavTrace.short(editingEntryID))")
         journals = snapshot.journals.isEmpty ? [Journal.makeDefault()] : snapshot.journals
         templates = snapshot.templates
         // Edits not written yet are newer than the folder.
@@ -388,6 +389,7 @@ final class AppModel {
         let stale = entries
             .filter { isUnwritten($0) && !persistedIDs.contains($0.id) && $0.id != editingEntryID }
             .map(\.id)
+        if !stale.isEmpty { NavTrace.note("beginNewEntry drops unwritten entries \(stale.map { NavTrace.short($0) })") }
         entries.removeAll { stale.contains($0.id) }
         for id in stale {
             startingBodies[id] = nil
@@ -419,6 +421,7 @@ final class AppModel {
     /// Ends an editing session. An entry with nothing in it is dropped instead of saved.
     func finishEditing(_ id: UUID, announce: Bool, calendar: DayCalendar) {
         let wasEditing = editingEntryID == id
+        NavTrace.note("finish \(NavTrace.short(id)), was editing \(wasEditing), in the journal \(entry(id) != nil), unwritten \(entry(id).map(isUnwritten) ?? false)")
         let wasNew = freshEntryIDs.contains(id)
         if quietStartID == id { quietStartID = nil }
         if wasEditing {

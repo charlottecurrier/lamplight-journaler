@@ -21,7 +21,7 @@ done
 [ "$missing" -eq 0 ] || exit 1
 
 cp "$ROOT"/Sources/JournalCore/*.swift "$WORK"/
-for name in AppModel StorageLocation CoordinatedFileAccess LockManager Formatting IO; do
+for name in AppModel StorageLocation CoordinatedFileAccess LockManager Formatting IO NavTrace; do
   # SwiftUI and UIKit imports become Foundation. The rest is stood in for by tools/typecheck_stubs.swift.
   {
     echo "import Observation" # SwiftUI normally brings this in
