@@ -79,3 +79,44 @@ jobs:
           if not total:
               sys.exit("No tests ran.")
           PY
+
+      # The new-entry tests run once more on a phone, so the layout is a phone's own and not an iPad window made to
+      # look like one. Same build, a different simulator, so it costs a boot and a short run.
+      - name: Phone tests
+        if: ${{ !cancelled() }}
+        run: |
+          udid=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          runtimes = json.load(sys.stdin)["devices"]
+          for runtime in sorted(runtimes, reverse=True):
+              for device in runtimes[runtime]:
+                  if device["name"].startswith("iPhone"):
+                      print(device["udid"])
+                      sys.exit()
+          sys.exit("No iPhone simulator found")
+          ')
+          echo "Using simulator $udid"
+          bundle="$RUNNER_TEMP/Phone.xcresult"
+          set +e
+          xcodebuild test-without-building -quiet \
+            -project Lamplight.xcodeproj \
+            -scheme Lamplight \
+            -destination "platform=iOS Simulator,id=$udid" \
+            -only-testing:LamplightTests/NewEntryNavigationTests \
+            -resultBundlePath "$bundle" \
+            CODE_SIGNING_ALLOWED=NO
+          status=$?
+          set -e
+          [ -d "$bundle" ] || { echo "No test results from the phone."; exit 1; }
+          xcrun xcresulttool get test-results summary --path "$bundle" > "$RUNNER_TEMP/phone.json"
+          python3 - "$RUNNER_TEMP/phone.json" <<'PY'
+          import json, sys
+          summary = json.load(open(sys.argv[1]))
+          for failure in summary.get("testFailures", []):
+              print(f"FAILED {failure.get('testName')}:\n{failure.get('failureText')}\n")
+          total = summary.get("totalTestCount")
+          print(f"Phone tests: {total} total, {summary.get('passedTests')} passed, {summary.get('failedTests')} failed, {summary.get('skippedTests')} skipped")
+          if not total:
+              sys.exit("No tests ran on the phone.")
+          PY
+          exit $status

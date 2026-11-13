@@ -15,6 +15,16 @@ final class NewEntryNavigationTests: EditorTestCase {
         let model: AppModel
         let window: UIWindow
         let host: UIHostingController<AnyView>
+        /// What the layout looks like, for the report.
+        let layout: String
+    }
+
+    private struct Options {
+        var compact: Bool
+        /// The journal starts new entries with a page of sections, as the person's does.
+        var template = false
+        /// The app opens to a new entry by itself, as it does by default when nothing is written yet today.
+        var openToNewEntry = false
     }
 
     /// Waits by suspending, so the work the model started can run. Spinning the run loop in place doesn't let it.
@@ -22,11 +32,31 @@ final class NewEntryNavigationTests: EditorTestCase {
         try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
     }
 
-    private var phone: CGSize { CGSize(width: 390, height: 844) }
-    private var pad: CGSize { CGSize(width: 1024, height: 768) }
+    private let phone = CGSize(width: 390, height: 844)
+    private let pad = CGSize(width: 1024, height: 768)
+
+    private static let templateBody = """
+    --- Morning ---
+
+
+    --- Evening ---
+
+
+    # Things I noticed
+
+    -
+    """
+
+    private func splitViews(in controller: UIViewController) -> [UISplitViewController] {
+        var found: [UISplitViewController] = []
+        if let split = controller as? UISplitViewController { found.append(split) }
+        for child in controller.children { found += splitViews(in: child) }
+        if let presented = controller.presentedViewController { found += splitViews(in: presented) }
+        return found
+    }
 
     /// The main screen over a journal in a temporary folder, with a few entries in it.
-    private func openMainScreen(compact: Bool, entries: Int = 3, openToNewEntry: Bool = false) async throws -> Screen {
+    private func openMainScreen(_ options: Options, entries: Int = 3) async throws -> Screen {
         let defaults = UserDefaults.standard
         let storageKeys = ["storage.mode", "storage.bookmark", "storage.name"]
         let saved = storageKeys.map { ($0, defaults.object(forKey: $0)) }
@@ -66,15 +96,26 @@ final class NewEntryNavigationTests: EditorTestCase {
         }
         XCTAssertEqual(model.entries(in: .all).count, entries)
 
+        if options.template {
+            var template = model.newTemplate()
+            template.name = "Day"
+            template.body = Self.templateBody
+            model.save(template: template)
+            var chosen = try XCTUnwrap(model.journal(journal))
+            chosen.defaultTemplateID = template.id
+            model.save(journal: chosen)
+            XCTAssertNotNil(model.defaultTemplate(for: journal), "The journal's template wasn't set.")
+        }
+
         let prefs = AppPrefs(defaults: prefsDefaults)
-        prefs.openToNewEntry = openToNewEntry
+        prefs.openToNewEntry = options.openToNewEntry
         let lock = LockManager(startLocked: false)
         let root = AnyView(MainView().environment(model).environment(lock).environmentObject(prefs))
         let host = UIHostingController(rootView: root)
-        if compact { host.traitOverrides.horizontalSizeClass = .compact }
+        host.traitOverrides.horizontalSizeClass = options.compact ? .compact : .regular
         let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
         let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: .zero)
-        window.frame = CGRect(origin: .zero, size: compact ? phone : pad)
+        window.frame = CGRect(origin: .zero, size: options.compact ? phone : pad)
         window.rootViewController = host
         window.makeKeyAndVisible()
         addTeardownBlock {
@@ -84,7 +125,15 @@ final class NewEntryNavigationTests: EditorTestCase {
         host.view.frame = window.bounds
         host.view.layoutIfNeeded()
         await pause(1.0)
-        return Screen(model: model, window: window, host: host)
+
+        let splits = splitViews(in: host)
+        let layout = splits.isEmpty
+            ? "no split view found"
+            : splits.map { "split view \($0.isCollapsed ? "collapsed" : "open")" }.joined(separator: ", ")
+        if options.compact, !splits.isEmpty {
+            XCTAssertTrue(splits.allSatisfy(\.isCollapsed), "The phone layout isn't collapsed, so this isn't a phone's screen.")
+        }
+        return Screen(model: model, window: window, host: host, layout: layout)
     }
 
     /// What there is to see a moment after the entry was started.
@@ -99,12 +148,8 @@ final class NewEntryNavigationTests: EditorTestCase {
         )
     }
 
-    private func checkPageStaysOpen(compact: Bool) async throws {
-        let screen = try await openMainScreen(compact: compact)
-        XCTAssertNil(screen.model.editingEntryID, "Nothing should be being written yet.")
-        NotificationCenter.default.post(name: .lamplightNewEntry, object: nil)
-
-        var lines: [String] = []
+    private func watch(_ screen: Screen, what: String, compact: Bool) async {
+        var lines: [String] = ["layout: \(screen.layout)"]
         var allOK = true
         for (step, wait) in [("after 0.1 s", 0.1), ("after 0.6 s", 0.5), ("after 1.6 s", 1.0), ("after 3.6 s", 2.0)] {
             await pause(wait)
@@ -113,15 +158,46 @@ final class NewEntryNavigationTests: EditorTestCase {
             allOK = allOK && result.ok
         }
         XCTAssertTrue(
-            allOK, "The new entry didn't stay open in the \(compact ? "phone" : "iPad") layout.\n" + lines.joined(separator: "\n")
+            allOK, "\(what) didn't stay open in the \(compact ? "phone" : "iPad") layout.\n" + lines.joined(separator: "\n")
         )
     }
 
-    func testANewEntryStaysOpenInThePhonesLayout() async throws {
-        try await checkPageStaysOpen(compact: true)
+    private func checkNewEntryStaysOpen(_ options: Options) async throws {
+        let screen = try await openMainScreen(options)
+        XCTAssertNil(screen.model.editingEntryID, "Nothing should be being written yet.")
+        NotificationCenter.default.post(name: .lamplightNewEntry, object: nil)
+        await watch(screen, what: "The new entry", compact: options.compact)
     }
 
+    private func checkLaunchEntryStaysOpen(_ options: Options) async throws {
+        var options = options
+        options.openToNewEntry = true
+        let screen = try await openMainScreen(options)
+        // The app began the entry by itself when the screen appeared.
+        await watch(screen, what: "The entry the app opened to", compact: options.compact)
+    }
+
+    // MARK: Phone
+
+    func testANewEntryStaysOpenInThePhonesLayout() async throws {
+        try await checkNewEntryStaysOpen(Options(compact: true))
+    }
+
+    func testANewEntryFromATemplateStaysOpenInThePhonesLayout() async throws {
+        try await checkNewEntryStaysOpen(Options(compact: true, template: true))
+    }
+
+    func testTheEntryTheAppOpensToStaysOpenInThePhonesLayout() async throws {
+        try await checkLaunchEntryStaysOpen(Options(compact: true, template: true))
+    }
+
+    // MARK: iPad
+
     func testANewEntryStaysOpenInTheIPadsLayout() async throws {
-        try await checkPageStaysOpen(compact: false)
+        try await checkNewEntryStaysOpen(Options(compact: false))
+    }
+
+    func testANewEntryFromATemplateStaysOpenInTheIPadsLayout() async throws {
+        try await checkNewEntryStaysOpen(Options(compact: false, template: true))
     }
 }
