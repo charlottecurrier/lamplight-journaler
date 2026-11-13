@@ -72,22 +72,6 @@ final class AppModel {
     @ObservationIgnored private var startingBodies: [UUID: String] = [:]
     /// A new entry opened without the keyboard, until it is finished. The page waits for a tap.
     @ObservationIgnored var quietStartID: UUID?
-    /// How many editor pages are on screen for each entry. The system can tear a page down and build it again a
-    /// moment later, so a page going away isn't always the person leaving.
-    @ObservationIgnored private var editorsShown: [UUID: Int] = [:]
-
-    func editorAppeared(_ id: UUID) {
-        editorsShown[id, default: 0] += 1
-    }
-
-    func editorDisappeared(_ id: UUID) {
-        let left = (editorsShown[id] ?? 0) - 1
-        editorsShown[id] = left > 0 ? left : nil
-    }
-
-    func isShowingEditor(_ id: UUID) -> Bool {
-        (editorsShown[id] ?? 0) > 0
-    }
     /// Set once the app has opened to a new entry for this launch, so reopening the journal doesn't do it again.
     @ObservationIgnored var didOpenToNewEntry = false
     /// Bumps after each refresh, so photos that failed to load can try again.
