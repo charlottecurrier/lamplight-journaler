@@ -177,6 +177,40 @@ final class NewEntryNavigationTests: EditorTestCase {
         await watch(screen, what: "The entry the app opened to", compact: options.compact)
     }
 
+    /// Start an entry, write in it, finish it with Done, and start another. The person found the first entry after
+    /// opening the app worked and the later ones didn't.
+    private func checkASecondEntryStaysOpen(_ options: Options) async throws {
+        let screen = try await openMainScreen(options)
+        NotificationCenter.default.post(name: .lamplightNewEntry, object: nil)
+        await pause(1.5)
+        let first = snapshot("first entry, after 1.5 s", screen)
+        XCTAssertTrue(first.ok, "The first entry didn't open.\n" + first.line)
+        let editor = try XCTUnwrap(Self.findTextView(in: screen.host.view), "The first entry has no editor.")
+        _ = editor.becomeFirstResponder()
+        editor.insertText("Something written in the first entry.")
+        await pause(0.5)
+
+        NotificationCenter.default.post(name: .lamplightFinishEntry, object: nil)
+        await pause(1.5)
+        XCTAssertNil(screen.model.editingEntryID, "The first entry wasn't finished.")
+        XCTAssertEqual(screen.model.entries(in: .all).count, 4, "The first entry wasn't kept.")
+
+        NotificationCenter.default.post(name: .lamplightNewEntry, object: nil)
+        await watch(screen, what: "The second entry", compact: options.compact)
+    }
+
+    func testASecondEntryStaysOpenInThePhonesLayout() async throws {
+        try await checkASecondEntryStaysOpen(Options(compact: true))
+    }
+
+    func testASecondEntryFromATemplateStaysOpenInThePhonesLayout() async throws {
+        try await checkASecondEntryStaysOpen(Options(compact: true, template: true))
+    }
+
+    func testASecondEntryStaysOpenInTheIPadsLayout() async throws {
+        try await checkASecondEntryStaysOpen(Options(compact: false))
+    }
+
     // MARK: Phone
 
     func testANewEntryStaysOpenInThePhonesLayout() async throws {
