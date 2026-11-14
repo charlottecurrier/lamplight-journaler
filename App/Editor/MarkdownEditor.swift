@@ -432,8 +432,28 @@ struct MarkdownEditor: UIViewRepresentable {
             }
         }
 
+        /// The screen change the view is part of, if one is under way: on a phone, the page sliding in.
+        private func transition(around view: UIView) -> UIViewControllerTransitionCoordinator? {
+            var responder: UIResponder? = view
+            while let current = responder {
+                if let controller = current as? UIViewController { return controller.transitionCoordinator }
+                responder = current.next
+            }
+            return nil
+        }
+
         /// Brings up the keyboard. If the view isn't on screen yet, tries again a moment later.
-        private func beginEditing(_ view: MarkdownUITextView, caret: Int?, attemptsLeft: Int) {
+        ///
+        /// While the page is still sliding in, it waits for the slide to end. Loading the keyboard is slow the
+        /// first time, and doing it mid-slide made the slide stutter on a phone.
+        private func beginEditing(_ view: MarkdownUITextView, caret: Int?, attemptsLeft: Int, afterSlide: Bool = false) {
+            if !afterSlide, let slide = transition(around: view) {
+                slide.animate(alongsideTransition: nil) { [weak self, weak view] _ in
+                    guard let self, let view else { return }
+                    self.beginEditing(view, caret: caret, attemptsLeft: attemptsLeft, afterSlide: true)
+                }
+                return
+            }
             let length = (view.text as NSString).length
             let location = min(max(caret ?? length, 0), length)
             if view.becomeFirstResponder() {
