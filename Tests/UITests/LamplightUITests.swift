@@ -22,7 +22,10 @@ final class LamplightUITests: XCTestCase {
             "-prefs.openToNewEntry", "NO",
         ]
         app.launch()
-        XCTAssertTrue(firstHittable("New Entry", timeout: 30) != nil, "The journal didn't open.")
+        if firstHittable("New Entry", timeout: 30) == nil {
+            shot("journal didn't open")
+            XCTFail("The journal didn't open: there is no New Entry button to tap.")
+        }
     }
 
     // MARK: Helpers
@@ -39,7 +42,9 @@ final class LamplightUITests: XCTestCase {
     private func firstHittable(_ label: String, timeout: TimeInterval = 5) -> XCUIElement? {
         let deadline = Date().addingTimeInterval(timeout)
         repeat {
-            let matches = app.buttons.matching(identifier: label).allElementsBoundByIndex
+            // By label, not by identifier: the app's buttons have labels and no identifiers, and
+            // matching(identifier:) found none of them.
+            let matches = app.buttons.matching(NSPredicate(format: "label == %@", label)).allElementsBoundByIndex
             if let found = matches.first(where: { $0.exists && $0.isHittable }) { return found }
             Thread.sleep(forTimeInterval: 0.25)
         } while Date() < deadline
@@ -53,7 +58,7 @@ final class LamplightUITests: XCTestCase {
 
     /// The page being written: its text and its Done button.
     private var editor: XCUIElement { app.textViews.firstMatch }
-    private var done: XCUIElement { app.buttons["Done"] }
+    private var done: XCUIElement { app.buttons.matching(NSPredicate(format: "label == %@", "Done")).firstMatch }
 
     private func startEntry(file: StaticString = #filePath, line: UInt = #line) throws {
         try tap("New Entry", file: file, line: line)
@@ -128,7 +133,7 @@ final class LamplightUITests: XCTestCase {
         let row = anything(saying: text)
         XCTAssertTrue(row.waitForExistence(timeout: 10), "The finished entry isn't in the journal.")
         row.tap()
-        XCTAssertTrue(app.buttons["Edit"].waitForExistence(timeout: 10), "The entry didn't open for reading.")
+        XCTAssertTrue(firstHittable("Edit", timeout: 10) != nil, "The entry didn't open for reading.")
         shot("reading an entry")
     }
 
