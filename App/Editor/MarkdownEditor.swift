@@ -448,11 +448,12 @@ struct MarkdownEditor: UIViewRepresentable {
         /// first time, and doing it mid-slide made the slide stutter on a phone.
         private func beginEditing(_ view: MarkdownUITextView, caret: Int?, attemptsLeft: Int, afterSlide: Bool = false) {
             if !afterSlide, let slide = transition(around: view) {
-                slide.animate(alongsideTransition: nil) { [weak self, weak view] _ in
-                    guard let self, let view else { return }
+                let waiting = slide.animate(alongsideTransition: nil) { [weak self, weak view] _ in
+                    guard let self, let view, !view.isFirstResponder else { return }
                     self.beginEditing(view, caret: caret, attemptsLeft: attemptsLeft, afterSlide: true)
                 }
-                return
+                // If the slide can't be waited on, don't leave the page without its keyboard.
+                if waiting { return }
             }
             let length = (view.text as NSString).length
             let location = min(max(caret ?? length, 0), length)
