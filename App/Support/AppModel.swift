@@ -332,10 +332,13 @@ final class AppModel {
         templates.first { $0.id == id }
     }
 
-    /// Entries for a list. A new entry you haven't typed in yet is shown only while you're editing it.
+    /// Entries for a list. A new entry isn't in it until something is written. It used to be, as a "New entry" row
+    /// that pushed the list down the moment New Entry was tapped and closed up again on the way back: on a phone
+    /// that showed as a jerk before the page slid in. An older entry being edited stays even if its text is cleared.
     func entries(in scope: EntryScope, matching query: String = "") -> [Entry] {
         entries.filter { entry in
-            guard !isUnwritten(entry) || entry.id == editingEntryID else { return false }
+            let beingEmptied = entry.id == editingEntryID && !freshEntryIDs.contains(entry.id)
+            guard !isUnwritten(entry) || beingEmptied else { return false }
             if case .journal(let id) = scope, entry.journalID != id { return false }
             return entry.matches(query: query)
         }
