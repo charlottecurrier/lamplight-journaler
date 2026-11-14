@@ -10,7 +10,23 @@ Apple's pages: [TestFlight](https://developer.apple.com/testflight/), [invite te
 2. The Team ID is in `project.yml` as `DEVELOPMENT_TEAM`. Build to your iPad once with it, to check that signing works and to register the app ID.
 3. In App Store Connect, go to Apps, then New App. Platform iOS, bundle ID `com.forageandjump.lamplight`. The App Store name has to be unique across the store, so "Lamplight" may be taken. If it is, pick another. The name under the icon on your home screen is separate (`CFBundleDisplayName`).
 
-## Each upload
+## Uploading without a Mac
+
+GitHub can build, sign and upload the app. You start it from the GitHub app or site, and install the build from the TestFlight app. This has to be set up once, in a browser.
+
+1. Create the app in App Store Connect (step 3 above). If the bundle ID isn't offered, register `com.forageandjump.lamplight` at developer.apple.com under Identifiers first.
+2. In App Store Connect, go to Users and Access, then Integrations, then App Store Connect API. Make a key with the **Admin** role. A lesser role can't make the signing certificate. Download the `.p8` file. Apple offers it once.
+3. In the GitHub repository, go to Settings, then Secrets and variables, then Actions. Add three repository secrets:
+   - `ASC_KEY_ID`: the key's ID.
+   - `ASC_ISSUER_ID`: the Issuer ID shown above the list of keys.
+   - `ASC_KEY_P8`: the whole text of the `.p8` file, with its BEGIN and END lines. On a phone, open the file in Files, select all and copy.
+4. Install TestFlight on the phone and sign in with the same Apple account.
+
+Then, for each build: Actions, then **TestFlight**, then **Run workflow**. It takes about fifteen minutes, and Apple takes a few more to process the build. It then shows in the TestFlight app. Your own installs need no review.
+
+The build number is the date and time, so nothing needs raising or committing. Each run uses Mac minutes at ten times the usual rate.
+
+## Each upload from Xcode
 
 1. Raise the build number. Apple refuses an upload that isn't higher than the last one. The first upload can use the number that's there. After that, run `python3 tools/bump_build.py` and commit the change.
 2. In Xcode, pick **Any iOS Device (arm64)** at the top, not a simulator.
