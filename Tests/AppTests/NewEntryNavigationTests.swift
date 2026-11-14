@@ -276,7 +276,13 @@ final class NewEntryNavigationTests: EditorTestCase {
         }
 
         goBack(screen)
-        await pause(1.5)
+        // Going back finishes the entry when the page has gone, which took more than 1.5 s on a slow runner.
+        var waited = 0.0
+        while screen.model.editingEntryID != nil && waited < 6 {
+            await pause(0.25)
+            waited += 0.25
+        }
+        await pause(1.0)
         XCTAssertNil(screen.model.editingEntryID, "The first entry wasn't finished by going back.")
         XCTAssertEqual(screen.model.entries(in: .all).count, writing ? 4 : 3)
 

@@ -21,6 +21,8 @@ final class LamplightUITests: XCTestCase {
             "-prefs.lockEnabled", "NO",
             "-prefs.openToNewEntry", "NO",
         ]
+        // An iPad held upright shows only the page. On its side it shows the list beside it, which the tests read.
+        if !isPhone { XCUIDevice.shared.orientation = .landscapeLeft }
         app.launch()
         if find("New Entry", timeout: 20) == nil {
             describeScreen("journal didn't open")
@@ -76,15 +78,16 @@ final class LamplightUITests: XCTestCase {
             XCTFail("There is nothing labelled \"\(label)\" to tap.", file: file, line: line)
             throw NothingToTap()
         }
-        if element.isHittable {
-            element.tap()
-        } else {
-            // It is there but something is counted as covering it. Tap where it is.
-            element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        }
+        press(element)
     }
 
     private struct NothingToTap: Error {}
+
+    /// Taps where a thing is. The app lays a see-through layer over every screen for its lamp light, and the test
+    /// tools count that as covering what is under it, so "can this be tapped" says no for things that can.
+    private func press(_ element: XCUIElement) {
+        element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+    }
 
     /// The page being written: its text and its Done button.
     private var editor: XCUIElement { app.textViews.firstMatch }
@@ -101,7 +104,7 @@ final class LamplightUITests: XCTestCase {
     /// Types a line no other entry has, and returns it.
     private func write(_ what: String) -> String {
         let text = "\(what) \(UUID().uuidString.prefix(6))"
-        editor.tap()
+        press(editor)
         editor.typeText(text)
         return text
     }
@@ -124,7 +127,7 @@ final class LamplightUITests: XCTestCase {
         shot("2 new entry")
         let text = write("Written by a test")
         shot("3 entry with text")
-        done.tap()
+        press(done)
         XCTAssertTrue(anything(saying: text).waitForExistence(timeout: 10), "The finished entry isn't in the journal.")
         shot("4 journal after Done")
     }
@@ -133,13 +136,13 @@ final class LamplightUITests: XCTestCase {
     func testASecondEntryStaysOpen() throws {
         try startEntry()
         _ = write("First of two")
-        done.tap()
+        press(done)
         XCTAssertTrue(firstHittable("New Entry", timeout: 10) != nil, "The journal didn't come back after Done.")
         try startEntry()
         assertPageStaysOpen("The second entry")
         shot("second entry")
         _ = write("Second of two")
-        done.tap()
+        press(done)
     }
 
     /// The same, leaving the first entry with the back button instead of Done. Only a phone has that button.
@@ -149,22 +152,22 @@ final class LamplightUITests: XCTestCase {
         _ = write("Left with the back button")
         let back = app.navigationBars.buttons.element(boundBy: 0)
         XCTAssertTrue(back.waitForExistence(timeout: 5), "There is no back button.")
-        back.tap()
+        press(back)
         XCTAssertTrue(firstHittable("New Entry", timeout: 10) != nil, "The journal didn't come back after going back.")
         try startEntry()
         assertPageStaysOpen("The entry after going back")
         shot("entry after going back")
         _ = write("After going back")
-        done.tap()
+        press(done)
     }
 
     func testReadingAnEntry() throws {
         try startEntry()
         let text = write("To be read")
-        done.tap()
+        press(done)
         let row = anything(saying: text)
         XCTAssertTrue(row.waitForExistence(timeout: 10), "The finished entry isn't in the journal.")
-        row.tap()
+        press(row)
         XCTAssertTrue(firstHittable("Edit", timeout: 10) != nil, "The entry didn't open for reading.")
         shot("reading an entry")
     }
@@ -172,13 +175,13 @@ final class LamplightUITests: XCTestCase {
     /// Goes round the other screens and keeps a picture of each. It checks nothing: the pictures are the point.
     func testPicturesOfTheOtherScreens() throws {
         for screen in ["Today", "Calendar", "Journal"] {
-            guard let button = firstHittable(screen, timeout: 2), button.isHittable else { continue }
-            button.tap()
+            guard let button = firstHittable(screen, timeout: 3) else { continue }
+            press(button)
             Thread.sleep(forTimeInterval: 1)
             shot("screen \(screen)")
         }
-        if let settings = firstHittable("Settings", timeout: 2), settings.isHittable {
-            settings.tap()
+        if let settings = firstHittable("Settings", timeout: 3) {
+            press(settings)
             Thread.sleep(forTimeInterval: 1)
             shot("screen Settings")
         }
