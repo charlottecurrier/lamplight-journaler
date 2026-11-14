@@ -60,12 +60,19 @@ jobs:
             echo "::error::ASC_ISSUER_ID should be only the Issuer ID: 36 characters, like 12345678-abcd-abcd-abcd-1234567890ab. It has ${#issuer_id} characters after spaces are removed."
             bad=1
           fi
+          # The key file is rebuilt from its letters, so a paste that lost its line breaks, gained spaces or had
+          # its dashes changed by the keyboard still makes a file Xcode can read.
           mkdir -p "$RUNNER_TEMP/keys"
           key="$RUNNER_TEMP/keys/AuthKey.p8"
-          printf '%s\n' "$ASC_KEY_P8" > "$key"
+          body=$(printf '%s' "$ASC_KEY_P8" | sed -e 's/BEGIN PRIVATE KEY//g' -e 's/END PRIVATE KEY//g' | LC_ALL=C tr -cd 'A-Za-z0-9+/=')
+          {
+            echo "-----BEGIN PRIVATE KEY-----"
+            printf '%s\n' "$body" | fold -w 64
+            echo "-----END PRIVATE KEY-----"
+          } > "$key"
           chmod 600 "$key"
-          if ! grep -q "BEGIN PRIVATE KEY" "$key"; then
-            echo "::error::ASC_KEY_P8 doesn't look like a .p8 file. Paste the whole file, with its BEGIN and END lines."
+          if ! openssl pkey -in "$key" -noout 2>/dev/null; then
+            echo "::error::ASC_KEY_P8 is not a usable key. It has ${#body} letters between its BEGIN and END lines, and a .p8 file has about 200. Save the secret again with the whole text of the .p8 file."
             bad=1
           fi
           [ "$bad" -eq 0 ] || exit 1
