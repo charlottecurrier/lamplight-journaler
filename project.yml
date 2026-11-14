@@ -78,6 +78,20 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.forageandjump.lamplight.tests
         GENERATE_INFOPLIST_FILE: YES
 
+  # Runs the app in a simulator and taps it. Needs a Mac. Kept out of the Lamplight scheme so the quick tests stay quick.
+  LamplightUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: Tests/UITests
+    dependencies:
+      - target: Lamplight
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.forageandjump.lamplight.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Lamplight
+
 schemes:
   Lamplight:
     build:
@@ -93,3 +107,12 @@ schemes:
       config: Release
     archive:
       config: Release
+  LamplightUITests:
+    build:
+      targets:
+        Lamplight: all
+        LamplightUITests: [test]
+    test:
+      config: Debug
+      targets:
+        - LamplightUITests

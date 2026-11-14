@@ -70,6 +70,7 @@
 		CA85B3DC3B1B25D8C4CE525D /* SlashCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBA29D8169E5221D5820D086 /* SlashCommand.swift */; };
 		CC3C876BFCD16AB7484BD75D /* TestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB3B2BE259D1C1BE36AB6B36 /* TestSupport.swift */; };
 		CE523ED9A8B8E53F6BD50E70 /* SampleFolderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6BCA8060694A1AD9EDCB356 /* SampleFolderTests.swift */; };
+		D01B51897F091ED4C411CB0C /* LamplightUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82F3D04B12421C8E62E14077 /* LamplightUITests.swift */; };
 		D4991BAA99B1AA2C856FDB14 /* NewEntryNavigationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90E5E3C4E37A45CEA261F426 /* NewEntryNavigationTests.swift */; };
 		D6473C205AE4D3D0D6D525AA /* MarkdownStyler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68EC38FF8CE4B1AD30F29CAD /* MarkdownStyler.swift */; };
 		D6976599FFDC08ADE3F72E5B /* MoonPhaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F249AD9B71199263C6466A41 /* MoonPhaseTests.swift */; };
@@ -90,6 +91,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		1B04555B4C4ED61CF79ACA53 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4AFB5F866096DD8E8AF12CF1 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 9629F62BE28D2444B45EFE36;
+			remoteInfo = Lamplight;
+		};
 		3F6CDD8BCCB6C184ED11AF4E /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 4AFB5F866096DD8E8AF12CF1 /* Project object */;
@@ -147,7 +155,9 @@
 		7B7F4B5D26312FCF6B033BD8 /* EditorCaretTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorCaretTests.swift; sourceTree = "<group>"; };
 		7CBE403099A9389B2B848284 /* LibraryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryTests.swift; sourceTree = "<group>"; };
 		7E55550FDE06F9CD02EBF028 /* TodayScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayScreen.swift; sourceTree = "<group>"; };
+		82F3D04B12421C8E62E14077 /* LamplightUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LamplightUITests.swift; sourceTree = "<group>"; };
 		84C48750BF7A9C3A93BC39F2 /* BoundedWaitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoundedWaitTests.swift; sourceTree = "<group>"; };
+		8528435DF75B76DA35D7288D /* LamplightUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = LamplightUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		88385396F148DB8F7B7D91F8 /* PhotoLibraryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoLibraryTests.swift; sourceTree = "<group>"; };
 		8875EA9ACB53EB8EFD9183B3 /* Formatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formatting.swift; sourceTree = "<group>"; };
 		891CDF92D5FF2899DC389F53 /* MarkdownHTML.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownHTML.swift; sourceTree = "<group>"; };
@@ -237,6 +247,7 @@
 				475420AC691D365BEA2CDB7D /* AppTests */,
 				9C1BC7D7A201B13256F7C9AC /* EditorTests */,
 				8115880B6845EE595D164334 /* JournalCoreTests */,
+				8C7FF09536168E756513262C /* UITests */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -289,6 +300,14 @@
 			path = JournalCoreTests;
 			sourceTree = "<group>";
 		};
+		8C7FF09536168E756513262C /* UITests */ = {
+			isa = PBXGroup;
+			children = (
+				82F3D04B12421C8E62E14077 /* LamplightUITests.swift */,
+			);
+			path = UITests;
+			sourceTree = "<group>";
+		};
 		9C1BC7D7A201B13256F7C9AC /* EditorTests */ = {
 			isa = PBXGroup;
 			children = (
@@ -319,6 +338,7 @@
 			children = (
 				1C6F00FD687C82744F365D4F /* Lamplight.app */,
 				8CF6428CD0FBFE92844368DF /* LamplightTests.xctest */,
+				8528435DF75B76DA35D7288D /* LamplightUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -418,6 +438,24 @@
 			productReference = 1C6F00FD687C82744F365D4F /* Lamplight.app */;
 			productType = "com.apple.product-type.application";
 		};
+		C95884EE04E76649499889A7 /* LamplightUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F9AE8BB0544C747FE05A5838 /* Build configuration list for PBXNativeTarget "LamplightUITests" */;
+			buildPhases = (
+				D3B977011BB9F4823345672D /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				140510DD8ABF5EB3874778E0 /* PBXTargetDependency */,
+			);
+			name = LamplightUITests;
+			packageProductDependencies = (
+			);
+			productName = LamplightUITests;
+			productReference = 8528435DF75B76DA35D7288D /* LamplightUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -425,7 +463,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 1430;
+				LastUpgradeCheck = 1600;
 				TargetAttributes = {
 					27D1B8C93466B169C68F86CA = {
 						DevelopmentTeam = U8LGQ38JST;
@@ -434,6 +472,11 @@
 					9629F62BE28D2444B45EFE36 = {
 						DevelopmentTeam = U8LGQ38JST;
 						ProvisioningStyle = Automatic;
+					};
+					C95884EE04E76649499889A7 = {
+						DevelopmentTeam = U8LGQ38JST;
+						ProvisioningStyle = Automatic;
+						TestTargetID = 9629F62BE28D2444B45EFE36;
 					};
 				};
 			};
@@ -453,6 +496,7 @@
 			targets = (
 				9629F62BE28D2444B45EFE36 /* Lamplight */,
 				27D1B8C93466B169C68F86CA /* LamplightTests */,
+				C95884EE04E76649499889A7 /* LamplightUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -562,9 +606,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D3B977011BB9F4823345672D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D01B51897F091ED4C411CB0C /* LamplightUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		140510DD8ABF5EB3874778E0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 9629F62BE28D2444B45EFE36 /* Lamplight */;
+			targetProxy = 1B04555B4C4ED61CF79ACA53 /* PBXContainerItemProxy */;
+		};
 		F7483874AA2DB6140FB0525D /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 9629F62BE28D2444B45EFE36 /* Lamplight */;
@@ -631,6 +688,40 @@
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		2FDB3269419FA62FDF39C869 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.forageandjump.lamplight.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Lamplight;
+			};
+			name = Debug;
+		};
+		3411496569F9B7726A87E295 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.forageandjump.lamplight.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Lamplight;
 			};
 			name = Release;
 		};
@@ -798,6 +889,15 @@
 			buildConfigurations = (
 				4038C6F710CE209B30697A77 /* Debug */,
 				58A10FF1D73B359C8A0C79AA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F9AE8BB0544C747FE05A5838 /* Build configuration list for PBXNativeTarget "LamplightUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2FDB3269419FA62FDF39C869 /* Debug */,
+				3411496569F9B7726A87E295 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

@@ -138,7 +138,8 @@ final class AppPrefs: ObservableObject {
         lockEnabled = defaults.bool(forKey: Key.lockEnabled)
         lockTimeout = LockTimeout(rawValue: defaults.integer(forKey: Key.lockTimeout)) ?? .immediately
         rolloverHour = defaults.integer(forKey: Key.rolloverHour)
-        openToNewEntry = defaults.object(forKey: Key.openToNewEntry) as? Bool ?? true
+        // Read with bool(forKey:) so a value given when the app is launched, as the UI tests do, is understood.
+        openToNewEntry = defaults.object(forKey: Key.openToNewEntry) == nil ? true : defaults.bool(forKey: Key.openToNewEntry)
         paperTexture = defaults.string(forKey: Key.paperTexture).flatMap(PaperTexture.init(rawValue:)) ?? .cotton
         textureStrength = defaults.object(forKey: Key.textureStrength) as? Double ?? 1.0
         onboardingComplete = defaults.bool(forKey: Key.onboardingComplete)
