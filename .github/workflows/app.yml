@@ -1,10 +1,20 @@
-# Builds the app and runs the tests in the iPad simulator. This is the only place the SwiftUI and UIKit code
-# in App/ gets compiled outside Xcode. macOS runners on a private repository use minutes at ten times the
-# Linux rate, and one run is about fourteen minutes, so it only runs when started by hand: Actions, then App,
-# then "Run workflow", and pick the branch. Run it before merging a change to the app's code.
+# Builds the app and runs the tests in simulators. This is the only place the SwiftUI and UIKit code in App/
+# gets compiled outside Xcode. It runs on pull requests that change code, and a newer push cancels the older run.
+# The repository is public, so GitHub doesn't charge for the Mac minutes. If it is ever made private again, they
+# count ten times and one run is about fourteen minutes: take the pull_request trigger out then.
+# It can also be run by hand from the Actions tab with "Run workflow".
 name: App
 
 on:
+  pull_request:
+    paths:
+      - "App/**"
+      - "Sources/**"
+      - "Tests/**"
+      - "Package.swift"
+      - "project.yml"
+      - "Lamplight.xcodeproj/**"
+      - ".github/workflows/app.yml"
   workflow_dispatch:
 
 concurrency:

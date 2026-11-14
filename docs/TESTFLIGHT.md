@@ -24,7 +24,7 @@ GitHub can build, sign and upload the app. You start it from the GitHub app or s
 
 Then, for each build: Actions, then **TestFlight**, then **Run workflow**. It takes about fifteen minutes, and Apple takes a few more to process the build. It then shows in the TestFlight app. Your own installs need no review.
 
-The build number is the date and time, so nothing needs raising or committing. Each run uses Mac minutes at ten times the usual rate.
+The build number is the date and time, so nothing needs raising or committing.
 
 ## Each upload from Xcode
 

@@ -1,6 +1,6 @@
 # Builds Lamplight for a real device, signs it and uploads it to TestFlight. No Mac of your own is needed.
-# It only runs when started by hand: Actions, then TestFlight, then "Run workflow". macOS runners on a private
-# repository use minutes at ten times the Linux rate, so don't add a trigger that runs it by itself.
+# It only runs when started by hand: Actions, then TestFlight, then "Run workflow". Each run uploads a build
+# to Apple and uses the signing key, so don't add a trigger that runs it by itself.
 #
 # It needs three repository secrets (Settings, Secrets and variables, Actions), from an App Store Connect API
 # key with the Admin role:
