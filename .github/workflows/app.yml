@@ -28,7 +28,7 @@ jobs:
   app:
     name: Build and test
     runs-on: macos-26
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
 
@@ -184,12 +184,18 @@ jobs:
                       if not os.path.exists(new):
                           os.rename(old, new)
           print(f"{len([f for f in os.listdir(out) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.heic'))])} pictures in {out}")
+          # What a test saw when it couldn't find something. One is enough to read here; the rest are in the artifact.
+          trees = sorted(f for f in os.listdir(out) if f.endswith(".txt"))
+          if trees:
+              print(f"--- {trees[0]} ---")
+              print(open(os.path.join(out, trees[0]), errors="replace").read()[:20000])
           PY
           done
           exit $status
 
+      # Kept even when the job ran out of time, since that is when they are most wanted.
       - name: Keep the pictures
-        if: ${{ !cancelled() }}
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: screens

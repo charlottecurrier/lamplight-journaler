@@ -22,9 +22,10 @@ final class LamplightUITests: XCTestCase {
             "-prefs.openToNewEntry", "NO",
         ]
         app.launch()
-        if firstHittable("New Entry", timeout: 30) == nil {
+        if find("New Entry", timeout: 20) == nil {
+            describeScreen("journal didn't open")
             shot("journal didn't open")
-            XCTFail("The journal didn't open: there is no New Entry button to tap.")
+            XCTFail("The journal didn't open: there is nothing labelled New Entry.")
         }
     }
 
@@ -38,27 +39,58 @@ final class LamplightUITests: XCTestCase {
         add(attachment)
     }
 
-    /// The first button with this label that can be tapped. A screen can hold more than one New Entry button.
-    private func firstHittable(_ label: String, timeout: TimeInterval = 5) -> XCUIElement? {
+    /// The first thing on screen with this label, of any kind. One that can be tapped is preferred: a screen can
+    /// hold more than one New Entry button, and some are behind others.
+    private func find(_ label: String, timeout: TimeInterval = 5) -> XCUIElement? {
+        let query = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", label))
         let deadline = Date().addingTimeInterval(timeout)
+        var fallback: XCUIElement?
         repeat {
-            // By label, not by identifier: the app's buttons have labels and no identifiers, and
-            // matching(identifier:) found none of them.
-            let matches = app.buttons.matching(NSPredicate(format: "label == %@", label)).allElementsBoundByIndex
-            if let found = matches.first(where: { $0.exists && $0.isHittable }) { return found }
+            let matches = query.allElementsBoundByIndex.filter(\.exists)
+            if let hittable = matches.first(where: \.isHittable) { return hittable }
+            fallback = matches.first
             Thread.sleep(forTimeInterval: 0.25)
         } while Date() < deadline
-        return nil
+        return fallback
+    }
+
+    /// Kept for the tests' wording: something to tap with this label, or nil.
+    private func firstHittable(_ label: String, timeout: TimeInterval = 5) -> XCUIElement? {
+        find(label, timeout: timeout)
+    }
+
+    /// Writes down everything the test can see on screen, for when it can't find what it wants.
+    private func describeScreen(_ name: String) {
+        let text = app.debugDescription
+        let attachment = XCTAttachment(string: text)
+        attachment.name = "\(isPhone ? "phone" : "ipad") \(name) tree"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        print("SCREEN TREE (\(name)):\n\(text)")
     }
 
     private func tap(_ label: String, file: StaticString = #filePath, line: UInt = #line) throws {
-        let button = try XCTUnwrap(firstHittable(label), "There is no \"\(label)\" button to tap.", file: file, line: line)
-        button.tap()
+        guard let element = find(label) else {
+            describeScreen("no \(label)")
+            shot("no \(label)")
+            XCTFail("There is nothing labelled \"\(label)\" to tap.", file: file, line: line)
+            throw NothingToTap()
+        }
+        if element.isHittable {
+            element.tap()
+        } else {
+            // It is there but something is counted as covering it. Tap where it is.
+            element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        }
     }
+
+    private struct NothingToTap: Error {}
 
     /// The page being written: its text and its Done button.
     private var editor: XCUIElement { app.textViews.firstMatch }
-    private var done: XCUIElement { app.buttons.matching(NSPredicate(format: "label == %@", "Done")).firstMatch }
+    private var done: XCUIElement {
+        app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Done")).firstMatch
+    }
 
     private func startEntry(file: StaticString = #filePath, line: UInt = #line) throws {
         try tap("New Entry", file: file, line: line)
@@ -140,12 +172,12 @@ final class LamplightUITests: XCTestCase {
     /// Goes round the other screens and keeps a picture of each. It checks nothing: the pictures are the point.
     func testPicturesOfTheOtherScreens() throws {
         for screen in ["Today", "Calendar", "Journal"] {
-            guard let button = firstHittable(screen, timeout: 2) else { continue }
+            guard let button = firstHittable(screen, timeout: 2), button.isHittable else { continue }
             button.tap()
             Thread.sleep(forTimeInterval: 1)
             shot("screen \(screen)")
         }
-        if let settings = firstHittable("Settings", timeout: 2) {
+        if let settings = firstHittable("Settings", timeout: 2), settings.isHittable {
             settings.tap()
             Thread.sleep(forTimeInterval: 1)
             shot("screen Settings")
