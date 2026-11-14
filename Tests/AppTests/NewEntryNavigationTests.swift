@@ -221,6 +221,8 @@ final class NewEntryNavigationTests: EditorTestCase {
         XCTAssertNil(screen.model.editingEntryID, "Nothing should be being written yet.")
         NotificationCenter.default.post(name: .lamplightNewEntry, object: nil)
         await watch(screen, what: "The new entry", compact: options.compact)
+        // A row for it would push the list down as the page opens, and close up again on the way back.
+        XCTAssertEqual(screen.model.entries(in: .all).count, 3, "A new entry is in the list before anything is written.")
     }
 
     private func checkLaunchEntryStaysOpen(_ options: Options) async throws {
@@ -318,8 +320,8 @@ final class NewEntryNavigationTests: EditorTestCase {
         NotificationCenter.default.post(name: .lamplightNewEntry, object: nil)
         await watch(screen, what: "The second of two entries started at once", compact: true)
         XCTAssertEqual(
-            screen.model.entries(in: .all).count, 4,
-            "The journal should hold its three entries and the one being written.\n" + NavTrace.events.joined(separator: "\n")
+            screen.model.entries(in: .all).count, 3,
+            "The list should hold its three entries. An entry with nothing written isn't in it.\n" + NavTrace.events.joined(separator: "\n")
         )
     }
 
