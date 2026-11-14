@@ -43,14 +43,37 @@ jobs:
           done
           exit $missing
 
-      - name: Write the API key to a file
+      # A secret pasted on a phone often carries a space or a line break. Those are taken out here, and an ID of
+      # the wrong shape is refused with a plain message. The cleaned IDs are what the later steps use.
+      - name: Check the IDs and write the API key to a file
         run: |
+          key_id=$(printf '%s' "$ASC_KEY_ID" | tr -d '[:space:]')
+          issuer_id=$(printf '%s' "$ASC_ISSUER_ID" | tr -d '[:space:]')
+          echo "::add-mask::$key_id"
+          echo "::add-mask::$issuer_id"
+          bad=0
+          if ! printf '%s' "$key_id" | grep -Eq '^[A-Za-z0-9]{8,14}$'; then
+            echo "::error::ASC_KEY_ID should be only the Key ID: about ten letters and digits, with nothing else. It has ${#key_id} characters after spaces are removed."
+            bad=1
+          fi
+          if ! printf '%s' "$issuer_id" | grep -Eq '^[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}$'; then
+            echo "::error::ASC_ISSUER_ID should be only the Issuer ID: 36 characters, like 12345678-abcd-abcd-abcd-1234567890ab. It has ${#issuer_id} characters after spaces are removed."
+            bad=1
+          fi
           mkdir -p "$RUNNER_TEMP/keys"
-          key="$RUNNER_TEMP/keys/AuthKey_${ASC_KEY_ID}.p8"
+          key="$RUNNER_TEMP/keys/AuthKey.p8"
           printf '%s\n' "$ASC_KEY_P8" > "$key"
           chmod 600 "$key"
-          grep -q "BEGIN PRIVATE KEY" "$key" || { echo "::error::ASC_KEY_P8 doesn't look like a .p8 file. Paste the whole file, with its BEGIN and END lines."; exit 1; }
-          echo "ASC_KEY_PATH=$key" >> "$GITHUB_ENV"
+          if ! grep -q "BEGIN PRIVATE KEY" "$key"; then
+            echo "::error::ASC_KEY_P8 doesn't look like a .p8 file. Paste the whole file, with its BEGIN and END lines."
+            bad=1
+          fi
+          [ "$bad" -eq 0 ] || exit 1
+          {
+            echo "KEY_ID=$key_id"
+            echo "ISSUER_ID=$issuer_id"
+            echo "ASC_KEY_PATH=$key"
+          } >> "$GITHUB_ENV"
 
       # Apple refuses a build number that isn't higher than the last one. The date and time, in UTC, always is,
       # and nothing has to be committed. project.yml keeps its own number for builds made in Xcode.
@@ -108,8 +131,8 @@ jobs:
             -exportPath "$RUNNER_TEMP/export" \
             -allowProvisioningUpdates \
             -authenticationKeyPath "$ASC_KEY_PATH" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+            -authenticationKeyID "$KEY_ID" \
+            -authenticationKeyIssuerID "$ISSUER_ID"
           echo "Uploaded build $BUILD_NUMBER. It shows in TestFlight once Apple has finished processing it."
 
       # xcodebuild writes why signing or the upload failed to these logs, not to the screen.
