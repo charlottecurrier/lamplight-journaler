@@ -40,6 +40,8 @@ GitHub Actions runs two workflows on pull requests. After a push, look at the PR
 - `.github/workflows/core.yml` (Linux, every PR and every push to `main`): `swift test` with the sample journal, `tools/typecheck_support.sh`, `tools/check_palette.py`, `tools/check_privacy_manifest.py`, and a syntax check of the Python tools.
 - `.github/workflows/app.yml` (macOS, only PRs that change `App/`, `Sources/`, `Tests/`, `project.yml`, the Xcode project or `Package.swift`): builds the app and runs the tests in the iPad simulator. This is the only place the SwiftUI and UIKit code in `App/` is compiled outside Xcode, so it can find errors the Linux harness can't. A last step runs `NewEntryNavigationTests` again on an iPhone simulator, so the phone's layout is a real phone's. The repo is private, so macOS minutes count ten times. Don't add triggers that run it on every push.
 
+- `.github/workflows/testflight.yml` (macOS, only when started by hand): archives the app, signs it with an App Store Connect API key kept in repository secrets, and uploads it to TestFlight. The build number is the UTC date and time, passed on the command line, so nothing is committed. Setup is in `docs/TESTFLIGHT.md`. Don't give it a trigger.
+
 ## Rules that matter
 
 - **Review screen changes before calling a PR ready.** A PR that changes `App/Views`, `App/Editor` or navigation gets an independent review (the `code-review` skill) before the person is told it is ready. Fix what is real, and say in the PR what was found and what was left. CI passing is not enough: it doesn't tap through the screens.
