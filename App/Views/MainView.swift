@@ -200,8 +200,9 @@ struct MainView: View {
     private var contentColumn: some View {
         screen
             .toolbar {
+                // On the far side from Back, so the two can't be taken for one control or tapped by mistake.
                 if sizeClass == .compact {
-                    ToolbarItem(placement: .topBarLeading) {
+                    ToolbarItem(placement: .topBarTrailing) {
                         Button {
                             showSettings = true
                         } label: {

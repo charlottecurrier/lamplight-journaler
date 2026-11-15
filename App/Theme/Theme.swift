@@ -17,6 +17,9 @@ enum Theme {
     static var onAccent: Color { Palette.onAccent.color }
     /// The accent as it is on the light page, dark enough for white text in both looks. Swipe buttons use it.
     static var accentDeep: Color { Color(uiColor: UIColor(hex: Palette.accent.light)) }
+    /// Lamp light, the same in both looks: pale in the middle of a flame, amber at its edge.
+    static var lampCore: Color { Color(uiColor: UIColor(hex: Palette.onAccent.light)) }
+    static var lampEdge: Color { Color(uiColor: UIColor(hex: Palette.accent.dark)) }
     static var sage: Color { Palette.sage.color }
     static var danger: Color { Palette.danger.color }
 
@@ -42,7 +45,7 @@ enum Theme {
     }
 
     /// The stroke weight of every icon you tap. Light, so they sit with the thin serif type. The large decorative
-    /// icons on empty and lock screens are lighter still. To make the icons heavier or lighter, change it here.
+    /// icon on the lock screen is lighter still. To make the icons heavier or lighter, change it here.
     static let iconWeight = Font.Weight.light
 }
 

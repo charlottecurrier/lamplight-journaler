@@ -131,49 +131,43 @@ def write_imageset(name, image):
 
 # ---------- app icon ----------
 
-def lerp(a, b, t):
-    return tuple(round(x + (y - x) * t) for x, y in zip(a, b))
-
-
 def app_icon(size=1024):
+    """A window with a round top, lit from inside, in a dark wall. Lamplight, seen from outside at night."""
     s = size * 2  # draw large, shrink at the end for smooth edges
-    top, bottom = (43, 32, 25), (21, 16, 12)
-    base = Image.new("RGB", (s, s))
-    px = ImageDraw.Draw(base)
-    for y in range(s):
-        px.line([(0, y), (s, y)], fill=lerp(top, bottom, y / s))
+    top, bottom = (34, 25, 19), (14, 10, 8)
+    ramp = np.linspace(0, 1, s)[:, None, None]
+    wall = np.array(top)[None, None, :] * (1 - ramp) + np.array(bottom)[None, None, :] * ramp
+    base = Image.fromarray(np.broadcast_to(wall, (s, s, 3)).astype(np.uint8), "RGB").convert("RGBA")
 
-    # Lamp glow behind the page.
+    # The light the window throws on the wall around it.
     glow = Image.new("RGBA", (s, s), (0, 0, 0, 0))
-    gd = ImageDraw.Draw(glow)
-    cx, cy, r = s * 0.5, s * 0.42, s * 0.5
-    gd.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(227, 154, 98, 150))
-    glow = glow.filter(ImageFilter.GaussianBlur(s * 0.12))
-    base = Image.alpha_composite(base.convert("RGBA"), glow)
+    cx, cy, r = s * 0.5, s * 0.52, s * 0.40
+    ImageDraw.Draw(glow).ellipse([cx - r, cy - r, cx + r, cy + r], fill=(227, 154, 98, 90))
+    base = Image.alpha_composite(base, glow.filter(ImageFilter.GaussianBlur(s * 0.12)))
 
-    # The page: cream, slightly turned, with soft shadow and a few ruled lines.
-    pw, ph = int(s * 0.50), int(s * 0.62)
-    page = Image.new("RGBA", (pw, ph), (0, 0, 0, 0))
-    pd = ImageDraw.Draw(page)
-    pd.rounded_rectangle([0, 0, pw - 1, ph - 1], radius=int(s * 0.03), fill=(241, 228, 204, 255))
-    margin = int(pw * 0.14)
-    for i in range(6):
-        y = int(ph * 0.22 + i * ph * 0.115)
-        pd.line([(margin, y), (pw - margin - (int(pw * 0.25) if i == 5 else 0), y)], fill=(196, 176, 142, 255), width=int(s * 0.006))
-    pd.ellipse([margin, int(ph * 0.09), margin + int(s * 0.03), int(ph * 0.09) + int(s * 0.03)], fill=(194, 107, 52, 255))
-    page = page.rotate(5, expand=True, resample=Image.BICUBIC)
+    # The window: a half circle on a rectangle.
+    w, h = s * 0.40, s * 0.58
+    x0, y0 = s * 0.5 - w / 2, s * 0.22
+    arch = Image.new("L", (s, s), 0)
+    ad = ImageDraw.Draw(arch)
+    ad.ellipse([x0, y0, x0 + w, y0 + w], fill=255)
+    ad.rectangle([x0, y0 + w / 2, x0 + w, y0 + h], fill=255)
 
-    # Pad the shadow canvas so the blur isn't cut off at the page's edges.
-    pad = int(s * 0.08)
-    mask = Image.new("L", (page.width + 2 * pad, page.height + 2 * pad), 0)
-    mask.paste(page.getchannel("A"), (pad, pad))
-    mask = mask.filter(ImageFilter.GaussianBlur(s * 0.025)).point(lambda v: int(v * 0.6))
-    shadow = Image.new("RGBA", mask.size, (8, 5, 3, 0))
-    shadow.putalpha(mask)
+    # Inside it, pale where the lamp is and amber toward the frame.
+    yy = np.linspace(0, 1, s)[:, None]
+    xx = np.linspace(0, 1, s)[None, :]
+    t = np.clip(np.sqrt((xx - 0.5) ** 2 + ((yy - 0.60) * 0.8) ** 2) / 0.30, 0, 1)[..., None]
+    warm = np.array([255, 236, 200]) * (1 - t) + np.array([214, 132, 74]) * t
+    base = Image.composite(Image.fromarray(warm.astype(np.uint8), "RGB").convert("RGBA"), base, arch)
 
-    ox, oy = (s - page.width) // 2, int(s * 0.17)
-    base.alpha_composite(shadow, (ox - pad + int(s * 0.012), oy - pad + int(s * 0.03)))
-    base.alpha_composite(page, (ox, oy))
+    # Its bars and sill.
+    d = ImageDraw.Draw(base)
+    bar, thick = (58, 38, 24, 255), int(s * 0.016)
+    d.line([(s * 0.5, y0), (s * 0.5, y0 + h)], fill=bar, width=thick)
+    d.line([(x0, y0 + h * 0.56), (x0 + w, y0 + h * 0.56)], fill=bar, width=thick)
+    d.rounded_rectangle(
+        [x0 - s * 0.035, y0 + h, x0 + w + s * 0.035, y0 + h + s * 0.035], radius=s * 0.01, fill=(74, 52, 36, 255)
+    )
 
     icon = base.convert("RGB").resize((size, size), Image.LANCZOS)
     # A touch of grain so it matches the app.

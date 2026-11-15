@@ -174,10 +174,10 @@ struct LoadingView: View {
     var body: some View {
         ZStack {
             PaperBackground()
-            VStack(spacing: 16) {
-                ProgressView()
-                    .controlSize(.large)
-                Text("Opening your journal…")
+            VStack(spacing: 14) {
+                LampWindow()
+                    .padding(.bottom, 22)
+                Text("Opening your journal")
                     .font(Theme.serif(.title3))
                     .foregroundStyle(Theme.inkSecondary)
                 if !model.loadingStep.isEmpty {

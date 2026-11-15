@@ -373,7 +373,6 @@ struct RecentlyDeletedView: View {
         .overlay {
             if loaded && items.isEmpty {
                 EmptyStateView(
-                    systemImage: "trash",
                     title: "Nothing deleted",
                     message: "Entries you delete stay here for 30 days, then they're removed for good."
                 )
