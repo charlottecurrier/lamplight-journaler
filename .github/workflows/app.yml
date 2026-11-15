@@ -1,7 +1,8 @@
-# Builds the app and runs the tests in the iPad simulator. This is the only place the SwiftUI and UIKit code
-# in App/ gets compiled outside Xcode. macOS runners on a private repository use minutes at ten times the
-# Linux rate, so this only runs on pull requests that change code, and a newer push cancels the older run.
-# Run it by hand from the Actions tab with "Run workflow".
+# Builds the app and runs the tests in simulators. This is the only place the SwiftUI and UIKit code in App/
+# gets compiled outside Xcode. It runs on pull requests that change code, and a newer push cancels the older run.
+# The repository is public, so GitHub doesn't charge for the Mac minutes. If it is ever made private again, they
+# count ten times and one run is about fourteen minutes: take the pull_request trigger out then.
+# It can also be run by hand from the Actions tab with "Run workflow".
 name: App
 
 on:
@@ -27,7 +28,7 @@ jobs:
   app:
     name: Build and test
     runs-on: macos-26
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
 
@@ -120,3 +121,84 @@ jobs:
               sys.exit("No tests ran on the phone.")
           PY
           exit $status
+
+      # The UI tests start the whole app and tap it, on a phone and on an iPad, and take a picture at each step.
+      # They reuse the build above. A failure here doesn't hide the results of the tests before it.
+      - name: UI tests
+        if: ${{ !cancelled() }}
+        run: |
+          # With a hardware keyboard "connected", the simulator shows no keyboard and typing can fail.
+          defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool false
+          status=0
+          for kind in iPhone iPad; do
+            udid=$(xcrun simctl list devices available -j | KIND="$kind" python3 -c '
+          import json, os, sys
+          runtimes = json.load(sys.stdin)["devices"]
+          for runtime in sorted(runtimes, reverse=True):
+              for device in runtimes[runtime]:
+                  if device["name"].startswith(os.environ["KIND"]):
+                      print(device["udid"])
+                      sys.exit()
+          sys.exit("No simulator found")
+          ')
+            echo "UI tests on $kind simulator $udid"
+            bundle="$RUNNER_TEMP/UI-$kind.xcresult"
+            set +e
+            xcodebuild test -quiet \
+              -project Lamplight.xcodeproj \
+              -scheme LamplightUITests \
+              -destination "platform=iOS Simulator,id=$udid" \
+              -resultBundlePath "$bundle" \
+              CODE_SIGNING_ALLOWED=NO
+            [ $? -eq 0 ] || status=1
+            set -e
+            [ -d "$bundle" ] || { echo "No UI test results on $kind."; status=1; continue; }
+            xcrun xcresulttool get test-results summary --path "$bundle" > "$RUNNER_TEMP/ui-$kind.json"
+            KIND="$kind" python3 - "$RUNNER_TEMP/ui-$kind.json" <<'PY'
+          import json, os, sys
+          summary = json.load(open(sys.argv[1]))
+          for failure in summary.get("testFailures", []):
+              print(f"FAILED {failure.get('testName')}:\n{failure.get('failureText')}\n")
+          print(f"UI tests on {os.environ['KIND']}: {summary.get('totalTestCount')} total, {summary.get('passedTests')} passed, {summary.get('failedTests')} failed, {summary.get('skippedTests')} skipped")
+          PY
+            # The pictures come out named by number. Give them the names the tests gave them.
+            out="$RUNNER_TEMP/screens/$kind"
+            mkdir -p "$out"
+            xcrun xcresulttool export attachments --path "$bundle" --output-path "$out" || echo "Couldn't export the pictures for $kind."
+            python3 - "$out" <<'PY'
+          import json, os, re, sys
+          out = sys.argv[1]
+          manifest = os.path.join(out, "manifest.json")
+          if os.path.exists(manifest):
+              for test in json.load(open(manifest)):
+                  for item in test.get("attachments", []):
+                      old = os.path.join(out, item.get("exportedFileName", ""))
+                      name = item.get("suggestedHumanReadableName") or ""
+                      if not os.path.isfile(old) or not name:
+                          continue
+                      stem, ext = os.path.splitext(name)
+                      # The suggested name ends with a number and a long ID. Keep the part the test wrote.
+                      stem = re.sub(r"_\d+_[0-9A-Fa-f-]{36}$", "", stem)
+                      test_name = (test.get("testIdentifier") or "").split("/")[-1].replace("()", "")
+                      new = os.path.join(out, re.sub(r"[^A-Za-z0-9 ._-]", "", f"{test_name} - {stem}{ext or '.png'}"))
+                      if not os.path.exists(new):
+                          os.rename(old, new)
+          print(f"{len([f for f in os.listdir(out) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.heic'))])} pictures in {out}")
+          # What a test saw when it couldn't find something. One is enough to read here; the rest are in the artifact.
+          trees = sorted(f for f in os.listdir(out) if f.endswith(".txt"))
+          if trees:
+              print(f"--- {trees[0]} ---")
+              print(open(os.path.join(out, trees[0]), errors="replace").read()[:20000])
+          PY
+          done
+          exit $status
+
+      # Kept even when the job ran out of time, since that is when they are most wanted.
+      - name: Keep the pictures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: screens
+          path: ${{ runner.temp }}/screens
+          if-no-files-found: warn
+          retention-days: 14
