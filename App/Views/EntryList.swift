@@ -337,15 +337,13 @@ struct EntryListView: View {
             if entries.isEmpty {
                 if isSearching {
                     EmptyStateView(
-                        systemImage: "magnifyingglass",
                         title: "No matches",
                         message: "Nothing in this journal has those words."
                     )
                 } else {
                     EmptyStateView(
-                        systemImage: "book.closed",
                         title: "A blank page",
-                        message: "Your entries will gather here. Write a few lines tonight.",
+                        message: "Your entries will gather here.",
                         actionTitle: "Write an entry",
                         action: { onCompose(.standard) }
                     )
@@ -393,7 +391,6 @@ struct OnThisDayScreen: View {
         .overlay {
             if groups.isEmpty {
                 EmptyStateView(
-                    systemImage: "clock.arrow.circlepath",
                     title: "Nothing from past years",
                     message: "Entries you wrote on this date in earlier years will show up here."
                 )

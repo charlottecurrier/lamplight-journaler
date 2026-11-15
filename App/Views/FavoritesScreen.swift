@@ -26,7 +26,6 @@ struct FavoritesScreen: View {
         .overlay {
             if favorites.isEmpty {
                 EmptyStateView(
-                    systemImage: "bookmark",
                     title: "No favorites yet",
                     message: "Tap the ribbon on an entry, or swipe an entry to the right, to keep it here."
                 )

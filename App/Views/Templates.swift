@@ -72,7 +72,6 @@ struct TemplatesScreen: View {
         .overlay {
             if model.templates.isEmpty {
                 EmptyStateView(
-                    systemImage: "doc.text",
                     title: "No templates yet",
                     message: "A template is a page you write once, with headings, prompts or checklists. New entries start with a copy of it.",
                     actionTitle: "Create a Template",

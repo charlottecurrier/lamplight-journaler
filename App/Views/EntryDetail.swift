@@ -6,9 +6,7 @@ struct DetailPlaceholder: View {
 
     var body: some View {
         EmptyStateView(
-            systemImage: "book",
             title: "Choose an entry",
-            message: "Or begin a new one for tonight.",
             actionTitle: "New Entry",
             action: { onCompose(.standard) }
         )
