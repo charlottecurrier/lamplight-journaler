@@ -15,6 +15,7 @@ on:
       - "project.yml"
       - "Lamplight.xcodeproj/**"
       - ".github/workflows/app.yml"
+      - "tools/name_test_pictures.py"
   workflow_dispatch:
 
 concurrency:
@@ -80,11 +81,18 @@ jobs:
           if not total:
               sys.exit("No tests ran.")
           PY
-          # Some of these tests take pictures of screens the UI tests can't reach, such as the loading screen.
+
+      # Some of these tests take pictures of screens the UI tests can't reach, such as the loading screen.
+      # A step of its own, so a failure in the results above doesn't lose them, and losing them fails nothing.
+      - name: Pictures from the tests
+        if: ${{ !cancelled() }}
+        run: |
+          bundle="$RUNNER_TEMP/Lamplight.xcresult"
+          [ -d "$bundle" ] || exit 0
           out="$RUNNER_TEMP/screens/Pages"
           mkdir -p "$out"
           xcrun xcresulttool export attachments --path "$bundle" --output-path "$out" || echo "Couldn't export the pictures."
-          python3 tools/name_test_pictures.py "$out"
+          python3 tools/name_test_pictures.py "$out" || echo "Couldn't name the pictures."
 
       # The new-entry tests run once more on a phone, so the layout is a phone's own and not an iPad window made to
       # look like one. Same build, a different simulator, so it costs a boot and a short run.

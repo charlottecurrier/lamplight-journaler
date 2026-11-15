@@ -200,7 +200,7 @@ struct MainView: View {
     private var contentColumn: some View {
         screen
             .toolbar {
-                // On the far side from Back, so the two can't be taken for one control or tapped by mistake.
+                // On the far side from Back. Beside it, the two read as one control.
                 if sizeClass == .compact {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {

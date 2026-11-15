@@ -20,6 +20,9 @@ enum Theme {
     /// Lamp light, the same in both looks: pale in the middle of a flame, amber at its edge.
     static var lampCore: Color { Color(uiColor: UIColor(hex: Palette.onAccent.light)) }
     static var lampEdge: Color { Color(uiColor: UIColor(hex: Palette.accent.dark)) }
+    /// A window with no light in it, and the bars across it. Dark in both looks.
+    static var lampOut: Color { Color(uiColor: UIColor(hex: Palette.surfaceRaised.dark)) }
+    static var lampFrame: Color { Color(uiColor: UIColor(hex: Palette.page.dark)) }
     static var sage: Color { Palette.sage.color }
     static var danger: Color { Palette.danger.color }
 

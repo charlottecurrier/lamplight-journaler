@@ -5,7 +5,7 @@ import XCTest
 
 /// Takes pictures of the screens that are hard to reach by tapping: the loading screen, which is gone in a moment,
 /// and the pages with nothing on them. The Mac job keeps the pictures with the UI tests' pictures, so a change to
-/// one of these screens can be looked at. They check only that each screen draws.
+/// one of these screens can be looked at. They check only that a picture could be taken.
 @MainActor
 final class QuietScreenPictureTests: XCTestCase {
     private func pause(_ seconds: Double) async {
@@ -17,7 +17,7 @@ final class QuietScreenPictureTests: XCTestCase {
         _ name: String,
         style: UIUserInterfaceStyle = .dark,
         size: CGSize = CGSize(width: 390, height: 700),
-        wait: Double = 2.2,
+        wait: Double = 0.3,
         @ViewBuilder _ content: () -> Content
     ) async {
         let root = content()
@@ -39,10 +39,11 @@ final class QuietScreenPictureTests: XCTestCase {
         host.view.layoutIfNeeded()
         await pause(wait)
 
+        var drawn = false
         let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
-            window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+            drawn = window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
         }
-        XCTAssertEqual(image.size, size, "The picture of \(name) is the wrong size.")
+        XCTAssertTrue(drawn, "The picture of \(name) couldn't be taken.")
         let attachment = XCTAttachment(image: image)
         attachment.name = name
         attachment.lifetime = .keepAlways
@@ -52,8 +53,9 @@ final class QuietScreenPictureTests: XCTestCase {
     func testLoadingScreen() async {
         let model = AppModel()
         await picture("loading before the light", wait: 0.1) { LoadingView().environment(model) }
-        await picture("loading dark") { LoadingView().environment(model) }
-        await picture("loading light", style: .light) { LoadingView().environment(model) }
+        // Long enough for the light to come on.
+        await picture("loading dark", wait: 1.6) { LoadingView().environment(model) }
+        await picture("loading light", style: .light, wait: 1.6) { LoadingView().environment(model) }
         model.loadingStep = "Reading your entries"
         model.loadedCount = 212
         model.totalCount = 840
@@ -61,23 +63,17 @@ final class QuietScreenPictureTests: XCTestCase {
     }
 
     func testEmptyPages() async {
-        await picture("empty journal dark") {
-            EmptyStateView(
-                title: "A blank page",
-                message: "Your entries will gather here.",
-                actionTitle: "Write an entry",
-                action: {}
-            )
-            .background(PaperBackground())
-        }
-        await picture("empty journal light", style: .light) {
-            EmptyStateView(
-                title: "A blank page",
-                message: "Your entries will gather here.",
-                actionTitle: "Write an entry",
-                action: {}
-            )
-            .background(PaperBackground())
+        // The words are a copy of the journal's own empty page, which can't be shown without the whole list.
+        for (look, style) in [("dark", UIUserInterfaceStyle.dark), ("light", .light)] {
+            await picture("empty journal \(look)", style: style) {
+                EmptyStateView(
+                    title: "A blank page",
+                    message: "Your entries will gather here.",
+                    actionTitle: "Write an entry",
+                    action: {}
+                )
+                .background(PaperBackground())
+            }
         }
         await picture("no entry chosen", size: CGSize(width: 700, height: 700)) {
             DetailPlaceholder(onCompose: { _ in })

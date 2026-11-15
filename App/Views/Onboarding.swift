@@ -169,6 +169,7 @@ struct OnboardingView: View {
 /// while iCloud brings the entries down.
 struct LoadingView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var takingAWhile = false
 
     var body: some View {
@@ -177,9 +178,13 @@ struct LoadingView: View {
             VStack(spacing: 14) {
                 LampWindow()
                     .padding(.bottom, 22)
-                Text("Opening your journal")
+                Text("Opening your journal…")
                     .font(Theme.serif(.title3))
                     .foregroundStyle(Theme.inkSecondary)
+                if reduceMotion {
+                    // The window doesn't move with Reduce Motion on, so something else has to show work going on.
+                    ProgressView()
+                }
                 if !model.loadingStep.isEmpty {
                     Text(model.loadingStep)
                         .font(Theme.serif(.footnote))

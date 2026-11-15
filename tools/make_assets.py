@@ -137,7 +137,7 @@ def app_icon(size=1024):
     top, bottom = (34, 25, 19), (14, 10, 8)
     ramp = np.linspace(0, 1, s)[:, None, None]
     wall = np.array(top)[None, None, :] * (1 - ramp) + np.array(bottom)[None, None, :] * ramp
-    base = Image.fromarray(np.broadcast_to(wall, (s, s, 3)).astype(np.uint8), "RGB").convert("RGBA")
+    base = Image.fromarray(np.broadcast_to(wall, (s, s, 3)).astype(np.uint8)).convert("RGBA")
 
     # The light the window throws on the wall around it.
     glow = Image.new("RGBA", (s, s), (0, 0, 0, 0))
@@ -158,7 +158,7 @@ def app_icon(size=1024):
     xx = np.linspace(0, 1, s)[None, :]
     t = np.clip(np.sqrt((xx - 0.5) ** 2 + ((yy - 0.60) * 0.8) ** 2) / 0.30, 0, 1)[..., None]
     warm = np.array([255, 236, 200]) * (1 - t) + np.array([214, 132, 74]) * t
-    base = Image.composite(Image.fromarray(warm.astype(np.uint8), "RGB").convert("RGBA"), base, arch)
+    base = Image.composite(Image.fromarray(warm.astype(np.uint8)).convert("RGBA"), base, arch)
 
     # Its bars and sill.
     d = ImageDraw.Draw(base)

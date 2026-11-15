@@ -46,7 +46,8 @@ struct PaperOrnament: View {
 }
 
 /// The window from the app's icon. It starts dark, a light comes on inside, and the light breathes like a flame.
-/// With Reduce Motion on, it is simply lit.
+/// With Reduce Motion on, it is simply lit. The window is a night window in both looks, dark until lit, so the
+/// change is one of brightness.
 struct LampWindow: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var width: CGFloat = 76
@@ -59,7 +60,7 @@ struct LampWindow: View {
 
     var body: some View {
         ZStack {
-            WindowArch().fill(Theme.surface)
+            WindowArch().fill(Theme.lampOut)
             WindowArch()
                 .fill(RadialGradient(
                     colors: [Theme.lampCore, Theme.lampEdge],
@@ -69,8 +70,8 @@ struct LampWindow: View {
                 ))
                 .opacity(glow)
             // The bars of the window.
-            Rectangle().fill(Theme.page).frame(width: 2.5)
-            Rectangle().fill(Theme.page).frame(height: 2.5).offset(y: height * 0.08)
+            Rectangle().fill(Theme.lampFrame).frame(width: 2.5)
+            Rectangle().fill(Theme.lampFrame).frame(height: 2.5).offset(y: height * 0.08)
             WindowArch().stroke(Theme.line, lineWidth: 1)
         }
         .frame(width: width, height: height)
@@ -93,10 +94,9 @@ struct LampWindow: View {
                 bright = true
                 return
             }
-            try? await Task.sleep(nanoseconds: 350_000_000)
-            guard !Task.isCancelled else { return }
-            withAnimation(.easeOut(duration: 0.9)) { lit = true }
-            try? await Task.sleep(nanoseconds: 900_000_000)
+            // No wait before the light: a journal on this device opens in under a second.
+            withAnimation(.easeOut(duration: 0.6)) { lit = true }
+            try? await Task.sleep(nanoseconds: 600_000_000)
             guard !Task.isCancelled else { return }
             withAnimation(.easeInOut(duration: 1.7).repeatForever(autoreverses: true)) { bright = true }
         }
