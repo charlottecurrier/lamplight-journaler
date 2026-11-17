@@ -12,6 +12,7 @@ final class LockManager {
     /// True when the lock is on but this device has no passcode, so there is nothing to unlock with.
     private(set) var passcodeMissing = false
 
+    /// When the app stopped being in front: sent to the background, or covered by the app switcher.
     @ObservationIgnored private var backgroundedAt: Date?
     /// Set once the lock screen has asked for Face ID on its own. After a cancel, only the Unlock button asks again.
     @ObservationIgnored private var hasAutoPrompted = false
@@ -43,6 +44,11 @@ final class LockManager {
             return
         }
         switch phase {
+        case .inactive:
+            // The app switcher only makes the app inactive. Coming back from it counts as having left, or the
+            // journal could be opened from the switcher with no check. The Face ID sheet makes the app inactive
+            // too, so this is skipped while the journal is locked or being unlocked.
+            if !isLocked, !isAuthenticating, backgroundedAt == nil { backgroundedAt = Date() }
         case .background:
             if backgroundedAt == nil { backgroundedAt = Date() }
             hasAutoPrompted = false

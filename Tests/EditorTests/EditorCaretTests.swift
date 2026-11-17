@@ -64,4 +64,21 @@ final class EditorCaretTests: EditorTestCase {
         }
         XCTAssertTrue(problems.isEmpty, problems.joined(separator: "\n"))
     }
+
+    /// On a page with no text the caret was drawn at the text view's small default size until a letter was typed.
+    func testCaretOnAnEmptyPageIsAsTallAsItIsAfterTyping() throws {
+        let view = try editorTextView(markdown: "")
+        XCTAssertTrue(view.becomeFirstResponder(), "The text view wouldn't take focus.")
+        settle(0.2)
+        let empty = view.caretRect(for: view.endOfDocument)
+
+        type("a", into: view)
+        settle()
+        let typed = view.caretRect(for: view.endOfDocument)
+        XCTAssertGreaterThan(typed.height, 10, "The caret after a letter has no height, so there is nothing to compare.")
+        XCTAssertEqual(
+            empty.height, typed.height, accuracy: 2,
+            "The caret on an empty page is \(empty.height) tall, and \(typed.height) after a letter."
+        )
+    }
 }

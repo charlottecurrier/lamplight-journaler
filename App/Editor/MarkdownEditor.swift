@@ -385,6 +385,7 @@ struct MarkdownEditor: UIViewRepresentable {
 
             syncedText = parent.text
             view.text = EditorText.fromMarkdown(parent.text)
+            seedTypingStyle(view)
             syncMedia()
             restyle(force: true)
         }
@@ -414,6 +415,7 @@ struct MarkdownEditor: UIViewRepresentable {
                 let location = min(selection.location, length)
                 view.selectedRange = NSRange(location: location, length: min(selection.length, length - location))
                 restyle()
+                seedTypingStyle(view)
             }
 
             if parent.isFocusMode != lastFocusMode {
@@ -645,6 +647,14 @@ struct MarkdownEditor: UIViewRepresentable {
             }
         }
 
+        /// A page with no text has nothing to take a style from, so the text view drew its caret at its own small
+        /// default size until the first letter was typed. Give it the body style to start with. There is no text to
+        /// scroll, so this can't move the page.
+        private func seedTypingStyle(_ view: UITextView) {
+            guard view.textStorage.length == 0 else { return }
+            view.typingAttributes = MarkdownStyler.baseAttributes()
+        }
+
         /// Typed text takes the style of the line the caret is on, not of the character before it, which could be
         /// bold, or a hidden marker with no size. This is set when something is about to be typed, and only if the
         /// text view's own choice would differ. It isn't set when the caret moves: setting it makes the text view
@@ -738,6 +748,7 @@ struct MarkdownEditor: UIViewRepresentable {
 
         func textViewDidBeginEditing(_ textView: UITextView) {
             restyle()
+            seedTypingStyle(textView)
         }
 
         func textViewDidEndEditing(_ textView: UITextView) {

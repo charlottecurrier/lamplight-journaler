@@ -81,29 +81,42 @@ private struct DayCell: View {
         return MoonPhase(on: Calendar.journal.date(from: parts) ?? Date())
     }
 
+    /// A day with an entry is told apart by brightness, three ways: its number is bold and bright, its moon is
+    /// bright and larger, and it sits on a lighter tile. A day without one is dim. Color alone was too quiet.
     private var moonLit: Color {
         if isSelected { return isMarked ? Theme.onAccent : Theme.onAccent.opacity(0.5) }
-        return isMarked ? Theme.sage : Theme.inkTertiary.opacity(0.6)
+        return isMarked ? Theme.ink : Theme.inkTertiary.opacity(0.45)
+    }
+
+    private var numberColor: Color {
+        if isSelected { return Theme.onAccent }
+        return isMarked || isToday ? Theme.ink : Theme.inkTertiary
+    }
+
+    private var tile: Color {
+        if isSelected { return Theme.accent }
+        return isMarked ? Theme.raised : Color.clear
     }
 
     var body: some View {
         Button(action: action) {
             VStack(spacing: 3) {
                 Text("\(day.day)")
-                    .font(Theme.serif(.body, weight: isSelected || isToday ? .semibold : .regular))
-                    .foregroundStyle(isSelected ? Theme.onAccent : Theme.ink)
+                    .font(Theme.serif(.body, weight: isSelected || isToday || isMarked ? .semibold : .regular))
+                    .foregroundStyle(numberColor)
                 MoonGlyph(
                     phase: phase,
                     lit: moonLit,
                     shade: isSelected ? Theme.onAccent.opacity(0.18) : Theme.line.opacity(isMarked ? 0.9 : 0.5),
                     outline: isMarked ? moonLit : Color.clear
                 )
-                .frame(width: 11, height: 11)
+                .frame(width: isMarked ? 13 : 9, height: isMarked ? 13 : 9)
+                .frame(height: 13)
             }
             .frame(maxWidth: .infinity, minHeight: 46)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(isSelected ? Theme.accent : Color.clear)
+                    .fill(tile)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
