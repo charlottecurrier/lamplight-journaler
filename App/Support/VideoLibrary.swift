@@ -10,6 +10,8 @@ enum VideoLibrary {
     enum Problem: Error, Equatable {
         /// Lamplight may not read the Photos library.
         case noAccess
+        /// Only some photos are shared with Lamplight, and this video isn't among them.
+        case notShared
         /// The video isn't in the library on this device: deleted, or iCloud Photos is off here.
         case notFound
         /// The library has it but couldn't hand it over, such as with no connection.
@@ -65,7 +67,8 @@ enum VideoLibrary {
             let identifier = PHCloudIdentifier(stringValue: cloud)
             let mapped = PHPhotoLibrary.shared().localIdentifierMappings(for: [identifier])[identifier]
             if case .success(let local)? = mapped,
-               let asset = PHAsset.fetchAssets(withLocalIdentifiers: [local], options: nil).firstObject {
+               let asset = PHAsset.fetchAssets(withLocalIdentifiers: [local], options: nil).firstObject,
+               asset.mediaType == .video {
                 return .success(asset)
             }
         }
@@ -87,30 +90,61 @@ enum VideoLibrary {
             // Two that fit are not a match. Guessing could play the wrong video.
             if matches == 1, let match { return .success(match) }
         }
-        return .failure(.notFound)
+        // With only some photos shared, a video that isn't shared looks the same as one that is gone.
+        return .failure(PhotoAccess.current == .limited ? .notShared : .notFound)
     }
 
     /// Something to play for a video in the library. If the video is only in iCloud it is brought down, and
-    /// `progress` is told how far along that is, from 0 to 1.
+    /// `progress` is told how far along that is, from 0 to 1. Cancelling the task that waits for this stops the
+    /// download, so a video nobody is watching any more doesn't keep coming down.
     static func playerItem(
         for asset: PHAsset, progress: @escaping @Sendable (Double) -> Void
     ) async -> Result<AVPlayerItem, Problem> {
-        await withCheckedContinuation { continuation in
-            let options = PHVideoRequestOptions()
-            options.version = .current
-            options.deliveryMode = .automatic
-            options.isNetworkAccessAllowed = true
-            options.progressHandler = { fraction, _, _, _ in progress(fraction) }
-            var answered = false
-            PHImageManager.default().requestPlayerItem(forVideo: asset, options: options) { item, _ in
-                guard !answered else { return }
-                answered = true
-                if let item {
-                    continuation.resume(returning: .success(item))
-                } else {
-                    continuation.resume(returning: .failure(.unavailable))
+        let request = Request()
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                let options = PHVideoRequestOptions()
+                options.version = .current
+                options.deliveryMode = .automatic
+                options.isNetworkAccessAllowed = true
+                options.progressHandler = { fraction, _, _, _ in progress(fraction) }
+                var answered = false
+                let id = PHImageManager.default().requestPlayerItem(forVideo: asset, options: options) { item, _ in
+                    guard !answered else { return }
+                    answered = true
+                    if let item {
+                        continuation.resume(returning: .success(item))
+                    } else {
+                        continuation.resume(returning: .failure(.unavailable))
+                    }
                 }
+                request.started(id)
             }
+        } onCancel: {
+            request.cancel()
+        }
+    }
+
+    /// The library's number for a request, kept so it can be cancelled from wherever the task is cancelled.
+    private final class Request: @unchecked Sendable {
+        private let lock = NSLock()
+        private var id: PHImageRequestID?
+        private var cancelled = false
+
+        func started(_ id: PHImageRequestID) {
+            lock.lock()
+            self.id = id
+            let alreadyCancelled = cancelled
+            lock.unlock()
+            if alreadyCancelled { PHImageManager.default().cancelImageRequest(id) }
+        }
+
+        func cancel() {
+            lock.lock()
+            cancelled = true
+            let id = self.id
+            lock.unlock()
+            if let id { PHImageManager.default().cancelImageRequest(id) }
         }
     }
 }

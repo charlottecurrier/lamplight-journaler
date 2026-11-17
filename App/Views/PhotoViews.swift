@@ -64,8 +64,8 @@ struct PhotoMosaic: View {
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Photo")
-            .accessibilityHint("Opens the photo full screen")
+            .accessibilityLabel(photo.video == nil ? "Photo" : "Video, \(photo.video?.durationText ?? "")")
+            .accessibilityHint("Opens it full screen")
         } else {
             let columnCount = (photos.count == 2 || photos.count == 4) ? 2 : 3
             LazyVGrid(
@@ -82,8 +82,8 @@ struct PhotoMosaic: View {
                             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Photo \(index + 1) of \(photos.count)")
-                    .accessibilityHint("Opens the photo full screen")
+                    .accessibilityLabel("\(photo.video == nil ? "Photo" : "Video") \(index + 1) of \(photos.count)")
+                    .accessibilityHint("Opens it full screen")
                 }
             }
         }
@@ -220,6 +220,10 @@ struct LinkedVideoPage: View {
     @State private var frame: UIImage?
     @State private var stage: Stage = .still
     @State private var player: AVPlayer?
+    /// The work of finding and fetching the video, so it can be stopped when the page is left.
+    @State private var playTask: Task<Void, Never>?
+    /// Goes up with each try, so a report from an earlier try is not taken for this one's.
+    @State private var attempt = 0
 
     var body: some View {
         ZStack {
@@ -291,21 +295,25 @@ struct LinkedVideoPage: View {
     private func play() {
         guard stage == .still || isProblem else { return }
         stage = .finding
-        Task { @MainActor in
+        attempt += 1
+        let mine = attempt
+        playTask?.cancel()
+        playTask = Task { @MainActor in
             // Playing asks for the library the first time, if it was never asked for on this device.
             if PhotoAccess.current == .undecided {
                 _ = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
             }
             let link = video
             let found = await Task.detached(priority: .userInitiated) { VideoLibrary.asset(for: link) }.value
-            guard stage == .finding else { return }
+            guard !Task.isCancelled, attempt == mine else { return }
             switch found {
             case .failure(let problem):
                 stage = .problem(Self.message(for: problem))
             case .success(let asset):
                 let result = await VideoLibrary.playerItem(for: asset) { fraction in
                     Task { @MainActor in
-                        // Only while still waiting: a late report must not cover the video once it plays.
+                        // Only this try, and only while still waiting: a late report must not cover the video.
+                        guard attempt == mine else { return }
                         switch stage {
                         case .finding, .downloading:
                             if fraction < 1 { stage = .downloading(fraction) }
@@ -314,11 +322,13 @@ struct LinkedVideoPage: View {
                         }
                     }
                 }
-                guard stage == .finding || isDownloading else { return }
+                guard !Task.isCancelled, attempt == mine else { return }
                 switch result {
                 case .failure(let problem):
                     stage = .problem(Self.message(for: problem))
                 case .success(let item):
+                    // A video should be heard with the phone on silent, as it is in Photos.
+                    try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
                     let player = AVPlayer(playerItem: item)
                     self.player = player
                     stage = .playing
@@ -333,12 +343,11 @@ struct LinkedVideoPage: View {
         return false
     }
 
-    private var isDownloading: Bool {
-        if case .downloading = stage { return true }
-        return false
-    }
-
     private func stop() {
+        // Stops the download too, if the video was still coming down.
+        playTask?.cancel()
+        playTask = nil
+        attempt += 1
         player?.pause()
         player = nil
         stage = .still
@@ -348,6 +357,8 @@ struct LinkedVideoPage: View {
         switch problem {
         case .noAccess:
             return "Lamplight can't read your Photos library, so it can't play this video. Photos access is in Settings."
+        case .notShared:
+            return "Lamplight can see only some of your photos, and this video isn't one of them. You can share it, or all of them, in Settings."
         case .notFound:
             return "This video isn't in Photos on this device. It may have been deleted, or iCloud Photos may be off here."
         case .unavailable:

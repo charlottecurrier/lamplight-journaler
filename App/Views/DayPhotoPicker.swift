@@ -225,7 +225,7 @@ private struct PickerCell: View {
             }
             .overlay(alignment: .bottomTrailing) {
                 if asset.mediaType == .video {
-                    VideoLengthTab(text: VideoLink(localID: "", duration: asset.duration).durationText)
+                    VideoLengthTab(text: VideoLink.durationText(seconds: asset.duration))
                         .padding(5)
                 }
             }

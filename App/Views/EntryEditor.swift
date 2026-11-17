@@ -515,7 +515,7 @@ struct EntryEditorView: View {
             isImporting = true
             let picked = await DayPhotoPickerModel.media(for: ids)
             if picked.count < ids.count {
-                model.show("Some photos couldn't be added. They may still be coming down from iCloud.")
+                model.show("Some photos or videos couldn't be added. They may still be coming down from iCloud.")
             }
             await finishImport(picked.map(\.image), videos: picked.map(\.video))
         }

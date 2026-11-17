@@ -86,8 +86,10 @@ struct VideoLink: Codable, Hashable {
     }
 
     /// The length as it is shown on a video: 0:07, 3:12, 1:02:45.
-    var durationText: String {
-        let total = max(0, Int(duration.rounded()))
+    var durationText: String { Self.durationText(seconds: duration) }
+
+    static func durationText(seconds: Double) -> String {
+        let total = max(0, Int(seconds.rounded()))
         let hours = total / 3600
         let minutes = (total % 3600) / 60
         let seconds = total % 60

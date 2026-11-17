@@ -64,7 +64,8 @@ final class RuleLayoutManager: NSLayoutManager {
     /// on a dark disc or tab, so they show on a bright frame and a dark one.
     private static func drawVideoMark(in frame: CGRect, length: String) {
         let backing = UIColor(hex: Palette.page.dark).withAlphaComponent(0.62)
-        let mark = UIColor(hex: Palette.ink.dark)
+        // The same pair as `VideoLengthTab`: `Theme.lampFrame` behind, `Theme.lampCore` on top.
+        let mark = UIColor(hex: Palette.onAccent.light)
 
         let side = min(64, min(frame.width, frame.height) * 0.4)
         let disc = CGRect(x: frame.midX - side / 2, y: frame.midY - side / 2, width: side, height: side)
