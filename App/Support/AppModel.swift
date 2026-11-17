@@ -434,7 +434,7 @@ final class AppModel {
             startingBodies[id] = nil
             entries.removeAll { $0.id == id }
             if persistedIDs.remove(id) != nil, let library {
-                enqueueWrite { try library.moveToTrash(entryID: id) }
+                trash(id, in: library)
             }
             return
         }
@@ -483,8 +483,26 @@ final class AppModel {
         freshEntryIDs.remove(id)
         // A page that was never saved has no file to move.
         guard persistedIDs.remove(id) != nil else { return }
-        enqueueWrite { try library.moveToTrash(entryID: id) }
         show("Moved to Recently Deleted.")
+        trash(id, in: library)
+    }
+
+    /// Moves an entry's files to Recently Deleted. If another device had left a different version of the entry,
+    /// that version is kept as an entry of its own and shown, with a word about why it appeared.
+    private func trash(_ id: UUID, in library: Library) {
+        enqueueWrite { [weak self] in
+            let kept = try library.moveToTrash(entryID: id)
+            guard !kept.isEmpty else { return }
+            Task { @MainActor in
+                guard let self else { return }
+                for entry in kept where !self.entries.contains(where: { $0.id == entry.id }) {
+                    self.entries.append(entry)
+                    self.persistedIDs.insert(entry.id)
+                }
+                self.entries.sort { $0.createdAt > $1.createdAt }
+                self.show("Another device had a different version of that entry. It was kept.")
+            }
+        }
     }
 
     /// Keeps an entry close, or lets it go. Shown with a ribbon bookmark.
