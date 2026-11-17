@@ -11,7 +11,6 @@ struct EntryEditorView: View {
     @Environment(AppModel.self) private var model
     @EnvironmentObject private var prefs: AppPrefs
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var draft: Entry
@@ -162,9 +161,13 @@ struct EntryEditorView: View {
                     Text(Fmt.time(draft))
                     MoonLabel(date: draft.createdAt)
                 }
-                HStack(spacing: 16) {
-                    if model.journals.count > 1 { journalMenu }
-                    placeButton
+                // A place is shown once there is one. Adding one is the pin in the bar above, so the page doesn't
+                // offer it a second time.
+                if model.journals.count > 1 || draft.location != nil {
+                    HStack(spacing: 16) {
+                        if model.journals.count > 1 { journalMenu }
+                        if draft.location != nil { placeButton }
+                    }
                 }
             }
             .font(Theme.serif(.subheadline))
@@ -191,12 +194,12 @@ struct EntryEditorView: View {
             HStack(spacing: 4) {
                 Image(systemName: placeIcon)
                     .imageScale(.small)
-                Text(draft.location?.name ?? "Add place")
+                Text(draft.location?.name ?? "")
                     .lineLimit(1)
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(draft.location.map { "Place: \($0.name)" } ?? "Add a place")
+        .accessibilityLabel(draft.location.map { "Place: \($0.name)" } ?? "Place")
     }
 
     private var placeIcon: String {
@@ -299,41 +302,15 @@ struct EntryEditorView: View {
         )
         .overlay(alignment: .topLeading) {
             if draft.body.isEmpty {
-                VStack(alignment: .leading, spacing: 22) {
-                    Text("Start writing…")
-                        .font(Theme.serif(.title3))
-                        .foregroundStyle(Theme.inkTertiary)
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true)
-                    if !model.templates.isEmpty {
-                        templatePicker
-                    }
-                }
-                .padding(.top, 8)
+                // Only the one quiet line. Templates are under the format button in the bar, as Add Template.
+                Text("Start writing…")
+                    .font(Theme.serif(.title3))
+                    .foregroundStyle(Theme.inkTertiary)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+                    .padding(.top, 8)
             }
         }
-    }
-
-    /// On an empty page, your templates are offered. Typing anything makes them go away.
-    private var templatePicker: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            SectionLabel("Or begin with a template")
-                .padding(.bottom, 4)
-            ForEach(model.templatesByUse().prefix(sizeClass == .compact ? 3 : 5)) { template in
-                Button {
-                    add(template)
-                } label: {
-                    Label(template.name, systemImage: "doc.text")
-                        .font(Theme.serif(.body))
-                        .foregroundStyle(Theme.ink)
-                        .padding(.vertical, 10)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .frame(maxWidth: 360, alignment: .leading)
     }
 
     private var leaveFocusButton: some View {

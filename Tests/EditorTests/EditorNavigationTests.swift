@@ -72,6 +72,15 @@ final class EditorNavigationTests: EditorTestCase {
             guard let result = arrow(direction, in: view, edits: edits) else { break }
             let afterScroll = view.contentOffset.y
             settle(0.1)
+            // The text view moves the caret it draws a moment after the selection, and on a slow machine a tenth of
+            // a second isn't always enough. Give it up to a second to arrive. A caret that is drawn in the wrong
+            // place stays there, and is still reported.
+            var waited = 0.0
+            while waited < 1.0, let drawn = drawnCaret(in: view),
+                  abs(drawn.midY - reading("step \(number)", of: view).caret.midY) > 4 {
+                settle(0.1)
+                waited += 0.1
+            }
             taken.append(Step(
                 number: number,
                 direction: direction == .down ? "down" : "up",
