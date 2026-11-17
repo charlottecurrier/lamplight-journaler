@@ -118,8 +118,15 @@ final class MarkdownUITextView: UITextView {
         let length = textStorage.length
         let caret = offset(from: beginningOfDocument, to: position)
         let text = textStorage.string as NSString
+        // A page with no text has no style to take the caret's size from, so the text view draws it at its own small
+        // default until a letter is typed. Draw it as tall as a line of body text. Done here, where the caret is
+        // sized, so it holds however the page came to be empty.
+        if length == 0 {
+            rect.size.height = max(rect.height, ceil(MarkdownStyler.bodyFont().lineHeight))
+            return rect
+        }
         // An empty last line has no text to fit the caret to.
-        guard length > 0, caret >= 0, !(caret == length && text.character(at: length - 1) == 0x0A) else { return rect }
+        guard caret >= 0, !(caret == length && text.character(at: length - 1) == 0x0A) else { return rect }
         let index = min(caret, length - 1)
         guard let style = textStorage.attribute(.paragraphStyle, at: index, effectiveRange: nil) as? NSParagraphStyle,
               style.paragraphSpacingBefore > 0 || style.paragraphSpacing > 0
