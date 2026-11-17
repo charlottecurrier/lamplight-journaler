@@ -8,6 +8,8 @@ import UIKit
 final class RuleLayoutManager: NSLayoutManager {
     /// The picture for a photo's file name, or nil while it is still coming down.
     var mediaImage: ((String) -> UIImage?)?
+    /// For a picture that is the still frame of a video, how long the video is, as text. Nil for a photo.
+    var mediaVideoLength: ((String) -> String?)?
 
     override func drawBackground(forGlyphRange glyphsToShow: NSRange, at origin: CGPoint) {
         super.drawBackground(forGlyphRange: glyphsToShow, at: origin)
@@ -46,6 +48,9 @@ final class RuleLayoutManager: NSLayoutManager {
                 Palette.surfaceRaised.uiColor.setFill()
                 UIBezierPath(roundedRect: frame, cornerRadius: radius).fill()
             }
+            if let length = self.mediaVideoLength?(file) {
+                Self.drawVideoMark(in: frame, length: length)
+            }
             if active {
                 let outline = UIBezierPath(roundedRect: frame.insetBy(dx: 1, dy: 1), cornerRadius: radius)
                 outline.lineWidth = 2
@@ -53,6 +58,40 @@ final class RuleLayoutManager: NSLayoutManager {
                 outline.stroke()
             }
         }
+    }
+
+    /// What tells a video's still frame from a photo: a play mark in the middle and the length in a corner. Both sit
+    /// on a dark disc or tab, so they show on a bright frame and a dark one.
+    private static func drawVideoMark(in frame: CGRect, length: String) {
+        let backing = UIColor(hex: Palette.page.dark).withAlphaComponent(0.62)
+        let mark = UIColor(hex: Palette.ink.dark)
+
+        let side = min(64, min(frame.width, frame.height) * 0.4)
+        let disc = CGRect(x: frame.midX - side / 2, y: frame.midY - side / 2, width: side, height: side)
+        backing.setFill()
+        UIBezierPath(ovalIn: disc).fill()
+        let arrow = UIBezierPath()
+        let reach = side * 0.2
+        // Set a little to the right, where a triangle looks centered.
+        arrow.move(to: CGPoint(x: disc.midX - reach * 0.75, y: disc.midY - reach))
+        arrow.addLine(to: CGPoint(x: disc.midX + reach * 1.1, y: disc.midY))
+        arrow.addLine(to: CGPoint(x: disc.midX - reach * 0.75, y: disc.midY + reach))
+        arrow.close()
+        mark.setFill()
+        arrow.fill()
+
+        let text = NSAttributedString(string: length, attributes: [
+            .font: UIFont.monospacedDigitSystemFont(ofSize: 13, weight: .medium), .foregroundColor: mark,
+        ])
+        let size = text.size()
+        let tab = CGRect(
+            x: frame.maxX - size.width - 24, y: frame.maxY - size.height - 18,
+            width: size.width + 14, height: size.height + 8
+        )
+        guard tab.minX > frame.minX + 4, tab.minY > frame.minY + 4 else { return }
+        backing.setFill()
+        UIBezierPath(roundedRect: tab, cornerRadius: tab.height / 2).fill()
+        text.draw(at: CGPoint(x: tab.minX + 7, y: tab.minY + 4))
     }
 
     private func drawRules(storage: NSTextStorage, glyphsToShow: NSRange, origin: CGPoint) {
@@ -361,6 +400,10 @@ struct MarkdownEditor: UIViewRepresentable {
                     // Text is drawn on the main thread. If it ever isn't, draw the quiet block rather than trap.
                     guard Thread.isMainThread else { return nil }
                     return MainActor.assumeIsolated { self?.image(forFile: file) }
+                }
+                layout.mediaVideoLength = { [weak self] file in
+                    guard Thread.isMainThread else { return nil }
+                    return MainActor.assumeIsolated { self?.photosByFile[file]?.video?.durationText }
                 }
             }
 
