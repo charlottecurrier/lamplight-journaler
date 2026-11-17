@@ -24,7 +24,9 @@ final class LamplightUITests: XCTestCase {
         // An iPad held upright shows only the page. On its side it shows the list beside it, which the tests read.
         if !isPhone { XCUIDevice.shared.orientation = .landscapeLeft }
         app.launch()
-        if find("New Entry", timeout: 20) == nil {
+        // A simulator on a busy machine can take most of a minute to show the first screen. With 20 seconds, a run
+        // failed here while the picture taken a moment later showed the journal open.
+        if find("New Entry", timeout: 60) == nil {
             describeScreen("journal didn't open")
             shot("journal didn't open")
             XCTFail("The journal didn't open: there is nothing labelled New Entry.")
