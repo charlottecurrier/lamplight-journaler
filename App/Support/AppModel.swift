@@ -525,10 +525,13 @@ final class AppModel {
 
     // MARK: Photos
 
-    func addPhotos(_ images: [Data], to entryID: UUID) async -> [PhotoRef] {
+    /// Saves pictures into an entry. `videos` runs beside `images`: where it has a link, that picture is the still
+    /// frame of a video, and the link is kept with it.
+    func addPhotos(_ images: [Data], videos: [VideoLink?] = [], to entryID: UUID) async -> [PhotoRef] {
         guard let library else { return [] }
         var added: [PhotoRef] = []
-        for data in images {
+        for (position, data) in images.enumerated() {
+            let video = position < videos.count ? videos[position] : nil
             let ref = await IO.run { () -> PhotoRef? in
                 guard let prepared = ImageTools.prepareForStorage(data) else { return nil }
                 let id = UUID()
@@ -538,7 +541,7 @@ final class AppModel {
                 } catch {
                     return nil
                 }
-                return PhotoRef(id: id, fileName: fileName, width: prepared.width, height: prepared.height)
+                return PhotoRef(id: id, fileName: fileName, width: prepared.width, height: prepared.height, video: video)
             }
             if let ref { added.append(ref) }
         }

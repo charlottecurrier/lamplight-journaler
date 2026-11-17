@@ -490,16 +490,16 @@ struct EntryEditorView: View {
         guard !ids.isEmpty else { return }
         Task { @MainActor in
             isImporting = true
-            let images = await DayPhotoPickerModel.imageData(for: ids)
-            if images.count < ids.count {
-                model.show("Some photos couldn't be added. They may still be coming down from iCloud.")
+            let picked = await DayPhotoPickerModel.media(for: ids)
+            if picked.count < ids.count {
+                model.show("Some photos or videos couldn't be added. They may still be coming down from iCloud.")
             }
-            await finishImport(images)
+            await finishImport(picked.map(\.image), videos: picked.map(\.video))
         }
     }
 
-    private func finishImport(_ images: [Data]) async {
-        let added = await model.addPhotos(images, to: draft.id)
+    private func finishImport(_ images: [Data], videos: [VideoLink?] = []) async {
+        let added = await model.addPhotos(images, videos: videos, to: draft.id)
         draft.photos.append(contentsOf: added)
         // Each photo goes into the text at the caret, on a line of its own.
         controller.insertPhotos(added)

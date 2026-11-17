@@ -1,3 +1,5 @@
+import AVKit
+import Photos
 import SwiftUI
 
 /// A photo that fills whatever space it is given. Loads a small version, and shows a quiet placeholder
@@ -26,6 +28,12 @@ struct PhotoThumb: View {
                 }
             }
             .clipped()
+            .overlay(alignment: .bottomTrailing) {
+                if let video = photo.video {
+                    VideoLengthTab(text: video.durationText)
+                        .padding(5)
+                }
+            }
             .task(id: "\(photo.id.uuidString)-\(model.refreshCounter)") {
                 if image != nil, imageFor == photo.id { return }
                 let loaded = await model.image(entryID: entryID, photo: photo, maxPixel: maxPixel)
@@ -56,8 +64,8 @@ struct PhotoMosaic: View {
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Photo")
-            .accessibilityHint("Opens the photo full screen")
+            .accessibilityLabel(photo.video == nil ? "Photo" : "Video, \(photo.video?.durationText ?? "")")
+            .accessibilityHint("Opens it full screen")
         } else {
             let columnCount = (photos.count == 2 || photos.count == 4) ? 2 : 3
             LazyVGrid(
@@ -74,8 +82,8 @@ struct PhotoMosaic: View {
                             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Photo \(index + 1) of \(photos.count)")
-                    .accessibilityHint("Opens the photo full screen")
+                    .accessibilityLabel("\(photo.video == nil ? "Photo" : "Video") \(index + 1) of \(photos.count)")
+                    .accessibilityHint("Opens it full screen")
                 }
             }
         }
@@ -89,7 +97,8 @@ struct PhotoViewerItem: Identifiable {
     var index: Int
 }
 
-/// Full-screen photos. Swipe between them, pinch or double-tap to zoom.
+/// Full-screen photos. Swipe between them, pinch or double-tap to zoom. A video shows its still frame and plays
+/// when asked.
 struct PhotoViewer: View {
     @Environment(\.dismiss) private var dismiss
     let item: PhotoViewerItem
@@ -105,8 +114,14 @@ struct PhotoViewer: View {
             Theme.page.ignoresSafeArea()
             TabView(selection: $index) {
                 ForEach(Array(item.photos.enumerated()), id: \.element.id) { position, photo in
-                    ZoomablePhoto(entryID: item.entryID, photo: photo)
-                        .tag(position)
+                    Group {
+                        if let video = photo.video {
+                            LinkedVideoPage(entryID: item.entryID, photo: photo, video: video, isShowing: index == position)
+                        } else {
+                            ZoomablePhoto(entryID: item.entryID, photo: photo)
+                        }
+                    }
+                    .tag(position)
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: item.photos.count > 1 ? .automatic : .never))
@@ -160,6 +175,194 @@ struct ZoomablePhoto: View {
         }
         .task {
             image = await model.image(entryID: entryID, photo: photo, maxPixel: 2400)
+        }
+    }
+}
+
+/// How long a video is, on a dark tab so it shows on any picture. It marks a picture as a video's still frame.
+struct VideoLengthTab: View {
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "play.fill")
+                .font(.system(size: 8))
+            Text(text)
+                .font(.system(size: 12, weight: .medium).monospacedDigit())
+        }
+        .foregroundStyle(Theme.lampCore)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3)
+        .background(Capsule().fill(Theme.lampFrame.opacity(0.62)))
+        .accessibilityHidden(true)
+    }
+}
+
+/// A video an entry links to, full screen. It shows the still frame the entry keeps, and plays the video from the
+/// Photos library when asked. The video may have to come down from iCloud first, or may be gone, and the page says
+/// which.
+struct LinkedVideoPage: View {
+    @Environment(AppModel.self) private var model
+    let entryID: UUID
+    let photo: PhotoRef
+    let video: VideoLink
+    /// False once the person has swiped to another page, which stops the video.
+    let isShowing: Bool
+
+    private enum Stage: Equatable {
+        case still
+        case finding
+        case downloading(Double)
+        case playing
+        case problem(String)
+    }
+
+    @State private var frame: UIImage?
+    @State private var stage: Stage = .still
+    @State private var player: AVPlayer?
+    /// The work of finding and fetching the video, so it can be stopped when the page is left.
+    @State private var playTask: Task<Void, Never>?
+    /// Goes up with each try, so a report from an earlier try is not taken for this one's.
+    @State private var attempt = 0
+
+    var body: some View {
+        ZStack {
+            if let player, stage == .playing {
+                VideoPlayer(player: player)
+            } else {
+                still
+            }
+        }
+        .task {
+            frame = await model.image(entryID: entryID, photo: photo, maxPixel: 2400)
+        }
+        .onChange(of: isShowing) {
+            if !isShowing { stop() }
+        }
+        .onDisappear { stop() }
+    }
+
+    private var still: some View {
+        ZStack {
+            if let frame {
+                Image(uiImage: frame)
+                    .resizable()
+                    .scaledToFit()
+            }
+            VStack(spacing: 14) {
+                switch stage {
+                case .still:
+                    Button(action: play) {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 26))
+                            .foregroundStyle(Theme.lampCore)
+                            .frame(width: 76, height: 76)
+                            .background(Circle().fill(Theme.lampFrame.opacity(0.62)))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Play video, \(video.durationText)")
+                case .finding:
+                    ProgressView().tint(Theme.lampCore)
+                    note("Finding the video in Photos")
+                case .downloading(let fraction):
+                    ProgressView(value: fraction)
+                        .tint(Theme.lampCore)
+                        .frame(width: 160)
+                    note("Bringing it down from iCloud")
+                case .playing:
+                    EmptyView()
+                case .problem(let message):
+                    note(message)
+                    Button("Try Again", action: play)
+                        .buttonStyle(.quietPaper)
+                }
+            }
+            .padding(24)
+        }
+    }
+
+    private func note(_ text: String) -> some View {
+        Text(text)
+            .font(Theme.serif(.subheadline))
+            .foregroundStyle(Theme.lampCore)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.lampFrame.opacity(0.62)))
+            .frame(maxWidth: 320)
+    }
+
+    private func play() {
+        guard stage == .still || isProblem else { return }
+        stage = .finding
+        attempt += 1
+        let mine = attempt
+        playTask?.cancel()
+        playTask = Task { @MainActor in
+            // Playing asks for the library the first time, if it was never asked for on this device.
+            if PhotoAccess.current == .undecided {
+                _ = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+            }
+            let link = video
+            let found = await Task.detached(priority: .userInitiated) { VideoLibrary.asset(for: link) }.value
+            guard !Task.isCancelled, attempt == mine else { return }
+            switch found {
+            case .failure(let problem):
+                stage = .problem(Self.message(for: problem))
+            case .success(let asset):
+                let result = await VideoLibrary.playerItem(for: asset) { fraction in
+                    Task { @MainActor in
+                        // Only this try, and only while still waiting: a late report must not cover the video.
+                        guard attempt == mine else { return }
+                        switch stage {
+                        case .finding, .downloading:
+                            if fraction < 1 { stage = .downloading(fraction) }
+                        default:
+                            break
+                        }
+                    }
+                }
+                guard !Task.isCancelled, attempt == mine else { return }
+                switch result {
+                case .failure(let problem):
+                    stage = .problem(Self.message(for: problem))
+                case .success(let item):
+                    // A video should be heard with the phone on silent, as it is in Photos.
+                    try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
+                    let player = AVPlayer(playerItem: item)
+                    self.player = player
+                    stage = .playing
+                    player.play()
+                }
+            }
+        }
+    }
+
+    private var isProblem: Bool {
+        if case .problem = stage { return true }
+        return false
+    }
+
+    private func stop() {
+        // Stops the download too, if the video was still coming down.
+        playTask?.cancel()
+        playTask = nil
+        attempt += 1
+        player?.pause()
+        player = nil
+        stage = .still
+    }
+
+    private static func message(for problem: VideoLibrary.Problem) -> String {
+        switch problem {
+        case .noAccess:
+            return "Lamplight can't read your Photos library, so it can't play this video. Photos access is in Settings."
+        case .notShared:
+            return "Lamplight can see only some of your photos, and this video isn't one of them. You can share it, or all of them, in Settings."
+        case .notFound:
+            return "This video isn't in Photos on this device. It may have been deleted, or iCloud Photos may be off here."
+        case .unavailable:
+            return "Photos couldn't hand over the video. It may need a connection to come down from iCloud."
         }
     }
 }

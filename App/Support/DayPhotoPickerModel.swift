@@ -46,13 +46,22 @@ protocol PhotoListing {
     func asset(at index: Int) -> PHAsset?
 }
 
-/// The photos in the Photos library, newest first. This reads the library, so it needs access to it.
+/// Something chosen in the picker, ready to go into an entry: a picture, and for a video, where the video is.
+/// A video's picture is a still frame of it.
+struct PickedMedia {
+    var image: Data
+    var video: VideoLink?
+}
+
+/// The photos and videos in the Photos library, newest first. This reads the library, so it needs access to it.
 struct LibraryListing: PhotoListing {
     private let result: PHFetchResult<PHAsset>
 
     init() {
         let options = PHFetchOptions()
-        options.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
+        options.predicate = NSPredicate(
+            format: "mediaType == %d OR mediaType == %d", PHAssetMediaType.image.rawValue, PHAssetMediaType.video.rawValue
+        )
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         result = PHAsset.fetchAssets(with: options)
     }
@@ -219,16 +228,34 @@ final class DayPhotoPickerModel: ObservableObject {
     }
 
     /// The picked photos, as the files they are, in the order they were picked. One that can't be had, such as one
-    /// still in iCloud with no connection, is left out.
+    /// still in iCloud with no connection, is left out. A video gives its still frame.
     nonisolated static func imageData(for ids: [String]) async -> [Data] {
+        await media(for: ids).map(\.image)
+    }
+
+    /// The picked photos and videos, in the order they were picked. A photo is the file it is. A video is a still
+    /// frame and a link to the video in the library: the video itself is not read, so nothing big is downloaded.
+    /// One that can't be had, such as one still in iCloud with no connection, is left out.
+    nonisolated static func media(for ids: [String]) async -> [PickedMedia] {
         let fetched = PHAsset.fetchAssets(withLocalIdentifiers: ids, options: nil)
         var assets: [String: PHAsset] = [:]
         fetched.enumerateObjects { asset, _, _ in assets[asset.localIdentifier] = asset }
 
-        var all: [Data] = []
+        let videoIDs = ids.filter { assets[$0]?.mediaType == .video }
+        let cloudIDs = VideoLibrary.cloudIDs(forLocalIDs: videoIDs)
+
+        var all: [PickedMedia] = []
         for id in ids {
-            guard let asset = assets[id], let data = await data(for: asset) else { continue }
-            all.append(data)
+            guard let asset = assets[id] else { continue }
+            if asset.mediaType == .video {
+                guard let frame = await VideoLibrary.stillFrame(of: asset) else { continue }
+                let link = VideoLink(
+                    localID: id, cloudID: cloudIDs[id], duration: asset.duration, takenAt: asset.creationDate
+                )
+                all.append(PickedMedia(image: frame, video: link))
+            } else if let data = await data(for: asset) {
+                all.append(PickedMedia(image: data, video: nil))
+            }
         }
         return all
     }

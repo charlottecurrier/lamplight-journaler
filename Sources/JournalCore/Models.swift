@@ -57,17 +57,62 @@ struct EntryLocation: Codable, Hashable {
 
 // MARK: - Photos
 
+/// Where a video is in the person's Photos library. The video itself is not copied into the journal: the entry
+/// keeps a still frame of it, as a photo, and this link. The link points inside Photos, not at a web address, so only
+/// Lamplight can play it. Other apps show the still frame.
+struct VideoLink: Codable, Hashable {
+    /// The library's own name for the video on the device that added it. It can change, and it differs on every
+    /// device, so it is only the quick way to find the video.
+    var localID: String
+    /// The name iCloud Photos gives the video on every device. Nil if it couldn't be had when the video was added.
+    var cloudID: String?
+    /// How long the video is, in seconds.
+    var duration: Double
+    /// When the video was taken. With the length, it can find the video again if both names fail.
+    var takenAt: Date?
+
+    init(localID: String, cloudID: String? = nil, duration: Double, takenAt: Date? = nil) {
+        self.localID = localID
+        self.cloudID = cloudID
+        self.duration = duration
+        self.takenAt = takenAt
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case localID = "local"
+        case cloudID = "cloud"
+        case duration = "secs"
+        case takenAt = "taken"
+    }
+
+    /// The length as it is shown on a video: 0:07, 3:12, 1:02:45.
+    var durationText: String { Self.durationText(seconds: duration) }
+
+    static func durationText(seconds: Double) -> String {
+        let total = max(0, Int(seconds.rounded()))
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        let seconds = total % 60
+        let padded = seconds < 10 ? "0\(seconds)" : "\(seconds)"
+        guard hours > 0 else { return "\(minutes):\(padded)" }
+        return "\(hours):\(minutes < 10 ? "0" : "")\(minutes):\(padded)"
+    }
+}
+
 struct PhotoRef: Codable, Identifiable, Hashable {
     var id: UUID
     var fileName: String
     var width: Int
     var height: Int
+    /// Set when this picture is the still frame of a video. The file is still a photo like any other.
+    var video: VideoLink?
 
-    init(id: UUID = UUID(), fileName: String, width: Int, height: Int) {
+    init(id: UUID = UUID(), fileName: String, width: Int, height: Int, video: VideoLink? = nil) {
         self.id = id
         self.fileName = fileName
         self.width = width
         self.height = height
+        self.video = video
     }
 
     enum CodingKeys: String, CodingKey {
@@ -75,6 +120,7 @@ struct PhotoRef: Codable, Identifiable, Hashable {
         case fileName = "file"
         case width = "w"
         case height = "h"
+        case video
     }
 
     var aspectRatio: Double {

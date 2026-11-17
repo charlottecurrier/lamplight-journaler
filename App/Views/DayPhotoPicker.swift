@@ -61,7 +61,7 @@ struct DayPhotoPicker: View {
         case .undecided:
             Explanation(
                 title: "Photos from the day",
-                message: "Lamplight can show the photos you took on the day of an entry first. To do that it needs to read your Photos library. Photos you add are copied into your journal folder.",
+                message: "Lamplight can show the photos you took on the day of an entry first. To do that it needs to read your Photos library. Photos you add are copied into your journal folder. A video is not copied: the entry keeps a still frame and a link to the video in Photos.",
                 primaryTitle: "Allow Access",
                 primary: { Task { await model.requestAccess() } },
                 secondaryTitle: "Use the Photos Picker",
@@ -223,6 +223,12 @@ private struct PickerCell: View {
                         .padding(5)
                 }
             }
+            .overlay(alignment: .bottomTrailing) {
+                if asset.mediaType == .video {
+                    VideoLengthTab(text: VideoLink.durationText(seconds: asset.duration))
+                        .padding(5)
+                }
+            }
             .contentShape(Rectangle())
             .onTapGesture { model.toggle(asset.localIdentifier) }
             .task(id: asset.localIdentifier) {
@@ -235,8 +241,9 @@ private struct PickerCell: View {
     }
 
     private var label: String {
-        guard let date = asset.creationDate else { return "Photo" }
-        return "Photo from " + date.formatted(date: .omitted, time: .shortened)
+        let kind = asset.mediaType == .video ? "Video" : "Photo"
+        guard let date = asset.creationDate else { return kind }
+        return "\(kind) from " + date.formatted(date: .omitted, time: .shortened)
     }
 }
 

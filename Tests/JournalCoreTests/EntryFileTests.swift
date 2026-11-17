@@ -30,6 +30,40 @@ final class EntryFileTests: XCTestCase {
         XCTAssertEqual(roundTrip(entry), entry)
     }
 
+    /// A video is a photo, its still frame, with a link to the video in the Photos library.
+    func testAVideoLinkSurvivesTheRoundTrip() {
+        var entry = T.entry("2026-10-17T21:00:00Z", body: "![](photos/v.jpg)\n")
+        let link = VideoLink(
+            localID: "ABC-123/L0/001", cloudID: "cloud:xyz", duration: 72.4, takenAt: T.date("2026-10-17T19:02:11Z")
+        )
+        entry.photos = [
+            PhotoRef(fileName: "a.jpg", width: 2400, height: 1600),
+            PhotoRef(fileName: "v.jpg", width: 1920, height: 1080, video: link),
+        ]
+        let decoded = roundTrip(entry)
+        XCTAssertEqual(decoded.photos, entry.photos)
+        XCTAssertNil(decoded.photos[0].video)
+        XCTAssertEqual(decoded.photos[1].video, link)
+        // A plain photo is written as it always was, with no word of video.
+        let text = String(decoding: EntryFile.encode(entry), as: UTF8.self)
+        XCTAssertEqual(text.components(separatedBy: "\"video\"").count - 1, 1)
+    }
+
+    /// A video added where the cloud name couldn't be had keeps what it has.
+    func testAVideoLinkWithOnlyALocalNameIsRead() throws {
+        let raw = #"[{"file":"v.jpg","h":1080,"id":"6F1D6A1E-3B0B-4B7C-9C59-0D0E4F1A2B3C","video":{"local":"L1","secs":5},"w":1920}]"#
+        let photos = try JSONDecoder().decode([PhotoRef].self, from: Data(raw.utf8))
+        XCTAssertEqual(photos.first?.video, VideoLink(localID: "L1", duration: 5))
+    }
+
+    func testVideoLengthIsWrittenLikeAClock() {
+        XCTAssertEqual(VideoLink(localID: "x", duration: 0).durationText, "0:00")
+        XCTAssertEqual(VideoLink(localID: "x", duration: 7.4).durationText, "0:07")
+        XCTAssertEqual(VideoLink(localID: "x", duration: 59.6).durationText, "1:00")
+        XCTAssertEqual(VideoLink(localID: "x", duration: 192).durationText, "3:12")
+        XCTAssertEqual(VideoLink(localID: "x", duration: 3765).durationText, "1:02:45")
+    }
+
     func testBodyThatLooksLikeAHeaderIsLeftAlone() {
         let body = "---\nid: \"not a real id\"\n---\n\nStill just text.\n---\n"
         var entry = T.entry("2026-10-17T21:00:00Z", body: body)
