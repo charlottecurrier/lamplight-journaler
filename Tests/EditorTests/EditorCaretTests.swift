@@ -75,10 +75,18 @@ final class EditorCaretTests: EditorTestCase {
         type("a", into: view)
         settle()
         let typed = view.caretRect(for: view.endOfDocument)
+        let line = MarkdownStyler.bodyFont().lineHeight
         XCTAssertGreaterThan(typed.height, 10, "The caret after a letter has no height, so there is nothing to compare.")
-        XCTAssertEqual(
-            empty.height, typed.height, accuracy: 2,
-            "The caret on an empty page is \(empty.height) tall, and \(typed.height) after a letter."
+        XCTAssertGreaterThanOrEqual(
+            empty.height, line - 1,
+            "The caret on an empty page is \(empty.height) tall. A line of text is \(line), and the caret after a letter \(typed.height)."
         )
+        XCTAssertLessThanOrEqual(empty.height, typed.height + 2, "The caret on an empty page is taller than after a letter.")
+
+        // Emptied again, by the editor's own Backspace, it stays that tall.
+        view.deleteBackward()
+        settle()
+        XCTAssertEqual(view.text, "")
+        XCTAssertGreaterThanOrEqual(view.caretRect(for: view.endOfDocument).height, line - 1, "The caret shrank when the page was emptied.")
     }
 }

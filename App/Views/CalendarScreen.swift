@@ -85,7 +85,7 @@ private struct DayCell: View {
     /// bright and larger, and it sits on a lighter tile. A day without one is dim. Color alone was too quiet.
     private var moonLit: Color {
         if isSelected { return isMarked ? Theme.onAccent : Theme.onAccent.opacity(0.5) }
-        return isMarked ? Theme.ink : Theme.inkTertiary.opacity(0.45)
+        return isMarked ? Theme.ink : Theme.inkTertiary.opacity(0.6)
     }
 
     private var numberColor: Color {
@@ -95,7 +95,8 @@ private struct DayCell: View {
 
     private var tile: Color {
         if isSelected { return Theme.accent }
-        return isMarked ? Theme.raised : Color.clear
+        // The card behind the month is nearly as light as a raised surface, so the tile takes the line color.
+        return isMarked ? Theme.line.opacity(0.6) : Color.clear
     }
 
     var body: some View {
@@ -110,7 +111,7 @@ private struct DayCell: View {
                     shade: isSelected ? Theme.onAccent.opacity(0.18) : Theme.line.opacity(isMarked ? 0.9 : 0.5),
                     outline: isMarked ? moonLit : Color.clear
                 )
-                .frame(width: isMarked ? 13 : 9, height: isMarked ? 13 : 9)
+                .frame(width: isMarked ? 13 : 10, height: isMarked ? 13 : 10)
                 .frame(height: 13)
             }
             .frame(maxWidth: .infinity, minHeight: 46)
