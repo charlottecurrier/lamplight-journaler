@@ -41,9 +41,17 @@ jobs:
           echo "Using simulator $udid"
           echo "udid=$udid" >> "$GITHUB_OUTPUT"
 
-      - name: UI tests on the Duo
+      # The first run crashed while the test runner was starting up, on a simulator that had just been asked to boot.
+      # Boot it first and wait until it has finished.
+      - name: Boot the Duo
         run: |
           defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool false
+          xcrun simctl bootstatus "${{ steps.simulator.outputs.udid }}" -b
+          sleep 20
+          xcrun simctl list devices | grep -i "iPhone Duo" || true
+
+      - name: UI tests on the Duo
+        run: |
           udid="${{ steps.simulator.outputs.udid }}"
           bundle="$RUNNER_TEMP/UI-Duo.xcresult"
           set +e
@@ -68,6 +76,13 @@ jobs:
           mkdir -p "$out"
           xcrun xcresulttool export attachments --path "$bundle" --output-path "$out" || echo "Couldn't export the pictures."
           python3 tools/name_test_pictures.py "$out"
+          # If the test runner crashed, the crash log says where. Print the top of it.
+          for crash in "$out"/*.ips; do
+            [ -f "$crash" ] || continue
+            echo "CRASH LOG $crash"
+            head -c 6000 "$crash"
+            echo
+          done
           exit $status
 
       - name: Keep the pictures
