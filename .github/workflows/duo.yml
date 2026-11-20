@@ -76,6 +76,8 @@ jobs:
           mkdir -p "$out"
           xcrun xcresulttool export attachments --path "$bundle" --output-path "$out" || echo "Couldn't export the pictures."
           python3 tools/name_test_pictures.py "$out"
+          # Print every FACTS line, from every screen the facts test looked at.
+          grep -h "^FACTS" "$out"/*facts*.txt 2>/dev/null || true
           # If the test runner crashed, the crash log says where. Print the top of it.
           for crash in "$out"/*.ips; do
             [ -f "$crash" ] || continue

@@ -15,21 +15,58 @@ Dates are when the finding was made. Today's date when this was written: 2026-11
 
 Apple's first foldable. Announced 9 September 2026, shipping from October on iOS 27.1.
 
-**What it is** (from web pages, partly third-party):
+**What it is** (web pages and Apple's developer page):
 
 - Two displays. The outer one is 5.4 inch and is compact width in portrait, like any iPhone. The inner one is 7.6 inch and
-  is regular width and regular height, like an iPad. Apple's advice is to design around size classes, not orientation or
-  fixed widths. ([Apple's spec page](https://www.apple.com/ie/iphone-duo/specs/),
+  is regular width and regular height, like an iPad. ([Apple's spec page](https://www.apple.com/ie/iphone-duo/specs/),
   [devclass](https://devclass.com/devops/2026/09/16/apple-iphone-duo-makes-developers-think-in-folds/5296425))
 - It has Touch ID, not Face ID. ([spec summary](https://www.91mobiles.com/apple-iphone-duo-price-in-india?ty=specs))
-- An app built with an older SDK still runs, but inside part of the screen. To use the inner display fully, build with
-  Xcode 27. ([third-party](https://pasqualepillitteri.it/en/news/15360/iphone-duo-prepare-apps-developers))
-- A new API, `ArrangementView`, splits space between two views. Layout is still decided by size classes. Not used by
-  Lamplight. (third-party only, **unverified**)
-- Point sizes are **unverified** and the sources disagree. One blog gives the outer display as 466 x 678 points and the
-  inner one as 626 x 890, then corrects the inner one to 669 x 951
-  ([blog](https://blakecrosley.com/blog/iphone-duo-for-developers)). Replace these with the figures the
-  `ScreenFactsTests` print (lines that start with `FACTS` in the Duo run's log).
+- **Apple's page, "Preparing your app for iPhone Duo"**
+  ([developer.apple.com](https://developer.apple.com/documentation/technologyoverviews/preparing-your-app-for-iphone-duo)),
+  read 2026-11-20. It says:
+  - Size views relative to their container, not to fixed iPhone sizes. Track `horizontalSizeClass` and
+    `verticalSizeClass`. Don't use `userInterfaceIdiom` or the interface orientation for layout.
+  - Content moves between the displays as the device opens, closes, partly folds and rotates.
+  - Check every view, sheet and popover in each pose. Look for controls hidden in the fold.
+  - **Navigation bars, toolbars and tab bars can appear vertically along the side**, on the outer display when closed and on
+    some inner-display views when open. In a split view the sidebar and content bars stay horizontal and the detail view's
+    bars go vertical. Use `.toolbar` on `NavigationStack` or `NavigationSplitView`, not custom bars. Give toolbar items an
+    icon and a title. Put Back or Close first and Done in the pinned trailing group.
+  - Reserved regions: the fold (a "division", active when partly open) and the camera (an "occlusion"). In SwiftUI, read
+    `GeometryProxy.reservedRegions`.
+  - Build with the latest Xcode to use the whole screen. With Xcode 26 or earlier the app doesn't extend under the status
+    bar and camera. The page gives no deadline and doesn't mention an iOS 17 minimum.
+  - `ArrangementView` splits space between two views for the pose. It says to "evaluate whether" it helps, so it is
+    optional, and not to put one inside a split view, list or scroll view.
+- A third-party article says builds must use the Xcode 27 SDK by April 2027
+  ([hackernoon](https://hackernoon.com/stop-ignoring-the-crease-ship-your-ios-app-for-iphone-duo-before-the-april-2027-deadline)).
+  **Unverified.** Apple's page names no date.
+
+**What the Duo simulator showed** (verified in CI, 2026-11-20, `Duo` workflow on PR #38, Xcode 27.1, iOS 27.2 runtime):
+
+- The simulator starts on the **outer display**. The app's window is **466 x 678 points**, which matches the blog figure
+  for the outer display. The test runner's `UIScreen` said 386 x 678.
+- The app's own content is laid out about **382 to 386 points wide**. The rest, on the right (from about x = 394), is a
+  vertical strip where the system put the toolbar buttons: Back (399, 179), Settings (402, 240) and Search (399, 611). This
+  is the vertical toolbar Apple's page describes. The strip is about 72 points wide.
+- Lamplight's own bottom bar (`CompactBar`, a custom bar) sits inside the 386 points: Journal at x 6, Today 80, New Entry 164,
+  Calendar 228, More 302, each 74 wide and 48 tall. **No button stuck out past the window.** It is not a system tab bar, so
+  it doesn't move to the side.
+- The list screen showed no clipping. The editor page's and the sideways page's facts were saved as text and pictures in the
+  `duo-screens` artifact but were not printed in the log. Read them there.
+- All 6 UI tests passed on the Duo, including the second-new-entry test. The first run crashed while the test runner
+  started, because the simulator had only just been asked to boot. Booting it first with `xcrun simctl bootstatus -b`,
+  then waiting 20 seconds, fixed it. A fresh boot on the runner printed "Data Migration Failed" and still worked. The UI test
+  step took about 19 minutes, so expect a Duo run to take close to half an hour.
+
+**Not known yet:**
+
+- **How to unfold the simulator from a script.** Apple's page only says to test in the simulator. The Simulator window has
+  open, close, rotate and fold buttons. A [forum thread](https://developer.apple.com/forums/thread/847883) asks for a
+  command-line or UI-test way and has no answer. `xcrun simctl help` lists nothing for posture. So CI can only see the
+  outer display. For the inner display, use a size class override in a hosted test (as `NewEntryNavigationTests` do) and
+  look at it by hand on a device or in Xcode's simulator.
+- The inner display's point size. Blogs say 626 x 890, corrected to 669 x 951. Unverified.
 
 **What the CI runner has** (verified in CI, 2026-11-20, probe PR #37, since closed):
 
@@ -37,27 +74,29 @@ Apple's first foldable. Announced 9 September 2026, shipping from October on iOS
 - Xcode 27.0, 27.1 (the default) and 27.2 are installed. iOS 27.0, 27.1 and 27.2 simulators are installed.
 - An **iPhone Duo** simulator exists on iOS 27.1 and on 27.2.
 - The existing `macos-26` label has Xcode 26.6, which is what `app.yml` builds with.
-- Not known: how the simulator folds and unfolds, and whether tests can switch screens.
-  ([GitHub's changelog](https://github.blog/changelog/2026-10-15-xcode-27-runner-image-generally-available) names the
-  label but not the versions.)
 
-**What it means for Lamplight** (reading the code, **unverified on a device**):
+**What it means for Lamplight** (reading the code and the run, **unverified on a device**):
 
+- The app builds with Xcode 27.1 and runs on the Duo simulator. That is verified.
 - Few places read the size class (`MainView`, `EntryList`), and most fixed sizes are small controls. The screens already
   adapt, so most of the work is checking, not rewriting.
 - `LockManager.methodName` already asks the device for `biometryType`, so the lock screen says "Touch ID" when it should.
   Two lines in `Settings.swift` still say "Face ID" in fixed text (the passcode message and the lock footer). They should
   use `LockManager.methodName`.
+- The editor page's toolbar has many buttons (photo, place, format, Done). On the outer display the detail view's toolbar
+  goes vertical, in a strip about 72 points wide and 678 high. Check that all of them fit and that Done is last in the
+  trailing group. This is the first thing to look at in the artifact's page pictures.
 - Folding or unfolding changes the size class while the app runs, and the split view collapses or opens. The phone bug
   below was exactly this kind of change: a page torn down for a moment cost the new, empty entry. `MainView.open` also
   branches on `sizeClass == .compact`, so a fold while a page is "on its way" is an untested case. A test should change
   the size class with an entry open and check that the page, the text and the caret survive.
 - At about 630 to 670 points wide, the three-column split view (sidebar 230 to 320, list from 340) leaves little for the
   page. Look at the pictures before changing widths.
+- Apple prefers system tab bars and toolbars to custom bars. Moving `CompactBar` to a `TabView` would let it follow the
+  device to the side. That is a navigation change, so it needs its own tests and review.
 
-**Status:** the Duo workflow (`.github/workflows/duo.yml`) and `Tests/UITests/ScreenFactsTests.swift` run the UI tests on
-the Duo simulator with Xcode 27.1 and keep pictures as the `duo-screens` artifact. Next: read the FACTS lines, fix the
-"Face ID" wording, add the fold test, then change the layout where the pictures show a problem.
+**Status:** pictures of the Duo run are in the `duo-screens` artifact of the run (14 days). Next: read the editor page
+facts, fix the "Face ID" wording, add the fold test, then decide about the bottom bar and the layout.
 
 ## The phone's second new entry closed at once (fixed)
 
