@@ -1,0 +1,31 @@
+# A one-off look at what the Xcode 27 runner image has: the Xcode version and whether it has an iPhone Duo simulator.
+# Runs only when this file changes, or by hand. Delete it once the answer is known.
+name: Duo probe
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/duo-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: What the Xcode 27 image has
+    runs-on: xcode-27
+    timeout-minutes: 15
+    steps:
+      - name: Versions
+        run: |
+          sw_vers
+          xcodebuild -version
+          xcode-select -p
+          ls /Applications | grep -i xcode || true
+      - name: Simulator runtimes
+        run: xcrun simctl list runtimes
+      - name: Device types that look like a fold or a new iPhone
+        run: xcrun simctl list devicetypes | grep -i -E "duo|fold|iphone 1[6-9]|iphone 2|iPad" || true
+      - name: Devices ready to use
+        run: xcrun simctl list devices available | head -80
