@@ -1,0 +1,161 @@
+# Discoveries
+
+Things learned while working on Lamplight that the code doesn't say. Read the part that matches what you are about to
+change. Add to it when you learn something that would have saved you time.
+
+Each finding says how it was checked:
+
+- **Verified in CI** means a run in the Mac job showed it. The run is named.
+- **From a web page** means someone's page said so, and the link is given. Third-party pages are marked.
+- **Unverified** means a guess or a figure that disagrees between sources. Replace it when you can check.
+
+Dates are when the finding was made. Today's date when this was written: 2026-11-20.
+
+## The iPhone Duo
+
+Apple's first foldable. Announced 9 September 2026, shipping from October on iOS 27.1.
+
+**What it is** (from web pages, partly third-party):
+
+- Two displays. The outer one is 5.4 inch and is compact width in portrait, like any iPhone. The inner one is 7.6 inch and
+  is regular width and regular height, like an iPad. Apple's advice is to design around size classes, not orientation or
+  fixed widths. ([Apple's spec page](https://www.apple.com/ie/iphone-duo/specs/),
+  [devclass](https://devclass.com/devops/2026/09/16/apple-iphone-duo-makes-developers-think-in-folds/5296425))
+- It has Touch ID, not Face ID. ([spec summary](https://www.91mobiles.com/apple-iphone-duo-price-in-india?ty=specs))
+- An app built with an older SDK still runs, but inside part of the screen. To use the inner display fully, build with
+  Xcode 27. ([third-party](https://pasqualepillitteri.it/en/news/15360/iphone-duo-prepare-apps-developers))
+- A new API, `ArrangementView`, splits space between two views. Layout is still decided by size classes. Not used by
+  Lamplight. (third-party only, **unverified**)
+- Point sizes are **unverified** and the sources disagree. One blog gives the outer display as 466 x 678 points and the
+  inner one as 626 x 890, then corrects the inner one to 669 x 951
+  ([blog](https://blakecrosley.com/blog/iphone-duo-for-developers)). Replace these with the figures the
+  `ScreenFactsTests` print (lines that start with `FACTS` in the Duo run's log).
+
+**What the CI runner has** (verified in CI, 2026-11-20, probe PR #37, since closed):
+
+- Label `xcode-27` (also `xcode-27-xlarge`). Apple silicon only. macOS 27.0.1.
+- Xcode 27.0, 27.1 (the default) and 27.2 are installed. iOS 27.0, 27.1 and 27.2 simulators are installed.
+- An **iPhone Duo** simulator exists on iOS 27.1 and on 27.2.
+- The existing `macos-26` label has Xcode 26.6, which is what `app.yml` builds with.
+- Not known: how the simulator folds and unfolds, and whether tests can switch screens.
+  ([GitHub's changelog](https://github.blog/changelog/2026-10-15-xcode-27-runner-image-generally-available) names the
+  label but not the versions.)
+
+**What it means for Lamplight** (reading the code, **unverified on a device**):
+
+- Few places read the size class (`MainView`, `EntryList`), and most fixed sizes are small controls. The screens already
+  adapt, so most of the work is checking, not rewriting.
+- `LockManager.methodName` already asks the device for `biometryType`, so the lock screen says "Touch ID" when it should.
+  Two lines in `Settings.swift` still say "Face ID" in fixed text (the passcode message and the lock footer). They should
+  use `LockManager.methodName`.
+- Folding or unfolding changes the size class while the app runs, and the split view collapses or opens. The phone bug
+  below was exactly this kind of change: a page torn down for a moment cost the new, empty entry. `MainView.open` also
+  branches on `sizeClass == .compact`, so a fold while a page is "on its way" is an untested case. A test should change
+  the size class with an entry open and check that the page, the text and the caret survive.
+- At about 630 to 670 points wide, the three-column split view (sidebar 230 to 320, list from 340) leaves little for the
+  page. Look at the pictures before changing widths.
+
+**Status:** the Duo workflow (`.github/workflows/duo.yml`) and `Tests/UITests/ScreenFactsTests.swift` run the UI tests on
+the Duo simulator with Xcode 27.1 and keep pictures as the `duo-screens` artifact. Next: read the FACTS lines, fix the
+"Face ID" wording, add the fold test, then change the layout where the pictures show a problem.
+
+## The phone's second new entry closed at once (fixed)
+
+**Symptom:** on an iPhone, the first new entry after a restart worked. Every one after that opened, flashed "Choose an
+entry", and dropped back to the list. After Done or after swiping back, the same. Not on iPad.
+
+**Cause** (verified in CI, PR #26): setting `selectedEntryID` and `compactColumn` together made the phone's navigation
+remove the new page straight after it opened. The editor's `onDisappear` then called `finishEditing`, which drops an
+unwritten entry. The page found no entry and its placeholder closed it.
+
+**What was tried**, each in its own test on the phone layout:
+
+| Way of showing the page | Result |
+| --- | --- |
+| selection, then column (the old code) | fails |
+| selection only | fails |
+| column, then selection | fails |
+| selection, then column a turn later | fails |
+| **column now, selection a turn later** | **passes** |
+
+That last one is `MainView.open`. The rule is in `CLAUDE.md`.
+
+**Tried and did not help:**
+
+- Waiting 120 ms before `finishEditing`, in case the editor was only rebuilt. It was not rebuilt, so the entry was lost
+  anyway. Reverted.
+- A guard in `onClose` so a late close from an old page couldn't close a new one. SwiftUI updates the detail view in
+  place with the newest closure, so the guard would have passed the late close. Never shipped.
+
+**How it was found:**
+
+- `NewEntryNavigationTests` host the real `MainView` in a phone layout (size class override, and the Mac job also runs
+  them on a real iPhone simulator) and start entries with `.lamplightNewEntry` and finish them with
+  `.lamplightFinishEntry`.
+- `NavTrace` records each step (begin, selection, column, editor appeared and went away, finish) and the failing tests
+  print it. The trace showed the editor going away with no navigation event before it.
+- In a test, wait with `Task.sleep`, not by spinning the run loop. Spinning stops the model's own tasks from running, and
+  the journal never finished opening.
+- A unit test can't tap a SwiftUI button. Use a notification that runs the same action, or the UI tests.
+
+## The editor
+
+These are in the `CLAUDE.md` rules. Here is why:
+
+- Edits made through `Coordinator.apply` skip UIKit's own scroll to the caret, so `keepCaretInView` does it.
+- The text view's caret rectangle includes the space before and after a paragraph, so the caret hung above headings and
+  section titles. `MarkdownUITextView.caretRect` trims it.
+- Setting `UITextView.typingAttributes` scrolls the page away and back a moment later. The typing style is now set when
+  something is typed, and only when it changed.
+- Restyling all the text on each caret move throws away the layout and moves the page. Only the lines the caret leaves and
+  enters are restyled.
+- `scrollRectToVisible` is clamped by a content size that lags, so the offset is worked out by hand.
+
+## iCloud and files
+
+- `NSFileCoordinator` reads can wait on iCloud for ever. `BoundedWait` stops waiting after a time, and after three
+  failures in a row it pauses new reads for 20 seconds. A read that failed is not an empty one: never write a default
+  over something that could not be read.
+
+## Photos
+
+- The picker lists photos by day. Which photos belong to a day is `PhotoDays` and `PhotoDayGrouper` in Core, tested on
+  Linux. The model reads through `PhotoListing`, so tests use a fake list.
+- **The real-library tests cannot run in the Mac job.** The simulator shows the Photos permission as granted (the
+  `kTCCServicePhotos` row is there) but the test app still reads "not decided". Tried: granting before and after the
+  install, and ad hoc signing. `PhotoLibraryTests` skip there. They run in Xcode once the app has been allowed to read
+  Photos.
+- PhotoKit video code can't be run in CI: the simulator has no iCloud Photos. Say it is untested until tried on a device.
+
+## CI and the repository
+
+- A skipped test looks like a pass. The Mac job prints the skipped count. `-quiet` hides failure text, so the job reads
+  the `.xcresult` with `xcresulttool` to print failures and totals.
+- Mac minutes were ten times as costly while the repository was private, and are free while it is public. If it goes
+  private again, take the trigger off `app.yml` for anything but code changes.
+- The repository was renamed to `lamplight-journaler`. The tools still reach it as `day-one` (checked 2026-11-20), but
+  the Claude GitHub App was not installed on it, so PR events did not arrive on their own. Check a PR's state by hand
+  until it is installed.
+- A new Linux session starts without the Swift toolchain or XcodeGen. Swift 6.1.x for Ubuntu 24.04 comes from
+  download.swift.org, and XcodeGen builds from its GitHub source with `swift build -c release --product xcodegen`. The
+  scratchpad can be cleared between sessions, so don't count on it.
+- When XcodeGen isn't available, a new Swift file can be added to `Lamplight.xcodeproj` by hand (a file reference, a
+  build file, the group entry and the sources phase), but the next real `xcodegen` run will give it new IDs. This was done
+  for `ScreenFactsTests.swift`. Regenerate when you can.
+- The UI tests start the whole app with launch arguments, which UserDefaults reads as preferences (`-storage.mode local`
+  and so on), so the app needs no test code. Their pictures and the screen tree are kept as artifacts for 14 days.
+- You can't look at an artifact's pictures from the agent tools. Read the text instead: the tests print sizes and the
+  screen tree. The person can open the pictures from the run's page.
+
+## Apple developer program and TestFlight
+
+Steps are in `docs/TESTFLIGHT.md`. What was checked:
+
+- From Apple's pages: $99 a year. An individual enrolls with a legal name on the Apple Account. Up to 10,000 external
+  testers. External testing needs Beta App Review for the first build and a beta description and feedback email. A build
+  lasts 90 days.
+- **Unverified:** that a build installed from Xcode lasts a year on the paid membership. Apple's pages don't say.
+- **Unverified:** the privacy manifest's reason codes (`CA92.1`, `C617.1`, `3B52.1`). Apple's upload email will say if
+  one is wrong.
+- The team is set in `project.yml` as `DEVELOPMENT_TEAM`, not in Xcode, because regenerating the project overwrites
+  Xcode's choice.

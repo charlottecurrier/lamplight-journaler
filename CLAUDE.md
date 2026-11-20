@@ -1,6 +1,6 @@
 # Lamplight
 
-An iPad-first (also iPhone) SwiftUI journal. Entries are Markdown files in a folder the person picks in iCloud Drive. Read `README.md` for the product and `docs/DECISIONS.md` for why things are the way they are.
+An iPad-first (also iPhone) SwiftUI journal. Entries are Markdown files in a folder the person picks in iCloud Drive. Read `README.md` for the product and `docs/DECISIONS.md` for why things are the way they are. Read `docs/DISCOVERIES.md` before you change navigation, the editor, photos, CI or anything for a new device (it has the iPhone Duo findings): it records what was found, how it was checked, and what was tried and didn't work. When you learn something the code doesn't say, add it there, and say how you checked it.
 
 ## Layout
 

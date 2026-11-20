@@ -72,6 +72,7 @@
 		CC3C876BFCD16AB7484BD75D /* TestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB3B2BE259D1C1BE36AB6B36 /* TestSupport.swift */; };
 		CE523ED9A8B8E53F6BD50E70 /* SampleFolderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6BCA8060694A1AD9EDCB356 /* SampleFolderTests.swift */; };
 		D01B51897F091ED4C411CB0C /* LamplightUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82F3D04B12421C8E62E14077 /* LamplightUITests.swift */; };
+		5C0DE1A7B3F94E26A8D01F32 /* ScreenFactsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E3A9B1C4D2F58A06B9E7D14 /* ScreenFactsTests.swift */; };
 		D4991BAA99B1AA2C856FDB14 /* NewEntryNavigationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90E5E3C4E37A45CEA261F426 /* NewEntryNavigationTests.swift */; };
 		D6473C205AE4D3D0D6D525AA /* MarkdownStyler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68EC38FF8CE4B1AD30F29CAD /* MarkdownStyler.swift */; };
 		D6976599FFDC08ADE3F72E5B /* MoonPhaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F249AD9B71199263C6466A41 /* MoonPhaseTests.swift */; };
@@ -159,6 +160,7 @@
 		7CBE403099A9389B2B848284 /* LibraryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryTests.swift; sourceTree = "<group>"; };
 		7E55550FDE06F9CD02EBF028 /* TodayScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayScreen.swift; sourceTree = "<group>"; };
 		82F3D04B12421C8E62E14077 /* LamplightUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LamplightUITests.swift; sourceTree = "<group>"; };
+		7E3A9B1C4D2F58A06B9E7D14 /* ScreenFactsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenFactsTests.swift; sourceTree = "<group>"; };
 		84C48750BF7A9C3A93BC39F2 /* BoundedWaitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoundedWaitTests.swift; sourceTree = "<group>"; };
 		8528435DF75B76DA35D7288D /* LamplightUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = LamplightUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		88385396F148DB8F7B7D91F8 /* PhotoLibraryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoLibraryTests.swift; sourceTree = "<group>"; };
@@ -309,6 +311,7 @@
 			isa = PBXGroup;
 			children = (
 				82F3D04B12421C8E62E14077 /* LamplightUITests.swift */,
+				7E3A9B1C4D2F58A06B9E7D14 /* ScreenFactsTests.swift */,
 			);
 			path = UITests;
 			sourceTree = "<group>";
@@ -619,6 +622,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				D01B51897F091ED4C411CB0C /* LamplightUITests.swift in Sources */,
+				5C0DE1A7B3F94E26A8D01F32 /* ScreenFactsTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
