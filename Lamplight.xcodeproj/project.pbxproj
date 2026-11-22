@@ -66,6 +66,7 @@
 		BD108B53F8EE542713BF59DE /* MarkdownEditing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61ED34D57C85DA8068E3821C /* MarkdownEditing.swift */; };
 		BE9707E0B9833CC509ADEC8B /* EditorText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36706E665D473A4D40DA563A /* EditorText.swift */; };
 		C01B45505BA742D4510FCEF7 /* DayAndStreakTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A52C54B6479E9626367BE999 /* DayAndStreakTests.swift */; };
+		D7A41B9E0C3F4A62B58E1D07 /* DuoWideLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F8C2E5A9D1B47C0A6E4B953 /* DuoWideLayoutTests.swift */; };
 		C2022CECD8FB2F4C7BE6EB2C /* QuietScreenPictureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE96830AD9DFF3079C820D23 /* QuietScreenPictureTests.swift */; };
 		C2148EFDD029B67D7CDAC8C2 /* EntryEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0DCF3193C40A2D5ACB6810 /* EntryEditor.swift */; };
 		C8F4BBDECE33D51DBF38B171 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F114470549B0A7F0EB8B7257 /* RootView.swift */; };
@@ -180,6 +181,7 @@
 		B4201CE5340BEBCE013274FF /* MediaLineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaLineTests.swift; sourceTree = "<group>"; };
 		B8E1841F5704D8743F4B29D4 /* EntryFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntryFile.swift; sourceTree = "<group>"; };
 		B9313CDB7E0DDC2AF4B8F378 /* EntryList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntryList.swift; sourceTree = "<group>"; };
+		3F8C2E5A9D1B47C0A6E4B953 /* DuoWideLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuoWideLayoutTests.swift; sourceTree = "<group>"; };
 		BE96830AD9DFF3079C820D23 /* QuietScreenPictureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuietScreenPictureTests.swift; sourceTree = "<group>"; };
 		BFA78D27462BEE3157679BCC /* AppPrefs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPrefs.swift; sourceTree = "<group>"; };
 		C05858181821B7C17F72307E /* FavoritesScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesScreen.swift; sourceTree = "<group>"; };
@@ -243,6 +245,7 @@
 				5315D32C1FD771E40CF3E282 /* DayPhotoPickerTests.swift */,
 				90E5E3C4E37A45CEA261F426 /* NewEntryNavigationTests.swift */,
 				88385396F148DB8F7B7D91F8 /* PhotoLibraryTests.swift */,
+				3F8C2E5A9D1B47C0A6E4B953 /* DuoWideLayoutTests.swift */,
 				BE96830AD9DFF3079C820D23 /* QuietScreenPictureTests.swift */,
 			);
 			path = AppTests;
@@ -544,6 +547,7 @@
 				D4991BAA99B1AA2C856FDB14 /* NewEntryNavigationTests.swift in Sources */,
 				16DB178F46C9C40F6AA3C97E /* PhotoDaysTests.swift in Sources */,
 				9D72B7086C95802CDCD0B7BA /* PhotoLibraryTests.swift in Sources */,
+				D7A41B9E0C3F4A62B58E1D07 /* DuoWideLayoutTests.swift in Sources */,
 				C2022CECD8FB2F4C7BE6EB2C /* QuietScreenPictureTests.swift in Sources */,
 				CE523ED9A8B8E53F6BD50E70 /* SampleFolderTests.swift in Sources */,
 				CC3C876BFCD16AB7484BD75D /* TestSupport.swift in Sources */,
