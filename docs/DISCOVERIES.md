@@ -119,6 +119,12 @@ it (`simctl bootstatus -b`, then 20 seconds) before testing, and its simulator i
 the phone and iPad run on 27.2. **Also guesses.** If the runs still go wrong, the next thing to try is a job of their
 own for the UI tests.
 
+**The run after that passed** (verified in CI, 2026-11-22, PR #38 on head `ab82aac`, iOS 27.2 for the phone and iPad).
+Hosted tests 330 total, 326 passed, 0 failed, 4 skipped, in about half the usual time. Phone tests 13 total, 9 passed,
+0 failed, 4 skipped. UI tests: phone 5 passed and 1 skipped, iPad 4 passed and 2 skipped. The two changes went in
+together, and the hosted test also stopped using a fixed 1.5 s wait, so it isn't known which one mattered. **One clean
+run after four bad ones is not proof.** If a UI test hangs again, start with the job of their own.
+
 **Status:** pictures of the Duo run are in the `duo-screens` artifact of the run (14 days). `ScreenFactsTests` now skip
 on every simulator but the Duo. Next: read the editor page facts, look at the open Duo on the device after a TestFlight
 build, then decide about the bottom bar and the layout.
