@@ -119,6 +119,15 @@ it (`simctl bootstatus -b`, then 20 seconds) before testing, and its simulator i
 the phone and iPad run on 27.2. **Also guesses.** If the runs still go wrong, the next thing to try is a job of their
 own for the UI tests.
 
+**It was not fixed** (2026-11-22, later): the run after those changes passed, and the next one (PR #39, same changes,
+iOS 27.2) failed again: the phone's `testASecondEntryStaysOpen` ran out its five minutes, and on the iPad the test
+runner crashed before any test ran ("never finished bootstrapping", the same as the Duo's first run). So across six Mac
+runs on `xcode-27`, one had clean UI tests. The hosted and phone tests failed once in six. The Duo job, which builds and
+runs the same UI tests alone on its own machine, passed every time. So the UI tests now run the same way: two jobs of
+their own in `app.yml` (`UI tests (iPhone)`, `UI tests (iPad)`), each on a fresh machine with one simulator. They are
+still required and nothing is skipped. **Unproven** until several runs have gone by. Not tried: turning off the
+keyboard's predictions and first-use screens in the simulator, which a stall on the first tap into the page hints at.
+
 **Status:** pictures of the Duo run are in the `duo-screens` artifact of the run (14 days). `ScreenFactsTests` now skip
 on every simulator but the Duo. Next: read the editor page facts, look at the open Duo on the device after a TestFlight
 build, then decide about the bottom bar and the layout.

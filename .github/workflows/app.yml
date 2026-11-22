@@ -31,8 +31,7 @@ jobs:
     name: Build and test
     # Xcode 27.1 or later is what lets the app fill the inner screen of the folding iPhone Duo.
     runs-on: xcode-27
-    # Xcode 27's simulators start the app slowly: a run that passes takes about 45 minutes.
-    timeout-minutes: 75
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
 
@@ -128,61 +127,87 @@ jobs:
           PY
           exit $status
 
-      # The UI tests start the whole app and tap it, on a phone and on an iPad, and take a picture at each step.
-      # They reuse the build above. A failure here doesn't hide the results of the tests before it.
-      # Each test gets five minutes. A simulator once hung starting the app and used up the job's time,
-      # which left no result and no pictures. With a limit, that test fails and the rest still run.
-      - name: UI tests
-        if: ${{ !cancelled() }}
-        run: |
-          # With a hardware keyboard "connected", the simulator shows no keyboard and typing can fail.
-          defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool false
-          status=0
-          for kind in iPhone iPad; do
-            udid=$(python3 tools/pick_simulator.py "$kind") || { echo "No $kind simulator."; status=1; continue; }
-            echo "UI tests on $kind simulator $udid"
-            # Three runs in a row went wrong here with the unit tests' simulator still running beside this one:
-            # the app couldn't be quit, a launch hung, a lookup took minutes. The Duo job runs one simulator
-            # and passed each time. So stop the others first.
-            xcrun simctl shutdown all || true
-            xcrun simctl bootstatus "$udid" -b
-            sleep 20
-            bundle="$RUNNER_TEMP/UI-$kind.xcresult"
-            set +e
-            xcodebuild test -quiet \
-              -project Lamplight.xcodeproj \
-              -scheme LamplightUITests \
-              -destination "platform=iOS Simulator,id=$udid" \
-              -resultBundlePath "$bundle" \
-              -test-timeouts-enabled YES \
-              -default-test-execution-time-allowance 300 \
-              -maximum-test-execution-time-allowance 300 \
-              CODE_SIGNING_ALLOWED=NO
-            [ $? -eq 0 ] || status=1
-            set -e
-            [ -d "$bundle" ] || { echo "No UI test results on $kind."; status=1; continue; }
-            xcrun xcresulttool get test-results summary --path "$bundle" > "$RUNNER_TEMP/ui-$kind.json"
-            KIND="$kind" python3 - "$RUNNER_TEMP/ui-$kind.json" <<'PY'
-          import json, os, sys
-          summary = json.load(open(sys.argv[1]))
-          for failure in summary.get("testFailures", []):
-              print(f"FAILED {failure.get('testName')}:\n{failure.get('failureText')}\n")
-          print(f"UI tests on {os.environ['KIND']}: {summary.get('totalTestCount')} total, {summary.get('passedTests')} passed, {summary.get('failedTests')} failed, {summary.get('skippedTests')} skipped")
-          PY
-            # The pictures come out named by number. Give them the names the tests gave them.
-            out="$RUNNER_TEMP/screens/$kind"
-            mkdir -p "$out"
-            xcrun xcresulttool export attachments --path "$bundle" --output-path "$out" || echo "Couldn't export the pictures for $kind."
-            python3 tools/name_test_pictures.py "$out"
-          done
-          exit $status
-
       # Kept even when the job ran out of time, since that is when they are most wanted.
       - name: Keep the pictures
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: screens
+          path: ${{ runner.temp }}/screens
+          if-no-files-found: warn
+          retention-days: 14
+
+  # The UI tests start the whole app and tap it, on a phone and on an iPad, and take a picture at each step.
+  # Each runs in a job of its own, on a machine of its own, the way the Duo job does. In the same job as the tests
+  # above they went wrong in five runs out of six on the xcode-27 runner (a stalled lookup, an app that couldn't be
+  # quit, a test runner that never started) while the Duo job, alone on its machine, passed every time. Apart, a
+  # stall here also can't hide or hold up the results above. It costs a second and third build.
+  ui:
+    name: UI tests (${{ matrix.kind }})
+    runs-on: xcode-27
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        kind: [iPhone, iPad]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Find and start the simulator
+        id: simulator
+        run: |
+          # With a hardware keyboard "connected", the simulator shows no keyboard and typing can fail.
+          defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool false
+          udid=$(python3 tools/pick_simulator.py "${{ matrix.kind }}")
+          [ -n "$udid" ] || { echo "No ${{ matrix.kind }} simulator found"; exit 1; }
+          echo "Using simulator $udid"
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+          # Wait until it has finished starting. Tests on a simulator that is still starting up stall.
+          xcrun simctl bootstatus "$udid" -b
+          sleep 20
+
+      # Each test gets five minutes. A simulator once hung starting the app and used up the job's time, which left
+      # no result and no pictures. With a limit, that test fails and the rest still run.
+      - name: UI tests
+        run: |
+          kind="${{ matrix.kind }}"
+          bundle="$RUNNER_TEMP/UI-$kind.xcresult"
+          set +e
+          xcodebuild test -quiet \
+            -project Lamplight.xcodeproj \
+            -scheme LamplightUITests \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}" \
+            -resultBundlePath "$bundle" \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 300 \
+            -maximum-test-execution-time-allowance 300 \
+            CODE_SIGNING_ALLOWED=NO
+          status=$?
+          set -e
+          [ -d "$bundle" ] || { echo "No UI test results on $kind. The build probably failed."; exit 1; }
+          xcrun xcresulttool get test-results summary --path "$bundle" > "$RUNNER_TEMP/ui-$kind.json"
+          KIND="$kind" python3 - "$RUNNER_TEMP/ui-$kind.json" <<'PY'
+          import json, os, sys
+          summary = json.load(open(sys.argv[1]))
+          for failure in summary.get("testFailures", []):
+              print(f"FAILED {failure.get('testName')}:\n{failure.get('failureText')}\n")
+          total = summary.get("totalTestCount")
+          print(f"UI tests on {os.environ['KIND']}: {total} total, {summary.get('passedTests')} passed, {summary.get('failedTests')} failed, {summary.get('skippedTests')} skipped")
+          if not total:
+              sys.exit("No UI tests ran.")
+          PY
+          # The pictures come out named by number. Give them the names the tests gave them.
+          out="$RUNNER_TEMP/screens/$kind"
+          mkdir -p "$out"
+          xcrun xcresulttool export attachments --path "$bundle" --output-path "$out" || echo "Couldn't export the pictures for $kind."
+          python3 tools/name_test_pictures.py "$out" || echo "Couldn't name the pictures."
+          exit $status
+
+      - name: Keep the pictures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: screens-${{ matrix.kind }}
           path: ${{ runner.temp }}/screens
           if-no-files-found: warn
           retention-days: 14
