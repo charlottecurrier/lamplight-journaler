@@ -20,16 +20,19 @@ final class LockManager {
         isLocked = startLocked
     }
 
-    /// "Face ID", "Touch ID", or "your passcode". For button and settings labels.
-    static var methodName: String {
+    /// "Face ID" or "Touch ID", or nil when the device has neither set up and only its passcode can open the app.
+    static var biometryName: String? {
         let context = LAContext()
         _ = context.canEvaluatePolicy(.deviceOwnerAuthentication, error: nil)
         switch context.biometryType {
         case .faceID: return "Face ID"
         case .touchID: return "Touch ID"
-        default: return "your passcode"
+        default: return nil
         }
     }
+
+    /// "Face ID", "Touch ID", or "your passcode". For button and settings labels.
+    static var methodName: String { biometryName ?? "your passcode" }
 
     static var canAuthenticate: Bool {
         LAContext().canEvaluatePolicy(.deviceOwnerAuthentication, error: nil)

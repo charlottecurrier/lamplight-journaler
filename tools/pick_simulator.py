@@ -38,13 +38,14 @@ def pick(runtimes, kind, newest_allowed):
             continue
         for device in devices:
             if device.get("isAvailable", True) and fits(device.get("name", ""), kind):
-                choices.append((version(runtime), device["udid"], device["name"], runtime))
+                choices.append((version(runtime), device["name"], device["udid"], runtime))
     if not choices:
         return None
+    # Sorted by system, then by name, so the same model is picked on every run.
     choices.sort()
     allowed = [choice for choice in choices if newest_allowed is None or choice[0] <= newest_allowed]
     chosen = allowed[-1] if allowed else choices[0]
-    return chosen[1], chosen[2], chosen[3]
+    return chosen[2], chosen[1], chosen[3]
 
 
 def xcode_sdk():

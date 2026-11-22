@@ -48,7 +48,11 @@ struct SettingsView: View {
                 } header: {
                     Text("Privacy")
                 } footer: {
-                    Text("If \(LockManager.methodName) doesn't work, your device passcode opens it. When the app isn't in front, its contents are hidden.")
+                    if let biometry = LockManager.biometryName {
+                        Text("If \(biometry) doesn't work, your device passcode opens it. When the app isn't in front, its contents are hidden.")
+                    } else {
+                        Text("When the app isn't in front, its contents are hidden.")
+                    }
                 }
                 .listRowBackground(Theme.surface)
 
