@@ -112,6 +112,29 @@ iPad simulator has this trouble is not known.
 on every simulator but the Duo. Next: read the editor page facts, look at the open Duo on the device after a TestFlight
 build, then decide about the bottom bar and the layout.
 
+**What the Duo runs showed** (2026-11-22, the Duo jobs of PR #38 and PR #39):
+
+- **The closed (outer) screen, seen by the UI tests on the Duo simulator. Verified in CI.** The window is 466 x 678 points
+  and the screen reads 386 x 678. On the list, the five buttons of the bottom bar sit at x 6 to 376, so all of them are
+  on the screen. The system's own buttons (Settings, Search) sit in a strip at x 394 to 437. On the editor page, Done
+  is at x 309 to 377, inside the screen. The format bar's last six buttons (Quote to Indent) are past the edge. They are
+  the end of a scrolling bar (`FormatBar` is a horizontal `UIScrollView`, read in the code), as on any phone. Whether it
+  scrolls on the Duo wasn't tried. One button with no label sits at the same place on the list and on the page. It
+  wasn't identified.
+- **Turning the device does nothing in the simulator.** The "page on its side" facts equal the "page" ones: the window
+  stays 466 x 678.
+- **The wide-layout test (`DuoWideLayoutTests`) did not show the open inner screen.** It makes a window 626 x 890 and
+  669 x 951 (and each on its side) inside the simulator's outer screen. At every size the split view showed only the page
+  (display mode 1) with a sidebar button at the top left, and the system's side strip stayed at x 394, where it is on the
+  closed screen (the pictures were looked at). So the system still lays out for the outer screen, and a big window in it
+  doesn't become the inner screen. What it gave: the widths the split view chose for its columns, sidebar 270 and list
+  420 at 626 and 669 wide, and list 357 and 418 at 890 and 951. Sidebar and list together are 690 points at the upright
+  sizes, more than the whole 626 or 669, so three columns can't sit side by side there. That is arithmetic on those
+  numbers. **Nobody has seen the open Duo.** The same test also runs on the iPad in the App job, which is a second look,
+  not the Duo's.
+- **Still needs the device:** how the open screen lays out, whether the list's 420 leaves the page enough room, and
+  how the bottom bar and the toolbars look closed. See the bottom bar's entry in `docs/DECISIONS.md`.
+
 ## The phone's second new entry closed at once (fixed)
 
 **Symptom:** on an iPhone, the first new entry after a restart worked. Every one after that opened, flashed "Choose an
