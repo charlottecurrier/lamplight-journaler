@@ -17,7 +17,7 @@ struct SettingsView: View {
             get: { prefs.lockEnabled },
             set: { wantsLock in
                 if wantsLock && !LockManager.canAuthenticate {
-                    lockProblem = "Set a passcode on this device first. Lamplight uses it, and Face ID, to lock your journal."
+                    lockProblem = "Set a passcode on this device first. Lamplight uses it to lock your journal."
                 } else {
                     prefs.lockEnabled = wantsLock
                     if !wantsLock { lock.forceUnlock() }
@@ -48,7 +48,11 @@ struct SettingsView: View {
                 } header: {
                     Text("Privacy")
                 } footer: {
-                    Text("If Face ID doesn't work, your device passcode opens it. When the app isn't in front, its contents are hidden.")
+                    if let biometry = LockManager.biometryName {
+                        Text("If \(biometry) doesn't work, your device passcode opens it. When the app isn't in front, its contents are hidden.")
+                    } else {
+                        Text("When the app isn't in front, its contents are hidden.")
+                    }
                 }
                 .listRowBackground(Theme.surface)
 

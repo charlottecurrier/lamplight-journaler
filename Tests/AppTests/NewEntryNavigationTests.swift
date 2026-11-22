@@ -245,8 +245,14 @@ final class NewEntryNavigationTests: EditorTestCase {
         await pause(0.5)
 
         NotificationCenter.default.post(name: .lamplightFinishEntry, object: nil)
-        await pause(1.5)
-        XCTAssertNil(screen.model.editingEntryID, "The first entry wasn't finished.")
+        // A fixed 1.5 s wasn't enough on a slow runner: wait for it, as the going-back test does.
+        var waited = 0.0
+        while screen.model.editingEntryID != nil && waited < 6 {
+            await pause(0.25)
+            waited += 0.25
+        }
+        await pause(1.0)
+        XCTAssertNil(screen.model.editingEntryID, "The first entry wasn't finished within 6 seconds of Done.")
         XCTAssertEqual(screen.model.entries(in: .all).count, 4, "The first entry wasn't kept.")
 
         NotificationCenter.default.post(name: .lamplightNewEntry, object: nil)
@@ -339,5 +345,48 @@ final class NewEntryNavigationTests: EditorTestCase {
 
     func testANewEntryFromATemplateStaysOpenInTheIPadsLayout() async throws {
         try await checkNewEntryStaysOpen(Options(compact: false, template: true))
+    }
+
+    /// The folding iPhone Duo is wide when open and narrow when closed, so the layout changes under a page that is
+    /// being written. The page, and the words on it, have to come through folding and unfolding.
+    func testFoldingAndUnfoldingKeepsThePageBeingWritten() async throws {
+        let screen = try await openMainScreen(Options(compact: false))
+        NotificationCenter.default.post(name: .lamplightNewEntry, object: nil)
+        try await waitForFirstEntry(screen)
+        let id = try XCTUnwrap(screen.model.editingEntryID)
+        // Typed into the page itself, so the words are where a fold could lose them.
+        let words = "Written with the device open."
+        let page = try XCTUnwrap(Self.findTextView(in: screen.host.view), "The page has no text view.")
+        page.insertText(words)
+        // Wait for the words to be saved, so a slow save isn't taken for writing lost in the fold.
+        var saved = false
+        for _ in 0..<50 where !saved {
+            await pause(0.1)
+            saved = screen.model.entry(id)?.body.contains(words) == true
+        }
+        XCTAssertTrue(saved, "The words weren't saved within 5 seconds, before any fold.")
+
+        for (step, compact) in [("folded", true), ("unfolded again", false), ("folded again", true)] {
+            screen.host.traitOverrides.horizontalSizeClass = compact ? .compact : .regular
+            screen.host.view.setNeedsLayout()
+            screen.host.view.layoutIfNeeded()
+            var lines: [String] = []
+            var ok = true
+            for wait in [0.2, 0.8, 2.0] {
+                await pause(wait)
+                let look = snapshot("\(step), \(wait) s later", screen)
+                lines.append(look.line)
+                ok = ok && look.open && screen.model.editingEntryID == id
+            }
+            let last = snapshot(step, screen)
+            XCTAssertTrue(
+                ok && last.ok,
+                "The page being written didn't come through being \(step).\n" + lines.joined(separator: "\n")
+                    + "\nWhat happened, in order:\n" + NavTrace.events.joined(separator: "\n")
+            )
+            let shown = Self.findTextView(in: screen.host.view)?.text ?? ""
+            XCTAssertTrue(shown.contains(words), "The words weren't on the page when \(step). It showed: \(shown.prefix(80))")
+            XCTAssertEqual(screen.model.entry(id)?.body.contains(words), true, "The words weren't in the journal when \(step).")
+        }
     }
 }

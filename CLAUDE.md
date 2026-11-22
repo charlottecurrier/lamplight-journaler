@@ -1,6 +1,6 @@
 # Lamplight
 
-An iPad-first (also iPhone) SwiftUI journal. Entries are Markdown files in a folder the person picks in iCloud Drive. Read `README.md` for the product and `docs/DECISIONS.md` for why things are the way they are.
+An iPad-first (also iPhone) SwiftUI journal. Entries are Markdown files in a folder the person picks in iCloud Drive. Read `README.md` for the product and `docs/DECISIONS.md` for why things are the way they are. Read `docs/DISCOVERIES.md` before you change navigation, the editor, photos, CI or anything for a new device (it has the iPhone Duo findings): it records what was found, how it was checked, and what was tried and didn't work. When you learn something the code doesn't say, add it there, and say how you checked it.
 
 ## Layout
 
@@ -40,6 +40,8 @@ GitHub Actions runs two workflows on pull requests. After a push, look at the PR
 
 - `.github/workflows/core.yml` (Linux, every PR and every push to `main`): `swift test` with the sample journal, `tools/typecheck_support.sh`, `tools/check_palette.py`, `tools/check_privacy_manifest.py`, and a syntax check of the Python tools.
 - `.github/workflows/app.yml` (macOS, only PRs that change `App/`, `Sources/`, `Tests/`, `project.yml`, the Xcode project or `Package.swift`): builds the app and runs the tests in the iPad simulator. This is the only place the SwiftUI and UIKit code in `App/` is compiled outside Xcode, so it can find errors the Linux harness can't. A last step runs `NewEntryNavigationTests` again on an iPhone simulator, so the phone's layout is a real phone's. Then the UI tests run on a phone and an iPad simulator, and their pictures are kept as the `screens` artifact of the run for 14 days. Look at them when a screen changes. Mac minutes are free while the repo is public. If it goes private again they count ten times, and the trigger should come out. A run's pictures and screen recordings can be downloaded and looked at: on a failure, look at them before guessing.
+
+- The Mac workflows run on the `xcode-27` runner, whose default is Xcode 27.1. An app built with older tools runs in a small phone-sized window on the inner screen of the folding iPhone Duo, so don't move them back. `tools/pick_simulator.py` picks the simulators. Lay screens out by size class, never by device: the Duo is regular width open and compact closed, and it changes while the app runs. `NewEntryNavigationTests` has a test that folds and unfolds under a page being written.
 
 - `.github/workflows/testflight.yml` (macOS, only when started by hand): archives the app, signs it with an App Store Connect API key kept in repository secrets, and uploads it to TestFlight. The build number is the UTC date and time, passed on the command line, so nothing is committed. Setup is in `docs/TESTFLIGHT.md`. Don't give it a trigger.
 

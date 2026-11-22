@@ -16,6 +16,7 @@ on:
       - "Lamplight.xcodeproj/**"
       - ".github/workflows/app.yml"
       - "tools/name_test_pictures.py"
+      - "tools/pick_simulator.py"
   workflow_dispatch:
 
 concurrency:
@@ -28,8 +29,10 @@ permissions:
 jobs:
   app:
     name: Build and test
-    runs-on: macos-26
-    timeout-minutes: 45
+    # Xcode 27.1 or later is what lets the app fill the inner screen of the folding iPhone Duo.
+    runs-on: xcode-27
+    # Xcode 27's simulators start the app slowly: a run that passes takes about 45 minutes.
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v7
 
@@ -39,19 +42,14 @@ jobs:
       - name: Find an iPad simulator
         id: simulator
         run: |
-          udid=$(xcrun simctl list devices available -j | python3 -c '
-          import json, sys
-          runtimes = json.load(sys.stdin)["devices"]
-          for runtime in sorted(runtimes, reverse=True):
-              for device in runtimes[runtime]:
-                  if device["name"].startswith("iPad"):
-                      print(device["udid"])
-                      sys.exit()
-          sys.exit("No iPad simulator found")
-          ')
+          udid=$(python3 tools/pick_simulator.py iPad)
           [ -n "$udid" ] || { echo "No iPad simulator found"; exit 1; }
           echo "Using simulator $udid"
           echo "udid=$udid" >> "$GITHUB_OUTPUT"
+          # Start it and wait until it has finished starting, as the Duo job does. Tests on a simulator that is
+          # still starting up stall.
+          xcrun simctl bootstatus "$udid" -b
+          sleep 20
 
       - name: Build and test
         run: |
@@ -99,17 +97,12 @@ jobs:
       - name: Phone tests
         if: ${{ !cancelled() }}
         run: |
-          udid=$(xcrun simctl list devices available -j | python3 -c '
-          import json, sys
-          runtimes = json.load(sys.stdin)["devices"]
-          for runtime in sorted(runtimes, reverse=True):
-              for device in runtimes[runtime]:
-                  if device["name"].startswith("iPhone"):
-                      print(device["udid"])
-                      sys.exit()
-          sys.exit("No iPhone simulator found")
-          ')
+          # One simulator at a time. The runner has 7 GB, and a second simulator left running starves the first.
+          xcrun simctl shutdown all || true
+          udid=$(python3 tools/pick_simulator.py iPhone)
           echo "Using simulator $udid"
+          xcrun simctl bootstatus "$udid" -b
+          sleep 20
           bundle="$RUNNER_TEMP/Phone.xcresult"
           set +e
           xcodebuild test-without-building -quiet \
@@ -137,6 +130,8 @@ jobs:
 
       # The UI tests start the whole app and tap it, on a phone and on an iPad, and take a picture at each step.
       # They reuse the build above. A failure here doesn't hide the results of the tests before it.
+      # Each test gets five minutes. A simulator once hung starting the app and used up the job's time,
+      # which left no result and no pictures. With a limit, that test fails and the rest still run.
       - name: UI tests
         if: ${{ !cancelled() }}
         run: |
@@ -144,17 +139,14 @@ jobs:
           defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool false
           status=0
           for kind in iPhone iPad; do
-            udid=$(xcrun simctl list devices available -j | KIND="$kind" python3 -c '
-          import json, os, sys
-          runtimes = json.load(sys.stdin)["devices"]
-          for runtime in sorted(runtimes, reverse=True):
-              for device in runtimes[runtime]:
-                  if device["name"].startswith(os.environ["KIND"]):
-                      print(device["udid"])
-                      sys.exit()
-          sys.exit("No simulator found")
-          ')
+            udid=$(python3 tools/pick_simulator.py "$kind") || { echo "No $kind simulator."; status=1; continue; }
             echo "UI tests on $kind simulator $udid"
+            # Three runs in a row went wrong here with the unit tests' simulator still running beside this one:
+            # the app couldn't be quit, a launch hung, a lookup took minutes. The Duo job runs one simulator
+            # and passed each time. So stop the others first.
+            xcrun simctl shutdown all || true
+            xcrun simctl bootstatus "$udid" -b
+            sleep 20
             bundle="$RUNNER_TEMP/UI-$kind.xcresult"
             set +e
             xcodebuild test -quiet \
@@ -162,6 +154,9 @@ jobs:
               -scheme LamplightUITests \
               -destination "platform=iOS Simulator,id=$udid" \
               -resultBundlePath "$bundle" \
+              -test-timeouts-enabled YES \
+              -default-test-execution-time-allowance 300 \
+              -maximum-test-execution-time-allowance 300 \
               CODE_SIGNING_ALLOWED=NO
             [ $? -eq 0 ] || status=1
             set -e
