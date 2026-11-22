@@ -245,8 +245,14 @@ final class NewEntryNavigationTests: EditorTestCase {
         await pause(0.5)
 
         NotificationCenter.default.post(name: .lamplightFinishEntry, object: nil)
-        await pause(1.5)
-        XCTAssertNil(screen.model.editingEntryID, "The first entry wasn't finished.")
+        // A fixed 1.5 s wasn't enough on a slow runner: wait for it, as the going-back test does.
+        var waited = 0.0
+        while screen.model.editingEntryID != nil && waited < 6 {
+            await pause(0.25)
+            waited += 0.25
+        }
+        await pause(1.0)
+        XCTAssertNil(screen.model.editingEntryID, "The first entry wasn't finished within 6 seconds of Done.")
         XCTAssertEqual(screen.model.entries(in: .all).count, 4, "The first entry wasn't kept.")
 
         NotificationCenter.default.post(name: .lamplightNewEntry, object: nil)
