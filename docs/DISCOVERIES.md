@@ -102,11 +102,15 @@ the `macos-26` runner. The Duo work up to then had only added tests and notes. O
 showed Lamplight in a small phone-sized window with a zoom button, with the phone's bottom bar. `testflight.yml` and
 `app.yml` now run on `xcode-27`. **Unverified on a device** until a new TestFlight build is installed.
 
-**The iPad UI tests on Xcode 27** (2026-11-22): in two Mac runs in a row no test of ours failed, but the iPad UI run did.
-Once one test ended with "Failed to terminate com.forageandjump.lamplight". Once the simulator hung starting the second
-test until the job ran out of time, which left no result and no pictures. The phone UI run passed both times. Each UI
-test now has a five-minute limit (`-test-timeouts-enabled`), so a hang fails one test and the rest still run. Why the
-iPad simulator has this trouble is not known.
+**The UI tests on the `xcode-27` runner** (2026-11-22): three Mac runs in a row went wrong in the UI tests, each a
+different way, and no check of ours failed. On the iPad, "Failed to terminate com.forageandjump.lamplight". On the iPad,
+a hang starting a test until the job ran out of time. On the phone, `testASecondEntryStaysOpen` sat for minutes looking
+for the Done button. That run's spindump (in the `screens` artifact) shows the app's main thread idle in its run loop,
+so the app was not hung: the test tools were. The runner is a 3-core, 7 GB machine, and `app.yml` left the unit tests'
+simulator running while the UI tests used another. The Duo job runs one simulator and passed three times out of
+three. So `app.yml` now shuts down every simulator before each run (`xcrun simctl shutdown all`), and each UI test has
+a five-minute limit so a hang fails one test and keeps the pictures. **A guess from the evidence, not proven**: see
+whether the runs after this are clean.
 
 **Status:** pictures of the Duo run are in the `duo-screens` artifact of the run (14 days). `ScreenFactsTests` now skip
 on every simulator but the Duo. Next: read the editor page facts, look at the open Duo on the device after a TestFlight

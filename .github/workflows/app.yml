@@ -93,6 +93,8 @@ jobs:
       - name: Phone tests
         if: ${{ !cancelled() }}
         run: |
+          # One simulator at a time. The runner has 7 GB, and a second simulator left running starves the first.
+          xcrun simctl shutdown all || true
           udid=$(python3 tools/pick_simulator.py iPhone)
           echo "Using simulator $udid"
           bundle="$RUNNER_TEMP/Phone.xcresult"
@@ -133,6 +135,10 @@ jobs:
           for kind in iPhone iPad; do
             udid=$(python3 tools/pick_simulator.py "$kind") || { echo "No $kind simulator."; status=1; continue; }
             echo "UI tests on $kind simulator $udid"
+            # Three runs in a row went wrong here with the unit tests' simulator still running beside this one:
+            # the app couldn't be quit, a launch hung, a lookup took minutes. The Duo job runs one simulator
+            # and passed each time. So stop the others first.
+            xcrun simctl shutdown all || true
             bundle="$RUNNER_TEMP/UI-$kind.xcresult"
             set +e
             xcodebuild test -quiet \
