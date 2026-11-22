@@ -46,6 +46,10 @@ jobs:
           [ -n "$udid" ] || { echo "No iPad simulator found"; exit 1; }
           echo "Using simulator $udid"
           echo "udid=$udid" >> "$GITHUB_OUTPUT"
+          # Start it and wait until it has finished starting, as the Duo job does. Tests on a simulator that is
+          # still starting up stall.
+          xcrun simctl bootstatus "$udid" -b
+          sleep 20
 
       - name: Build and test
         run: |
@@ -97,6 +101,8 @@ jobs:
           xcrun simctl shutdown all || true
           udid=$(python3 tools/pick_simulator.py iPhone)
           echo "Using simulator $udid"
+          xcrun simctl bootstatus "$udid" -b
+          sleep 20
           bundle="$RUNNER_TEMP/Phone.xcresult"
           set +e
           xcodebuild test-without-building -quiet \
@@ -139,6 +145,8 @@ jobs:
             # the app couldn't be quit, a launch hung, a lookup took minutes. The Duo job runs one simulator
             # and passed each time. So stop the others first.
             xcrun simctl shutdown all || true
+            xcrun simctl bootstatus "$udid" -b
+            sleep 20
             bundle="$RUNNER_TEMP/UI-$kind.xcresult"
             set +e
             xcodebuild test -quiet \

@@ -7,8 +7,9 @@
 
 "iPhone" never picks the folding iPhone Duo, which has a layout of its own: ask for "Duo" to get it.
 
-Of the simulators that fit, the newest system that is not newer than the installed Xcode's own is used. A simulator
-with a newer system than Xcode was made for may not start. If none is that old, the oldest is used.
+Of the simulators that fit, the one on the installed Xcode's own system is used. If there is none, the nearest newer
+system, and only then an older one. The UI tests kept stalling on iOS 27.0 simulators under Xcode 27.1, while the Duo's
+runs on 27.1 and 27.2 passed.
 The list of simulators is read from `xcrun simctl`, or from a file given as the second argument, for trying it out.
 """
 import json
@@ -49,8 +50,14 @@ def pick(runtimes, kind, newest_allowed):
         return None
     # Sorted by system, then the preferred model, then by name, so the same model is picked on every run.
     choices.sort()
-    allowed = [choice for choice in choices if newest_allowed is None or choice[0] <= newest_allowed]
-    chosen = allowed[-1] if allowed else choices[0]
+    if newest_allowed is None:
+        chosen = choices[-1]
+    else:
+        # Xcode's own system if there is one. If not, the nearest newer one, and only then an older one.
+        same = [choice for choice in choices if choice[0][:2] == newest_allowed[:2]]
+        newer = [choice for choice in choices if choice[0][:2] > newest_allowed[:2]]
+        nearest = [choice for choice in newer if choice[0][:2] == newer[0][0][:2]] if newer else []
+        chosen = (same or nearest or choices)[-1]
     return chosen[3], chosen[2], chosen[4]
 
 

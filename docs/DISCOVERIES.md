@@ -109,8 +109,15 @@ for the Done button. That run's spindump (in the `screens` artifact) shows the a
 so the app was not hung: the test tools were. The runner is a 3-core, 7 GB machine, and `app.yml` left the unit tests'
 simulator running while the UI tests used another. The Duo job runs one simulator and passed three times out of
 three. So `app.yml` now shuts down every simulator before each run (`xcrun simctl shutdown all`), and each UI test has
-a five-minute limit so a hang fails one test and keeps the pictures. **A guess from the evidence, not proven**: see
-whether the runs after this are clean.
+a five-minute limit so a hang fails one test and keeps the pictures. **That guess was wrong, or not enough.** The next run, with one simulator at a time, went wrong
+again: on the iPad the UI test stalled tapping the page of its first entry, and a hosted test
+(`testASecondEntryStaysOpenInTheIPadsLayout`, "The first entry wasn't finished") failed in a run whose tests took 781
+seconds where they had taken about 460. The spindump again shows the app idle, and the saved screen shows the page open
+with the keyboard up. Two things the passing Duo job does that `app.yml` didn't: it starts the simulator and waits for
+it (`simctl bootstatus -b`, then 20 seconds) before testing, and its simulator is on iOS 27.1 or 27.2, not 27.0.
+`app.yml` now does the first, and `pick_simulator.py` now prefers Xcode's own system, then the nearest newer one, so
+the phone and iPad run on 27.2. **Also guesses.** If the runs still go wrong, the next thing to try is a job of their
+own for the UI tests.
 
 **Status:** pictures of the Duo run are in the `duo-screens` artifact of the run (14 days). `ScreenFactsTests` now skip
 on every simulator but the Duo. Next: read the editor page facts, look at the open Duo on the device after a TestFlight
