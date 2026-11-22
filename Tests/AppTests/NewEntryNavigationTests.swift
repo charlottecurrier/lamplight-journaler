@@ -340,4 +340,41 @@ final class NewEntryNavigationTests: EditorTestCase {
     func testANewEntryFromATemplateStaysOpenInTheIPadsLayout() async throws {
         try await checkNewEntryStaysOpen(Options(compact: false, template: true))
     }
+
+    /// The folding iPhone Duo is wide when open and narrow when closed, so the layout changes under a page that is
+    /// being written. The page, and the words on it, have to come through folding and unfolding.
+    func testFoldingAndUnfoldingKeepsThePageBeingWritten() async throws {
+        let screen = try await openMainScreen(Options(compact: false))
+        NotificationCenter.default.post(name: .lamplightNewEntry, object: nil)
+        try await waitForFirstEntry(screen)
+        let id = try XCTUnwrap(screen.model.editingEntryID)
+        // Typed into the page itself, so the words are where a fold could lose them.
+        let words = "Written with the device open."
+        let page = try XCTUnwrap(Self.findTextView(in: screen.host.view), "The page has no text view.")
+        page.insertText(words)
+        await pause(0.3)
+
+        for (step, compact) in [("folded", true), ("unfolded again", false), ("folded again", true)] {
+            screen.host.traitOverrides.horizontalSizeClass = compact ? .compact : .regular
+            screen.host.view.setNeedsLayout()
+            screen.host.view.layoutIfNeeded()
+            var lines: [String] = []
+            var ok = true
+            for wait in [0.2, 0.8, 2.0] {
+                await pause(wait)
+                let look = snapshot("\(step), \(wait) s later", screen)
+                lines.append(look.line)
+                ok = ok && look.open && screen.model.editingEntryID == id
+            }
+            let last = snapshot(step, screen)
+            XCTAssertTrue(
+                ok && last.ok,
+                "The page being written didn't come through being \(step).\n" + lines.joined(separator: "\n")
+                    + "\nWhat happened, in order:\n" + NavTrace.events.joined(separator: "\n")
+            )
+            let shown = Self.findTextView(in: screen.host.view)?.text ?? ""
+            XCTAssertTrue(shown.contains(words), "The words weren't on the page when \(step). It showed: \(shown.prefix(80))")
+            XCTAssertEqual(screen.model.entry(id)?.body.contains(words), true, "The words weren't in the journal when \(step).")
+        }
+    }
 }

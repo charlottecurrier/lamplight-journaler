@@ -95,6 +95,11 @@ Apple's first foldable. Announced 9 September 2026, shipping from October on iOS
 - Apple prefers system tab bars and toolbars to custom bars. Moving `CompactBar` to a `TabView` would let it follow the
   device to the side. That is a navigation change, so it needs its own tests and review.
 
+**Why it looked like a phone app on a real Duo** (2026-11-22): the TestFlight workflow still built with Xcode 26.6 on
+the `macos-26` runner. The Duo work up to then had only added tests and notes. On the device, the open inner screen
+showed Lamplight in a small phone-sized window with a zoom button, with the phone's bottom bar. `testflight.yml` and
+`app.yml` now run on `xcode-27`. **Unverified on a device** until a new TestFlight build is installed.
+
 **Status:** pictures of the Duo run are in the `duo-screens` artifact of the run (14 days). Next: read the editor page
 facts, fix the "Face ID" wording, add the fold test, then decide about the bottom bar and the layout.
 

@@ -9,6 +9,7 @@ on:
     paths:
       - ".github/workflows/duo.yml"
       - "Tests/UITests/ScreenFactsTests.swift"
+      - "tools/pick_simulator.py"
 
 permissions:
   contents: read
@@ -27,16 +28,7 @@ jobs:
       - name: Find the iPhone Duo simulator
         id: simulator
         run: |
-          udid=$(xcrun simctl list devices available -j | python3 -c '
-          import json, sys
-          runtimes = json.load(sys.stdin)["devices"]
-          for runtime in sorted(runtimes, reverse=True):
-              for device in runtimes[runtime]:
-                  if device["name"] == "iPhone Duo":
-                      print(device["udid"])
-                      sys.exit()
-          sys.exit("No iPhone Duo simulator found")
-          ')
+          udid=$(python3 tools/pick_simulator.py Duo)
           [ -n "$udid" ] || { echo "No iPhone Duo simulator found"; exit 1; }
           echo "Using simulator $udid"
           echo "udid=$udid" >> "$GITHUB_OUTPUT"
