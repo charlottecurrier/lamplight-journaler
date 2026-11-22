@@ -80,16 +80,18 @@ Apple's first foldable. Announced 9 September 2026, shipping from October on iOS
 - The app builds with Xcode 27.1 and runs on the Duo simulator. That is verified.
 - Few places read the size class (`MainView`, `EntryList`), and most fixed sizes are small controls. The screens already
   adapt, so most of the work is checking, not rewriting.
-- `LockManager.methodName` already asks the device for `biometryType`, so the lock screen says "Touch ID" when it should.
-  Two lines in `Settings.swift` still say "Face ID" in fixed text (the passcode message and the lock footer). They should
-  use `LockManager.methodName`.
+- The lock's text now names what the device has. `Settings.swift` had "Face ID" in fixed text in two places. They use
+  `LockManager.methodName` and `biometryName` now, and with neither Face ID nor Touch ID the "if it doesn't work"
+  sentence is left out. Checked by reading and by the Mac build. **Not seen on a Duo.**
 - The editor page's toolbar has many buttons (photo, place, format, Done). On the outer display the detail view's toolbar
   goes vertical, in a strip about 72 points wide and 678 high. Check that all of them fit and that Done is last in the
   trailing group. This is the first thing to look at in the artifact's page pictures.
 - Folding or unfolding changes the size class while the app runs, and the split view collapses or opens. The phone bug
-  below was exactly this kind of change: a page torn down for a moment cost the new, empty entry. `MainView.open` also
-  branches on `sizeClass == .compact`, so a fold while a page is "on its way" is an untested case. A test should change
-  the size class with an entry open and check that the page, the text and the caret survive.
+  below was exactly this kind of change: a page torn down for a moment cost the new, empty entry.
+  `NewEntryNavigationTests.testFoldingAndUnfoldingKeepsThePageBeingWritten` types into a new entry in the wide layout,
+  then switches the size class narrow, wide and narrow. The page stayed open and the words stayed on it and in the
+  journal (passed in the Mac job on Xcode 27.1, 2026-11-22, two runs). It is a size class override in a hosted view, not
+  a real fold, and it doesn't check the caret.
 - At about 630 to 670 points wide, the three-column split view (sidebar 230 to 320, list from 340) leaves little for the
   page. Look at the pictures before changing widths.
 - Apple prefers system tab bars and toolbars to custom bars. Moving `CompactBar` to a `TabView` would let it follow the
@@ -100,8 +102,15 @@ the `macos-26` runner. The Duo work up to then had only added tests and notes. O
 showed Lamplight in a small phone-sized window with a zoom button, with the phone's bottom bar. `testflight.yml` and
 `app.yml` now run on `xcode-27`. **Unverified on a device** until a new TestFlight build is installed.
 
-**Status:** pictures of the Duo run are in the `duo-screens` artifact of the run (14 days). Next: read the editor page
-facts, fix the "Face ID" wording, add the fold test, then decide about the bottom bar and the layout.
+**The iPad UI tests on Xcode 27** (2026-11-22): in two Mac runs in a row no test of ours failed, but the iPad UI run did.
+Once one test ended with "Failed to terminate com.forageandjump.lamplight". Once the simulator hung starting the second
+test until the job ran out of time, which left no result and no pictures. The phone UI run passed both times. Each UI
+test now has a five-minute limit (`-test-timeouts-enabled`), so a hang fails one test and the rest still run. Why the
+iPad simulator has this trouble is not known.
+
+**Status:** pictures of the Duo run are in the `duo-screens` artifact of the run (14 days). `ScreenFactsTests` now skip
+on every simulator but the Duo. Next: read the editor page facts, look at the open Duo on the device after a TestFlight
+build, then decide about the bottom bar and the layout.
 
 ## The phone's second new entry closed at once (fixed)
 

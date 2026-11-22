@@ -352,7 +352,13 @@ final class NewEntryNavigationTests: EditorTestCase {
         let words = "Written with the device open."
         let page = try XCTUnwrap(Self.findTextView(in: screen.host.view), "The page has no text view.")
         page.insertText(words)
-        await pause(0.3)
+        // Wait for the words to be saved, so a slow save isn't taken for writing lost in the fold.
+        var saved = false
+        for _ in 0..<50 where !saved {
+            await pause(0.1)
+            saved = screen.model.entry(id)?.body.contains(words) == true
+        }
+        XCTAssertTrue(saved, "The words weren't saved within 5 seconds, before any fold.")
 
         for (step, compact) in [("folded", true), ("unfolded again", false), ("folded again", true)] {
             screen.host.traitOverrides.horizontalSizeClass = compact ? .compact : .regular

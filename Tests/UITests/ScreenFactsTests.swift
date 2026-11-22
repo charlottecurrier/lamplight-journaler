@@ -8,6 +8,8 @@ final class ScreenFactsTests: XCTestCase {
     private var app: XCUIApplication!
 
     override func setUpWithError() throws {
+        // The other simulators have pictures from the other UI tests, and starting the app there costs minutes.
+        try XCTSkipUnless(UIDevice.current.name.contains("Duo"), "Only for the iPhone Duo.")
         continueAfterFailure = false
         app = XCUIApplication()
         app.launchArguments += [
@@ -17,6 +19,12 @@ final class ScreenFactsTests: XCTestCase {
             "-prefs.openToNewEntry", "NO",
         ]
         app.launch()
+    }
+
+    override func tearDown() {
+        // A test here turns the device on its side. Leave it upright for whatever runs next.
+        XCUIDevice.shared.orientation = .portrait
+        super.tearDown()
     }
 
     private func element(_ label: String) -> XCUIElement {

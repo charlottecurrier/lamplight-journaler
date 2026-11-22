@@ -17,7 +17,6 @@ on:
       - ".github/workflows/app.yml"
       - "tools/name_test_pictures.py"
       - "tools/pick_simulator.py"
-      - ".github/workflows/testflight.yml"
   workflow_dispatch:
 
 concurrency:
