@@ -125,7 +125,7 @@ runner crashed before any test ran ("never finished bootstrapping", the same as 
 runs on `xcode-27`, one had clean UI tests. The hosted and phone tests failed once in six. The Duo job, which builds and
 runs the same UI tests alone on its own machine, passed every time. So the UI tests now run the same way: two jobs of
 their own in `app.yml` (`UI tests (iPhone)`, `UI tests (iPad)`), each on a fresh machine with one simulator. They are
-still required and nothing is skipped. **Unproven** until several runs have gone by. Not tried: turning off the
+still required and nothing is skipped. First run that way (PR #41): the phone job passed in 17 minutes, and on the iPad the first test's launch timed out ("Timed out while launching application via Xcode") and the other tests passed. So the jobs now build first, start the app once by hand (`simctl launch`), wait, and then run the tests. **Unproven** until several runs have gone by. Not tried: turning off the
 keyboard's predictions and first-use screens in the simulator, which a stall on the first tap into the page hints at.
 
 **Status:** pictures of the Duo run are in the `duo-screens` artifact of the run (14 days). `ScreenFactsTests` now skip
