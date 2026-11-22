@@ -256,6 +256,37 @@ final class LibraryTests: XCTestCase {
         XCTAssertEqual(access.cleared.urls, [library.layout.entryFile(entry.id)])
     }
 
+    /// Deleting on one device must not take with it what was written on another. The other device's version is
+    /// kept as an entry of its own, and only the version this device had goes to Recently Deleted.
+    func testDeletingKeepsTheVersionAnotherDeviceWrote() throws {
+        let entry = T.entry("2026-10-17T21:14:03Z", body: "a few words, seen on the iPad")
+        try library.save(entry)
+        var other = entry
+        other.body = "the whole entry, written on the iPhone"
+        let access = ConflictingFileAccess(conflicts: [
+            library.layout.entryFile(entry.id): [
+                ConflictVersion(data: EntryFile.encode(other), modified: T.date("2026-10-17T22:00:00Z")),
+            ],
+        ])
+        let withConflicts = Library(root: library.layout.root, files: access)
+
+        let kept = try withConflicts.moveToTrash(entryID: entry.id)
+
+        XCTAssertEqual(kept.map(\.body), ["the whole entry, written on the iPhone"])
+        XCTAssertNotEqual(kept[0].id, entry.id)
+        XCTAssertEqual(try library.loadEntry(id: kept[0].id).body, "the whole entry, written on the iPhone")
+        XCTAssertThrowsError(try library.loadEntry(id: entry.id), "the deleted entry is still among the entries")
+        XCTAssertEqual(library.trashedEntries().map(\.entry.body), ["a few words, seen on the iPad"])
+    }
+
+    func testDeletingAnEntryNoOtherDeviceTouchedKeepsNothingExtra() throws {
+        let entry = T.entry("2026-10-17T21:14:03Z", body: "only here")
+        try library.save(entry)
+        XCTAssertEqual(try library.moveToTrash(entryID: entry.id), [])
+        XCTAssertEqual(library.trashedEntries().map(\.entry.id), [entry.id])
+        XCTAssertTrue(library.loadAllEntries().entries.isEmpty)
+    }
+
     // MARK: Copying
 
     func testCopyContentsBringsEverythingAndNeverOverwrites() throws {

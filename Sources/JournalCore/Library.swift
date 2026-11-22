@@ -270,12 +270,21 @@ final class Library {
         var deletedAt: Date
     }
 
-    func moveToTrash(entryID: UUID, now: Date = Date()) throws {
+    /// Moves an entry to Recently Deleted. If another device left a different version of it behind, that version
+    /// is first saved as an entry of its own, and returned. Words written on another device, which this one may
+    /// never have shown, must not go out with a delete made here.
+    @discardableResult
+    func moveToTrash(entryID: UUID, now: Date = Date()) throws -> [Entry] {
+        var copies: [Entry] = []
+        if let entry = try? loadEntry(id: entryID) {
+            copies = resolveConflicts(for: entry)
+        }
         let target = layout.trashEntryDir(entryID)
         if files.exists(target) { try files.remove(target) }
         try files.move(from: layout.entryDir(entryID), to: target)
         let marker = try JSONCoding.encoder().encode(TrashMarker(deletedAt: now))
         try files.write(marker, to: layout.trashMarker(entryID))
+        return copies
     }
 
     func trashedEntries() -> [TrashedEntry] {
