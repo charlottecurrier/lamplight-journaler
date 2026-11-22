@@ -32,7 +32,8 @@ jobs:
     name: Build and test
     # Xcode 27.1 or later is what lets the app fill the inner screen of the folding iPhone Duo.
     runs-on: xcode-27
-    timeout-minutes: 45
+    # Xcode 27's simulators start the app slowly: a run that passes takes about 45 minutes.
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v7
 
@@ -122,6 +123,8 @@ jobs:
 
       # The UI tests start the whole app and tap it, on a phone and on an iPad, and take a picture at each step.
       # They reuse the build above. A failure here doesn't hide the results of the tests before it.
+      # Each test gets five minutes. A simulator once hung starting the app and used up the job's time,
+      # which left no result and no pictures. With a limit, that test fails and the rest still run.
       - name: UI tests
         if: ${{ !cancelled() }}
         run: |
@@ -138,6 +141,9 @@ jobs:
               -scheme LamplightUITests \
               -destination "platform=iOS Simulator,id=$udid" \
               -resultBundlePath "$bundle" \
+              -test-timeouts-enabled YES \
+              -default-test-execution-time-allowance 300 \
+              -maximum-test-execution-time-allowance 300 \
               CODE_SIGNING_ALLOWED=NO
             [ $? -eq 0 ] || status=1
             set -e
