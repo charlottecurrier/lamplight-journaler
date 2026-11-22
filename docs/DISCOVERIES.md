@@ -128,6 +128,18 @@ their own in `app.yml` (`UI tests (iPhone)`, `UI tests (iPad)`), each on a fresh
 still required and nothing is skipped. First run that way (PR #41): the phone job passed in 17 minutes, and on the iPad the first test's launch timed out ("Timed out while launching application via Xcode") and the other tests passed. So the jobs now build first, start the app once by hand (`simctl launch`), wait, and then run the tests. **Unproven** until several runs have gone by. Not tried: turning off the
 keyboard's predictions and first-use screens in the simulator, which a stall on the first tap into the page hints at.
 
+**A cause, found in a spindump** (2026-11-22, PR #41's second run, iPad job, `screens-iPad` artifact): with the iPad's
+UI tests alone on a fresh machine and the app warmed up, `testASecondEntryStaysOpen` still ran out its five minutes.
+This time the sample caught the app's main thread busy, and not in our code: it was inside
+`XCTElementQuery matchingSnapshotsInSnapshotTree`, run by the test tools on the app's main run loop, fetching one
+element's label at a time (`XCElementSnapshot label`, `AXUIElementCopyMultipleAttributeValues`, a call to SpringBoard
+under each). The tests' own helper asked for that: `find` looked through every element of any kind for a label, then
+called `exists` and `isHittable` on each numbered match, and each of those walks the screen again. The app's lamp-light
+layer makes `isHittable` say no, so `find` kept doing that every quarter second until its time ran out, on every call.
+The iPad's screen has more on it (the list beside the page, a bigger keyboard), so it was the iPad that mostly failed.
+`find` and `done` now ask for the first button with the label, which is one walk, and look wider only if there is none.
+**Not yet shown to fix it**: see the runs after this.
+
 **Status:** pictures of the Duo run are in the `duo-screens` artifact of the run (14 days). `ScreenFactsTests` now skip
 on every simulator but the Duo. Next: read the editor page facts, look at the open Duo on the device after a TestFlight
 build, then decide about the bottom bar and the layout.

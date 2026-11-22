@@ -43,18 +43,30 @@ final class LamplightUITests: XCTestCase {
         add(attachment)
     }
 
-    /// The first thing on screen with this label, of any kind. One that can be tapped is preferred: a screen can
-    /// hold more than one New Entry button, and some are behind others.
+    /// The first thing on screen with this label. A button is looked for first, and one that can be tapped is
+    /// preferred: a screen can hold more than one New Entry button, and some are behind others.
+    ///
+    /// Looking is not free. The test tools walk the app's whole screen on the app's main thread, asking about one
+    /// element at a time, and every `exists` or `isHittable` on a numbered match walks it again. Looking through
+    /// everything of any kind, match by match, took minutes on a busy simulator and ran tests out of time (a spindump
+    /// showed the app's main thread inside `XCTElementQuery`). So ask for the first button, which is one walk, and
+    /// only look wider when that isn't enough.
     private func find(_ label: String, timeout: TimeInterval = 5) -> XCUIElement? {
-        let query = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", label))
+        let named = NSPredicate(format: "label == %@", label)
+        let button = app.buttons.matching(named).firstMatch
         let deadline = Date().addingTimeInterval(timeout)
-        var fallback: XCUIElement?
-        repeat {
-            let matches = query.allElementsBoundByIndex.filter(\.exists)
-            if let hittable = matches.first(where: \.isHittable) { return hittable }
-            fallback = matches.first
-            Thread.sleep(forTimeInterval: 0.25)
-        } while Date() < deadline
+        if button.waitForExistence(timeout: min(timeout, 3)), button.isHittable { return button }
+        var fallback: XCUIElement? = button.exists ? button : nil
+        for query in [app.buttons.matching(named), app.descendants(matching: .any).matching(named)] {
+            repeat {
+                let matches = query.allElementsBoundByIndex.filter(\.exists)
+                if let hittable = matches.first(where: \.isHittable) { return hittable }
+                fallback = fallback ?? matches.first
+                if fallback != nil { break }
+                Thread.sleep(forTimeInterval: 0.25)
+            } while Date() < deadline
+            if fallback != nil { break }
+        }
         return fallback
     }
 
@@ -94,7 +106,7 @@ final class LamplightUITests: XCTestCase {
     /// The page being written: its text and its Done button.
     private var editor: XCUIElement { app.textViews.firstMatch }
     private var done: XCUIElement {
-        app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Done")).firstMatch
+        app.buttons.matching(NSPredicate(format: "label == %@", "Done")).firstMatch
     }
 
     private func startEntry(file: StaticString = #filePath, line: UInt = #line) throws {
