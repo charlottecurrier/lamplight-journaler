@@ -140,6 +140,13 @@ The iPad's screen has more on it (the list beside the page, a bigger keyboard), 
 `find` and `done` now ask for the first button with the label, which is one walk, and look wider only if there is none.
 **Not yet shown to fix it**: see the runs after this.
 
+**A simulator that didn't start** (2026-11-23, PR #42, phone UI job): `simctl bootstatus -b` printed "Data Migration
+Failed" (Status=3, after 1 m 54 s in LaunchServicesMigrator and the profile migrator) and still returned success. The
+app then built and started by hand, but the test runner crashed before any test ran ("never finished bootstrapping",
+`XCTWaiter handleStalledWait`), the same message as the Duo's first run and one of #39's. `tools/boot_simulator.sh`
+now reads what bootstatus says: on a failed start it wipes the simulator (`simctl erase`) and starts it once more, and
+fails the step if that fails too. All the Mac jobs use it. **Unproven**: it has not yet met a failed start.
+
 **Status:** pictures of the Duo run are in the `duo-screens` artifact of the run (14 days). `ScreenFactsTests` now skip
 on every simulator but the Duo. Next: read the editor page facts, look at the open Duo on the device after a TestFlight
 build, then decide about the bottom bar and the layout.

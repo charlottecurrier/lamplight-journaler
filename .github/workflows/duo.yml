@@ -38,8 +38,7 @@ jobs:
       - name: Boot the Duo
         run: |
           defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool false
-          xcrun simctl bootstatus "${{ steps.simulator.outputs.udid }}" -b
-          sleep 20
+          tools/boot_simulator.sh "${{ steps.simulator.outputs.udid }}"
           xcrun simctl list devices | grep -i "iPhone Duo" || true
 
       - name: UI tests on the Duo

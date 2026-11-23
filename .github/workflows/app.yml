@@ -17,6 +17,7 @@ on:
       - ".github/workflows/app.yml"
       - "tools/name_test_pictures.py"
       - "tools/pick_simulator.py"
+      - "tools/boot_simulator.sh"
   workflow_dispatch:
 
 concurrency:
@@ -47,8 +48,7 @@ jobs:
           echo "udid=$udid" >> "$GITHUB_OUTPUT"
           # Start it and wait until it has finished starting, as the Duo job does. Tests on a simulator that is
           # still starting up stall.
-          xcrun simctl bootstatus "$udid" -b
-          sleep 20
+          tools/boot_simulator.sh "$udid"
 
       - name: Build and test
         run: |
@@ -100,8 +100,7 @@ jobs:
           xcrun simctl shutdown all || true
           udid=$(python3 tools/pick_simulator.py iPhone)
           echo "Using simulator $udid"
-          xcrun simctl bootstatus "$udid" -b
-          sleep 20
+          tools/boot_simulator.sh "$udid"
           bundle="$RUNNER_TEMP/Phone.xcresult"
           set +e
           xcodebuild test-without-building -quiet \
@@ -163,8 +162,7 @@ jobs:
           echo "Using simulator $udid"
           echo "udid=$udid" >> "$GITHUB_OUTPUT"
           # Wait until it has finished starting. Tests on a simulator that is still starting up stall.
-          xcrun simctl bootstatus "$udid" -b
-          sleep 20
+          tools/boot_simulator.sh "$udid"
 
       # Each test gets five minutes. A simulator once hung starting the app and used up the job's time, which left
       # no result and no pictures. With a limit, that test fails and the rest still run.
