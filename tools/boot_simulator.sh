@@ -10,5 +10,10 @@
 set -u
 udid="$1"
 xcrun simctl bootstatus "$udid" -b || { echo "The simulator didn't start."; exit 1; }
+# The first time a keyboard comes up on a new simulator, it shows a lesson over itself ("Speed up your typing by
+# sliding your finger across the letters", with a Continue button). The first UI test that typed sat behind it until
+# its lookups timed out: a run's screen recording shows it. Say the lesson has been seen.
+xcrun simctl spawn "$udid" defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true \
+  || echo "Couldn't turn off the keyboard's first-use lesson."
 # Tests on a simulator that has only just started stall. Give it a moment.
 sleep 20

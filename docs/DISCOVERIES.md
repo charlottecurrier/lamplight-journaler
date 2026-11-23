@@ -152,6 +152,16 @@ Duo's first run and on #39: "LamplightUITests-Runner ... Early unexpected exit, 
 bootstrapping", with no test run. Cause not known. The UI jobs now start the tests once more when that exact message
 appears. A test that runs and fails is never run again.
 
+**The keyboard's first-use lesson** (2026-11-23, PR #42, phone UI job, seen in the `screens-iPhone` recording): the
+first test that brought up the keyboard on a new simulator got a sheet over the keyboard, "Speed up your typing by
+sliding your finger across the letters to compose a word", with a Continue button. The page and its Done button were
+on screen, and the lookup for Done still failed after minutes with "Failed to get matching snapshots: Timed out while
+evaluating UI query". The spindump shows the app's main thread in `XCTElementQuery` again. This is very likely what
+was behind many of the earlier stalls too: it only happens to the first test that types, on a simulator that has
+never shown a keyboard, which is every CI machine. `tools/boot_simulator.sh` now writes
+`DidShowContinuousPathIntroduction` to `com.apple.keyboard.preferences` in the simulator after it starts.
+**Not yet shown to work on iOS 27**: check the next recordings for the lesson.
+
 **Status:** pictures of the Duo run are in the `duo-screens` artifact of the run (14 days). `ScreenFactsTests` now skip
 on every simulator but the Duo. Next: read the editor page facts, look at the open Duo on the device after a TestFlight
 build, then decide about the bottom bar and the layout.
