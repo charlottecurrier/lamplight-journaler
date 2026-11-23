@@ -184,7 +184,7 @@ struct MainView: View {
             SettingsView()
         }
         // The keyboard shortcuts (`LamplightCommands`) arrive as notifications. None does anything while the
-        // journal is locked or Settings is over it. The tests post the first one too: it is the same as tapping
+        // journal is locked or a sheet is over it. The tests post the first one too: it is the same as tapping
         // New Entry, and a SwiftUI button can't be tapped from a unit test.
         .onReceive(NotificationCenter.default.publisher(for: .lamplightNewEntry)) { _ in
             if shortcutsAllowed { create(.standard) }
@@ -193,7 +193,7 @@ struct MainView: View {
             if shortcutsAllowed, let item = note.object as? SidebarItem { show(item) }
         }
         .onReceive(NotificationCenter.default.publisher(for: .lamplightShowSettings)) { _ in
-            if !lock.isLocked { showSettings = true }
+            if shortcutsAllowed { showSettings = true }
         }
         .onReceive(NotificationCenter.default.publisher(for: .lamplightTurnPage)) { note in
             if shortcutsAllowed, let step = note.object as? Int { turnPage(step) }
@@ -320,8 +320,13 @@ struct MainView: View {
         withAnimation(.easeInOut(duration: 0.3)) { columns = .doubleColumn }
     }
 
-    /// False while the journal is locked or Settings covers it, when a shortcut shouldn't change what is behind.
-    private var shortcutsAllowed: Bool { !lock.isLocked && !showSettings }
+    /// False while the journal is locked, or while Settings or any other sheet, picker or full-screen photo is up.
+    /// A shortcut there would change what is behind it, and could take away the page the sheet belongs to.
+    private var shortcutsAllowed: Bool {
+        guard !lock.isLocked, !showSettings else { return false }
+        let windows = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows)
+        return !windows.contains { $0.rootViewController?.presentedViewController != nil }
+    }
 
     /// Turns to the entry before or after the one being read. Does nothing while a page is being written, where
     /// the keys belong to the text, or at the end of the list.
