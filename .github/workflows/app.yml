@@ -17,6 +17,7 @@ on:
       - ".github/workflows/app.yml"
       - "tools/name_test_pictures.py"
       - "tools/pick_simulator.py"
+      - "tools/boot_simulator.sh"
   workflow_dispatch:
 
 concurrency:
@@ -47,8 +48,7 @@ jobs:
           echo "udid=$udid" >> "$GITHUB_OUTPUT"
           # Start it and wait until it has finished starting, as the Duo job does. Tests on a simulator that is
           # still starting up stall.
-          xcrun simctl bootstatus "$udid" -b
-          sleep 20
+          tools/boot_simulator.sh "$udid"
 
       - name: Build and test
         run: |
@@ -100,8 +100,7 @@ jobs:
           xcrun simctl shutdown all || true
           udid=$(python3 tools/pick_simulator.py iPhone)
           echo "Using simulator $udid"
-          xcrun simctl bootstatus "$udid" -b
-          sleep 20
+          tools/boot_simulator.sh "$udid"
           bundle="$RUNNER_TEMP/Phone.xcresult"
           set +e
           xcodebuild test-without-building -quiet \
@@ -163,8 +162,7 @@ jobs:
           echo "Using simulator $udid"
           echo "udid=$udid" >> "$GITHUB_OUTPUT"
           # Wait until it has finished starting. Tests on a simulator that is still starting up stall.
-          xcrun simctl bootstatus "$udid" -b
-          sleep 20
+          tools/boot_simulator.sh "$udid"
 
       # Each test gets five minutes. A simulator once hung starting the app and used up the job's time, which left
       # no result and no pictures. With a limit, that test fails and the rest still run.
@@ -189,18 +187,30 @@ jobs:
             || echo "Couldn't start the app for the warm-up."
           sleep 30
           xcrun simctl terminate "$udid" com.forageandjump.lamplight || true
+          run_tests() {
+            rm -rf "$bundle"
+            xcodebuild test-without-building -quiet \
+              -project Lamplight.xcodeproj \
+              -scheme LamplightUITests \
+              -destination "platform=iOS Simulator,id=$udid" \
+              -derivedDataPath "$built" \
+              -resultBundlePath "$bundle" \
+              -test-timeouts-enabled YES \
+              -default-test-execution-time-allowance 300 \
+              -maximum-test-execution-time-allowance 300 \
+              CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/ui-$kind.log"
+            return "${PIPESTATUS[0]}"
+          }
           set +e
-          xcodebuild test-without-building -quiet \
-            -project Lamplight.xcodeproj \
-            -scheme LamplightUITests \
-            -destination "platform=iOS Simulator,id=$udid" \
-            -derivedDataPath "$built" \
-            -resultBundlePath "$bundle" \
-            -test-timeouts-enabled YES \
-            -default-test-execution-time-allowance 300 \
-            -maximum-test-execution-time-allowance 300 \
-            CODE_SIGNING_ALLOWED=NO
+          run_tests
           status=$?
+          # Now and then the test runner dies before any test has started ("never finished bootstrapping"). No
+          # test has run or failed then, so start once more. A test that fails is never run again.
+          if [ $status -ne 0 ] && grep -q "never finished bootstrapping" "$RUNNER_TEMP/ui-$kind.log"; then
+            echo "The test runner didn't start. Trying once more."
+            run_tests
+            status=$?
+          fi
           set -e
           [ -d "$bundle" ] || { echo "No UI test results on $kind."; exit 1; }
           xcrun xcresulttool get test-results summary --path "$bundle" > "$RUNNER_TEMP/ui-$kind.json"

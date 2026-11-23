@@ -140,6 +140,28 @@ The iPad's screen has more on it (the list beside the page, a bigger keyboard), 
 `find` and `done` now ask for the first button with the label, which is one walk, and look wider only if there is none.
 **Not yet shown to fix it**: see the runs after this.
 
+**"Data Migration Failed" is normal here** (2026-11-23, PR #42): on the `xcode-27` runner the iPhone Air (iOS 27.2)
+ends its first start with Status=3 "Data Migration Failed" every time, and works all the same. The phone jobs that
+passed on 2026-11-22 had the line too (checked in three logs). The iPad ends with "Finished". Mistaking that line for
+the cause of a failed run, `tools/boot_simulator.sh` was made to wipe the simulator and start again on it. The wiped
+simulator said the same, and every phone job failed at the boot step. Taken back out: the script only waits for
+`simctl bootstatus` and then 20 seconds.
+
+**The test runner that doesn't start** (same day): the run that prompted that had a different fault, seen before on the
+Duo's first run and on #39: "LamplightUITests-Runner ... Early unexpected exit, operation never finished
+bootstrapping", with no test run. Cause not known. The UI jobs now start the tests once more when that exact message
+appears. A test that runs and fails is never run again.
+
+**The keyboard's first-use lesson** (2026-11-23, PR #42, phone UI job, seen in the `screens-iPhone` recording): the
+first test that brought up the keyboard on a new simulator got a sheet over the keyboard, "Speed up your typing by
+sliding your finger across the letters to compose a word", with a Continue button. The page and its Done button were
+on screen, and the lookup for Done still failed after minutes with "Failed to get matching snapshots: Timed out while
+evaluating UI query". The spindump shows the app's main thread in `XCTElementQuery` again. This is very likely what
+was behind many of the earlier stalls too: it only happens to the first test that types, on a simulator that has
+never shown a keyboard, which is every CI machine. `tools/boot_simulator.sh` now writes
+`DidShowContinuousPathIntroduction` to `com.apple.keyboard.preferences` in the simulator after it starts.
+**Not yet shown to work on iOS 27**: check the next recordings for the lesson.
+
 **Status:** pictures of the Duo run are in the `duo-screens` artifact of the run (14 days). `ScreenFactsTests` now skip
 on every simulator but the Duo. Next: read the editor page facts, look at the open Duo on the device after a TestFlight
 build, then decide about the bottom bar and the layout.

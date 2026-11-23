@@ -267,6 +267,49 @@ final class NewEntryNavigationTests: EditorTestCase {
         try await checkASecondEntryStaysOpen(Options(compact: true, template: true))
     }
 
+    /// Command-N in the middle of writing: the entry being written is kept with its words, and a new page opens.
+    private func checkNewEntryWhileWritingKeepsTheFirst(_ options: Options) async throws {
+        let screen = try await openMainScreen(options)
+        NotificationCenter.default.post(name: .lamplightNewEntry, object: nil)
+        try await waitForFirstEntry(screen)
+        let first = try XCTUnwrap(screen.model.editingEntryID)
+        let words = "Written before pressing Command-N."
+        let editor = try XCTUnwrap(Self.findTextView(in: screen.host.view), "The first entry has no editor.")
+        _ = editor.becomeFirstResponder()
+        editor.insertText(words)
+        await pause(0.3)
+
+        // What the shortcut posts.
+        NotificationCenter.default.post(name: .lamplightNewEntry, object: nil)
+        var waited = 0.0
+        while (screen.model.editingEntryID == first || screen.model.editingEntryID == nil) && waited < 6 {
+            await pause(0.25)
+            waited += 0.25
+        }
+        let second = try XCTUnwrap(screen.model.editingEntryID, "No entry is being written after the second New Entry.")
+        XCTAssertNotEqual(second, first, "The second New Entry didn't start another entry.")
+        // The first editor saves what it holds as it goes away.
+        waited = 0.0
+        while screen.model.entry(first)?.body.contains(words) != true && waited < 6 {
+            await pause(0.25)
+            waited += 0.25
+        }
+        XCTAssertEqual(
+            screen.model.entry(first)?.body.contains(words), true,
+            "The words written before the second New Entry weren't kept.\nWhat happened, in order:\n"
+                + NavTrace.events.joined(separator: "\n")
+        )
+        await watch(screen, what: "The entry started while another was being written", compact: options.compact)
+    }
+
+    func testNewEntryWhileWritingKeepsTheFirstInThePhonesLayout() async throws {
+        try await checkNewEntryWhileWritingKeepsTheFirst(Options(compact: true))
+    }
+
+    func testNewEntryWhileWritingKeepsTheFirstInTheIPadsLayout() async throws {
+        try await checkNewEntryWhileWritingKeepsTheFirst(Options(compact: false))
+    }
+
     func testASecondEntryStaysOpenInTheIPadsLayout() async throws {
         try await checkASecondEntryStaysOpen(Options(compact: false))
     }
