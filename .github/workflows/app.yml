@@ -187,18 +187,30 @@ jobs:
             || echo "Couldn't start the app for the warm-up."
           sleep 30
           xcrun simctl terminate "$udid" com.forageandjump.lamplight || true
+          run_tests() {
+            rm -rf "$bundle"
+            xcodebuild test-without-building -quiet \
+              -project Lamplight.xcodeproj \
+              -scheme LamplightUITests \
+              -destination "platform=iOS Simulator,id=$udid" \
+              -derivedDataPath "$built" \
+              -resultBundlePath "$bundle" \
+              -test-timeouts-enabled YES \
+              -default-test-execution-time-allowance 300 \
+              -maximum-test-execution-time-allowance 300 \
+              CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/ui-$kind.log"
+            return "${PIPESTATUS[0]}"
+          }
           set +e
-          xcodebuild test-without-building -quiet \
-            -project Lamplight.xcodeproj \
-            -scheme LamplightUITests \
-            -destination "platform=iOS Simulator,id=$udid" \
-            -derivedDataPath "$built" \
-            -resultBundlePath "$bundle" \
-            -test-timeouts-enabled YES \
-            -default-test-execution-time-allowance 300 \
-            -maximum-test-execution-time-allowance 300 \
-            CODE_SIGNING_ALLOWED=NO
+          run_tests
           status=$?
+          # Now and then the test runner dies before any test has started ("never finished bootstrapping"). No
+          # test has run or failed then, so start once more. A test that fails is never run again.
+          if [ $status -ne 0 ] && grep -q "never finished bootstrapping" "$RUNNER_TEMP/ui-$kind.log"; then
+            echo "The test runner didn't start. Trying once more."
+            run_tests
+            status=$?
+          fi
           set -e
           [ -d "$bundle" ] || { echo "No UI test results on $kind."; exit 1; }
           xcrun xcresulttool get test-results summary --path "$bundle" > "$RUNNER_TEMP/ui-$kind.json"

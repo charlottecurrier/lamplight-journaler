@@ -140,12 +140,17 @@ The iPad's screen has more on it (the list beside the page, a bigger keyboard), 
 `find` and `done` now ask for the first button with the label, which is one walk, and look wider only if there is none.
 **Not yet shown to fix it**: see the runs after this.
 
-**A simulator that didn't start** (2026-11-23, PR #42, phone UI job): `simctl bootstatus -b` printed "Data Migration
-Failed" (Status=3, after 1 m 54 s in LaunchServicesMigrator and the profile migrator) and still returned success. The
-app then built and started by hand, but the test runner crashed before any test ran ("never finished bootstrapping",
-`XCTWaiter handleStalledWait`), the same message as the Duo's first run and one of #39's. `tools/boot_simulator.sh`
-now reads what bootstatus says: on a failed start it wipes the simulator (`simctl erase`) and starts it once more, and
-fails the step if that fails too. All the Mac jobs use it. **Unproven**: it has not yet met a failed start.
+**"Data Migration Failed" is normal here** (2026-11-23, PR #42): on the `xcode-27` runner the iPhone Air (iOS 27.2)
+ends its first start with Status=3 "Data Migration Failed" every time, and works all the same. The phone jobs that
+passed on 2026-11-22 had the line too (checked in three logs). The iPad ends with "Finished". Mistaking that line for
+the cause of a failed run, `tools/boot_simulator.sh` was made to wipe the simulator and start again on it. The wiped
+simulator said the same, and every phone job failed at the boot step. Taken back out: the script only waits for
+`simctl bootstatus` and then 20 seconds.
+
+**The test runner that doesn't start** (same day): the run that prompted that had a different fault, seen before on the
+Duo's first run and on #39: "LamplightUITests-Runner ... Early unexpected exit, operation never finished
+bootstrapping", with no test run. Cause not known. The UI jobs now start the tests once more when that exact message
+appears. A test that runs and fails is never run again.
 
 **Status:** pictures of the Duo run are in the `duo-screens` artifact of the run (14 days). `ScreenFactsTests` now skip
 on every simulator but the Duo. Next: read the editor page facts, look at the open Duo on the device after a TestFlight
