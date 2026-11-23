@@ -21,7 +21,6 @@ struct NewEntryButton: View {
             PaperIcon("square.and.pencil")
         }
         .accessibilityLabel("New Entry")
-        .keyboardShortcut("n", modifiers: .command)
     }
 }
 

@@ -11,8 +11,14 @@ enum SidebarItem: Hashable {
 }
 
 extension Notification.Name {
-    /// Posted to start a new entry, as if New Entry had been tapped.
+    /// Posted to start a new entry, as if New Entry had been tapped. Command-N posts it.
     static let lamplightNewEntry = Notification.Name("lamplight.newEntry")
+    /// Posted to go to a section. The object is the `SidebarItem`.
+    static let lamplightGo = Notification.Name("lamplight.go")
+    /// Posted to open Settings.
+    static let lamplightShowSettings = Notification.Name("lamplight.showSettings")
+    /// Posted to turn to the next entry in the list being read. The object is 1 for older, -1 for newer.
+    static let lamplightTurnPage = Notification.Name("lamplight.turnPage")
 }
 
 /// The sidebar: where to look. On a phone it is the first screen, on an iPad it sits at the left.
@@ -72,7 +78,6 @@ struct SidebarView: View {
                     PaperIcon("gearshape")
                 }
                 .accessibilityLabel("Settings")
-                .keyboardShortcut(",", modifiers: .command)
             }
         }
         .safeAreaInset(edge: .bottom) {
@@ -178,12 +183,23 @@ struct MainView: View {
         .sheet(isPresented: $showSettings) {
             SettingsView()
         }
-        #if DEBUG
-        // For the tests, and left out of a release build. The first is the same as tapping New Entry: a SwiftUI
-        // button can't be tapped from a unit test. The other two write the tests' step log.
+        // The keyboard shortcuts (`LamplightCommands`) arrive as notifications. None does anything while the
+        // journal is locked or Settings is over it. The tests post the first one too: it is the same as tapping
+        // New Entry, and a SwiftUI button can't be tapped from a unit test.
         .onReceive(NotificationCenter.default.publisher(for: .lamplightNewEntry)) { _ in
-            if !lock.isLocked { create(.standard) }
+            if shortcutsAllowed { create(.standard) }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .lamplightGo)) { note in
+            if shortcutsAllowed, let item = note.object as? SidebarItem { show(item) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .lamplightShowSettings)) { _ in
+            if !lock.isLocked { showSettings = true }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .lamplightTurnPage)) { note in
+            if shortcutsAllowed, let step = note.object as? Int { turnPage(step) }
+        }
+        #if DEBUG
+        // These two write the tests' step log, and are left out of a release build.
         .onChange(of: selectedEntryID) { old, new in
             NavTrace.note("selection \(NavTrace.short(old)) -> \(NavTrace.short(new))")
         }
@@ -302,6 +318,17 @@ struct MainView: View {
         compactColumn = .content
         writingFullWidth = false
         withAnimation(.easeInOut(duration: 0.3)) { columns = .doubleColumn }
+    }
+
+    /// False while the journal is locked or Settings covers it, when a shortcut shouldn't change what is behind.
+    private var shortcutsAllowed: Bool { !lock.isLocked && !showSettings }
+
+    /// Turns to the entry before or after the one being read. Does nothing while a page is being written, where
+    /// the keys belong to the text, or at the end of the list.
+    private func turnPage(_ step: Int) {
+        guard model.editingEntryID == nil, sidebar != .templates,
+              let current = selectedEntryID, let next = neighbor(of: current, step: step) else { return }
+        selectedEntryID = next
     }
 
     private func newTemplate() {
@@ -504,7 +531,6 @@ private struct CompactBar: View {
                     .background(Circle().fill(Theme.accent))
             }
             .buttonStyle(.plain)
-            .keyboardShortcut("n", modifiers: .command)
             .frame(maxWidth: .infinity)
             .accessibilityLabel("New Entry")
             tab("Calendar", "calendar", .calendar)

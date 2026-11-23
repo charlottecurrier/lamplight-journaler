@@ -6,7 +6,7 @@ Choices made for the first build. Change any of them.
 
 | You said | What I built |
 | --- | --- |
-| Mostly iPad, sometimes iPhone | One app for both. Sidebar, list and reading column on iPad. Collapses to one column on iPhone. Keyboard shortcuts: ⌘N new entry, ⌘E edit, ⌘↩ done, ⌘, settings. |
+| Mostly iPad, sometimes iPhone | One app for both. Sidebar, list and reading column on iPad. Collapses to one column on iPhone. Keyboard shortcuts: ⌘N new entry from anywhere, ⌘E edit, ⌘↩ done, ⌘, settings, ⌘1 to ⌘5 for All Entries, Today, On This Day, Favorites and Calendar, ⌥⌘↑ and ⌥⌘↓ for the newer and older entry. The ones that work from anywhere are app commands (`LamplightCommands`), not button shortcuts, which only work while their button is on screen. |
 | Sync, but no paid developer account | A folder in iCloud Drive that you pick. A free account can't use the iCloud features built into apps (CloudKit). Folder access through the Files app needs no paid account. |
 | Face ID plus phone passcode | `LocalAuthentication` with the "device owner" policy. Face ID first, passcode if it fails. Works on iPads with Touch ID too. |
 | Multiple journals | Yes. Each has a name and a color hint. |
