@@ -51,7 +51,11 @@ final class SampleFolderTests: XCTestCase {
         // The sample is built around "now", so these hold whenever it is generated and tested.
         let calendar = DayCalendar()
         let now = Date()
-        let stamp = calendar.stamp(for: now, timeZone: TimeZone(identifier: "America/Los_Angeles") ?? .current)
+        // The sample maker works out "today" on a fixed UTC-7 clock, with no daylight saving rules. Use the same clock
+        // here. With the real Los Angeles zone, the hour after 07:00 UTC from November to March is still yesterday
+        // there, and On This Day found nothing. That failed the Linux check once, at 07:26 UTC.
+        let sampleClock = TimeZone(secondsFromGMT: -7 * 3600) ?? .current
+        let stamp = calendar.stamp(for: now, timeZone: sampleClock)
         let streak = Streaks.summary(entries: result.entries, today: stamp, calendar: calendar)
         XCTAssertGreaterThanOrEqual(streak.longest, 12)
         let onThisDay = OnThisDay.groups(entries: result.entries, today: stamp, calendar: calendar)
